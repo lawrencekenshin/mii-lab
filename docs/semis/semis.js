@@ -1,20 +1,20 @@
-/* Semis tracking. Plain JS, no dependencies, no cookies. Reads the live semis.json from the semis-data branch (the
-   semis data job, polled every 5 min while the tab is visible, like the Fear meter's live.js) and falls back to the
-   semis.json bundled in this folder when that feed is missing, unreachable or invalid.
-   Layout, look and chart interaction follow the Fear meter page (live.js): one shared time window driven by one row of
-   range chips, pinch / ⌘-scroll zoom, drag to pan, tap or hover to read, double-tap or double-click for full screen.
-   Every value from the data is written with textContent. Research, not investment advice. */
+
+
+
+
+
+
 (function () {
   'use strict';
 
-  // ---------- live feed (live.js loader): manifest.json, then semis.json cache-busted with the manifest's sha ----------
+
   var DEFAULT_BASE = 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/semis-data/semis/';
-  var BUNDLED = 'semis.json';                  // the snapshot shipped with the page: the fallback
-  var POLL_MS = 5 * 60 * 1000;                 // raw.githubusercontent caches 5 min anyway
-  var TICK_MS = 30 * 1000;                     // recompute ages / chip from the phone clock
+  var BUNDLED = 'semis.json';
+  var POLL_MS = 5 * 60 * 1000;
+  var TICK_MS = 30 * 1000;
   var FETCH_TIMEOUT_MS = 15000;
-  var FIRST_SNAPSHOT_MS = 3500;                // first visit: the bundled snapshot shows if the feed has not answered by then
-  // NYSE calendar (the list in docs/live/live.js, same list as the data job). Extend every December.
+  var FIRST_SNAPSHOT_MS = 3500;
+
   var HOLIDAYS = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03',
     '2026-09-07', '2026-11-26', '2026-12-25', '2027-01-01', '2027-01-18', '2027-02-15', '2027-03-26', '2027-05-31',
     '2027-06-18', '2027-07-05', '2027-09-06', '2027-11-25', '2027-12-24'];
@@ -22,7 +22,7 @@
   var CAL_END = '2027-12-31';
   var QS = new URLSearchParams(location.search);
   var base = DEFAULT_BASE, preview = null;
-  // only the project's own raw GitHub files or a local test server may stand in for the live feed (with a banner)
+
   function dataHostOk(u) {
     var h = u.hostname;
     if (u.protocol === 'https:' && h === 'raw.githubusercontent.com' && /^\/lawrencekenshin\//.test(u.pathname)) return true;
@@ -38,22 +38,22 @@
         if (!/\/$/.test(href)) href += '/';
         base = href; preview = du.host;
       }
-    } catch (e) { /* ignore a bad override, use the live feed */ }
+    } catch (e) {  }
   }
-  var nowOverride = null;                      // ?now=ISO: pretend it is that time (tests; shown in a banner)
+  var nowOverride = null;
   if (QS.get('now')) { var t0 = Date.parse(QS.get('now')); if (!isNaN(t0)) nowOverride = t0 - Date.now(); }
   function nowMs() { return Date.now() + (nowOverride || 0); }
-  var pollMs = POLL_MS;                        // ?poll=SECONDS (tests): only with a local test feed
+  var pollMs = POLL_MS;
   if (preview && !/raw\.githubusercontent\.com/.test(preview) && +QS.get('poll') >= 2) pollMs = +QS.get('poll') * 1000;
 
-  // ---------- config ----------
+
   var C = { bg: '#131722', panel: '#1E222D', line: '#2A2E39', text: '#D1D4DC', muted: '#8A8E99', white: '#FFFFFF',
             fear: '#7E57C2', light: '#B39DDB' };
   var YEL = '#FFD84D';
   var FONT = getComputedStyle(document.documentElement).getPropertyValue('--font') || 'sans-serif';
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  // the six readings in card 1 (tap one to chart it), and the panels of the two stacked charts
+
   var TILES1 = ['TW_SEMI_S', 'TSMC', 'MEMORY_TW', 'TW_COMP', 'US_AI_HW', 'KR_MEM'];
   var STACK = { c2: ['TW_SEMI_S', 'TSMC', 'TPEX_SEMI', 'TW_COMP', 'ASPEED', 'TW_ORD_ELEC', 'TW_EXP_IC', 'TW_EXP_ADP', 'TW_FOREIGN'],
                 c3: ['US_AI_HW', 'KR_MEM', 'WSTS', 'MU_GM', 'HYPER_CAPEX', 'KR_CHIP'] };
@@ -62,7 +62,7 @@
     TW_EXP_IC: 'MOF exports: ICs', TW_EXP_ADP: 'MOF exports: servers', TW_FOREIGN: 'Foreign net buying 外資',
     WSTS: 'WSTS chip sales', MU_GM: 'Micron gross margin', HYPER_CAPEX: 'Hyperscaler capex', US_AI_HW: 'US AI-hardware imports',
     KR_MEM: 'Korea memory exports', KR_CHIP: 'Korea chip exports',
-    // the Korea card (its panels come from the data's "korea" block; KR_MEM is the top-level series)
+
     KR20: 'KCS chip exports, days 1–20', KR_SYS: 'Korea system-chip exports',
     HYNIX_RS63: 'SK Hynix vs SMH (in USD)', SAMSUNG_RS63: 'Samsung vs SMH (in USD)', KRW63: 'Won vs dollar (up = stronger won)' };
   var TILE_NAME = { TW_SEMI_S: 'TWSE semis', TSMC: 'TSMC', MEMORY_TW: 'Memory (TW)', TW_COMP: 'Servers (TWSE)', US_AI_HW: 'US AI-hw imports',
@@ -74,8 +74,8 @@
     yoy_print: 'days 1–20, y/y as printed', rel63: 'vs SMH, both in USD', chg63: 'up = stronger won' };
   var CARD_OF = { US_AI_HW: 'CENSUS' };
   var AXIS_WORDS = { yoy3: '% vs a year earlier', yoyq: '% vs a year earlier', level: 'gross margin %', flow: '% of gross traded',
-    yoy_print: '% vs a year earlier', rel63: '% vs SMH, 63 sessions', chg63: '% vs the dollar, 63 sessions' };          // the Now card whose history line belongs to a series
-  // the stacked charts: Taiwan (c2), hardware (c3), Korea (c4: the panels the data names, in its order)
+    yoy_print: '% vs a year earlier', rel63: '% vs SMH, 63 sessions', chg63: '% vs the dollar, 63 sessions' };
+
   var CHART_ID = { c2: 'chart2', c3: 'chart3', c4: 'chart4' }, RO_ID = { c2: 'ro2', c3: 'ro3', c4: 'ro4' }, LG_ID = { c2: 'lg2', c3: 'lg3', c4: 'lg4' };
   function stackKeys(key) { return key === 'c4' ? (D && D.kor ? D.kor.stack : []) : STACK[key]; }
 
@@ -83,7 +83,7 @@
   var TAP = HOVER ? 'hover' : 'tap';
   var IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 
-  // ---------- small helpers ----------
+
   var $ = function (id) { return document.getElementById(id); };
   function dayNum(s) { return Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +(s.slice(8, 10) || 1)) / 864e5; }
   function isoOf(dn) { return new Date(dn * 864e5).toISOString().slice(0, 10); }
@@ -106,25 +106,25 @@
   function fmtLv(v) { return (v < 0 ? '−' : '') + Math.round(Math.abs(v)) + '%'; }
   function fmtAxis(v) { var a = Math.abs(v), s = a >= 1000 ? (a / 1000) + 'k' : (Math.round(a * 10) / 10).toString(); return (v < 0 ? '−' : '') + s; }
   function fmtPrice(v) { return v >= 1000 ? (v / 1000) + 'k' : v < 10 ? v.toFixed(1) : String(v); }
-  function rnk(p) { var r = Math.round(p); if (r >= 100 && p < 100) r = 99; return r; }   // shown percentile (whole number)
-  // the latest reading is the 2013+ record but shows below the 99th (few readings: Micron's ~55 quarters stop at 98%)
+  function rnk(p) { var r = Math.round(p); if (r >= 100 && p < 100) r = 99; return r; }
+
   function topRec(S, j) { return j === S.v.length - 1 && S.now && S.now.top && rnk(S.p[j]) < 99; }
-  // Korea panels: the price panels are 63-session changes read on closed US sessions (ref = the date), the KCS print is
-  // one point per month on its release day (ref = the month, the print covers days 1-20)
+
+
   function printWord(S, j) { return MON[+S.ref[j].slice(5, 7) - 1] + ' 1–20'; }
-  function refHead(S, j) {                // the phone header's second line
+  function refHead(S, j) {
     var pub = fmtDay(S.t[j], false);
     if (S.daily) return '63 sessions to ' + pub;
     if (S.unit === 'yoy_print') return printWord(S, j) + ' print · public ' + pub;
     return refWord(S.ref[j]) + ' data · public ' + pub;
   }
-  function refCol(S, j) {                 // the wide right column: longest first
+  function refCol(S, j) {
     var pub = fmtDay(S.t[j], false);
     if (S.daily) return ['63 sessions to ' + pub, 'to ' + pub];
     if (S.unit === 'yoy_print') return [printWord(S, j) + ' print, public ' + pub, printWord(S, j) + ' · public ' + pub, 'public ' + pub];
     return [refWord(S.ref[j]) + ' data, public ' + pub, refWord(S.ref[j]) + ' · public ' + pub, MON[+S.ref[j].slice(5, 7) - 1] + ' · public ' + pub];
   }
-  function dataWord(S, j) {               // the series table's "Data" column
+  function dataWord(S, j) {
     if (S.daily) return '63 sessions to ' + fmtDay(S.t[j], true);
     if (S.unit === 'yoy_print') return printWord(S, j) + ', ' + S.ref[j].slice(0, 4);
     return refWord(S.ref[j]);
@@ -132,7 +132,7 @@
   function lvCell(S, q) { return S.lv[q] == null ? '–' : fmtLv(S.lv[q]); }
   function setAttr(n, k, v) { if (n.getAttribute(k) !== v) n.setAttribute(k, v); }
 
-  // ---------- clocks (live.js): New York for the market, Taipei for the reader ----------
+
   var fmtCache = {};
   function tzParts(epoch, tz) {
     var f = fmtCache[tz] || (fmtCache[tz] = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit',
@@ -146,13 +146,13 @@
     var hm0 = (p.h < 10 ? '0' : '') + p.h + ':' + (p.mi < 10 ? '0' : '') + p.mi;
     return (withDay === false ? '' : p.wd + ' ' + MON[p.mo - 1] + ' ' + p.d + ', ') + hm0 + ' ' + label;
   }
-  function hm(epoch) { return fmtTz(epoch, 'America/New_York', '', false).trim(); }      // "13:45" (caller adds ET)
+  function hm(epoch) { return fmtTz(epoch, 'America/New_York', '', false).trim(); }
   function etAndTpe(epoch) { return fmtTz(epoch, 'America/New_York', 'ET') + ' · ' + fmtTz(epoch, 'Asia/Taipei', 'Taipei'); }
   function tzOffsetMin(epoch, tz) {
     var e = Math.floor(epoch / 6e4) * 6e4, p = tzParts(e, tz);
     return Math.round((Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi) - e) / 6e4);
   }
-  function etEpoch(dn, h, m) {             // New York wall clock -> epoch ms
+  function etEpoch(dn, h, m) {
     var wall = dn * 864e5 + h * 36e5 + m * 6e4, g = wall + 4 * 36e5;
     for (var i = 0; i < 3; i++) g = wall - tzOffsetMin(g, 'America/New_York') * 6e4;
     return g;
@@ -173,11 +173,11 @@
   function nextSession(dn) { var d = dn + 1; while (!isSession(d)) d++; return d; }
   function closeHour(dn) { return HALF[dn] ? 13 : 16; }
 
-  // ---------- text measuring (labels must not collide on a phone) ----------
+
   var mctx = document.createElement('canvas').getContext('2d');
   function textW(str, size, weight) { mctx.font = (weight || 400) + ' ' + size + 'px ' + FONT; return mctx.measureText(str).width; }
 
-  // ---------- SVG helpers (live.js) ----------
+
   var NS = 'http://www.w3.org/2000/svg', uid = 0;
   function el(tag, attrs, parent) {
     var e = document.createElementNS(NS, tag);
@@ -185,7 +185,7 @@
     if (parent) parent.appendChild(e);
     return e;
   }
-  // TXREC (while a data pane is drawn): the box of every text written into it, so the percentile lines leave a gap under each
+
   var TXREC = null;
   function tx(parent, x, y, str, attrs) {
     var a = attrs || {}; a.x = x; a.y = y;
@@ -243,7 +243,7 @@
       tx(g, xR + 5, py + 3.5, fmt(v), { fill: C.muted, 'font-size': 11, 'text-anchor': 'start' });
     });
   }
-  // points i0..i1 as pixel x + value; when denser than 2 per pixel, keep first/min/max/last of each pixel column
+
   function decimate(xs, vs, i0, i1, X, keep) {
     var px = [], pv = [], i;
     if (i1 < i0) return { px: px, pv: pv };
@@ -268,7 +268,7 @@
   }
   function pathOf(P, Y) { var s = ''; for (var i = 0; i < P.px.length; i++) s += (i ? 'L' : 'M') + P.px[i].toFixed(1) + ' ' + Y(P.pv[i]).toFixed(1); return s; }
 
-  // ---------- dots (live.js): lows / turn signals = yellow with a dark edge; "now" = bright core + soft glow ring ----------
+
   function peakDot(g, x, y, r) { el('circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: r, fill: YEL, stroke: C.bg, 'stroke-width': r > 3 ? 1.6 : 1.3 }, g); }
   function ringDot(g, x, y, r) { el('circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: r, fill: C.panel, stroke: YEL, 'stroke-width': 1.7 }, g); }
   function nowDot(g, x, y, r) {
@@ -276,7 +276,7 @@
     el('circle', { cx: x, cy: y, r: r + 2, fill: 'none', stroke: C.light, 'stroke-width': 1.5, 'class': 'now-pulse' }, g);
     el('circle', { cx: x, cy: y, r: r, fill: '#F3EEFF', stroke: '#fff', 'stroke-width': 1.4 }, g);
   }
-  // turn signals: ▲ = trough-turn, ◆ = growth crossed above 0 (both yellow, like the fear page's peak dots)
+
   function evMark(g, x, y, r, type) {
     var s = r * 1.3, d;
     if (type === 'TT') d = 'M' + x.toFixed(1) + ' ' + (y - s).toFixed(1) + 'L' + (x + s).toFixed(1) + ' ' + (y + s * 0.8).toFixed(1) + 'L' + (x - s).toFixed(1) + ' ' + (y + s * 0.8).toFixed(1) + 'Z';
@@ -296,16 +296,16 @@
     return kept;
   }
 
-  // ---------- state ----------
+
   var J = null, D = null, sel = 'TW_SEMI_S';
   var hover = { c1: null, c2: null, c3: null, c4: null };
   var GEO = { c1: null, c2: null, c3: null, c4: null };
-  // where J came from: 'live' (the feed) or 'snapshot' (the bundled file); why = the reason the feed was not used
-  // badSha / badWhy: a live build that passed the checks but could not be drawn (skipped until a newer one lands)
+
+
   var SRC = { kind: null, why: '', lastErr: null, loads: 0, polls: 0, manifests: 0, docs: 0, badSha: null, badWhy: '',
     fails: 0, lastOk: 0, lastPoll: 0, older: false };
 
-  // ---------- validate + prepare ----------
+
   function validate(d) {
     if (!d || typeof d !== 'object') return 'not JSON';
     if (!Array.isArray(d.smh) || d.smh.length < 100) return 'SMH series missing';
@@ -317,7 +317,7 @@
     if (!d.smh_last || !Array.isArray(d.lows) || !Array.isArray(d.now)) return 'readings missing';
     return null;
   }
-  // the live file: the same page data plus the live layer (data contract section 2)
+
   function validateLive(d) {
     var bad = validate(d);
     if (bad) return bad;
@@ -340,7 +340,7 @@
     var P = { ser: {}, cards: {} }, pts = d.smh.map(function (p) { return { t: dayNum(p[0]), c: p[1], dd: p[2] }; }), have = {};
     pts.forEach(function (p) { have[p.t] = 1; });
     P.lows = d.lows.map(function (l) { return { t: dayNum(l.d), c: l.c, dd: l.dd, name: l.name, kind: l.kind }; });
-    P.lows.forEach(function (l) { if (!have[l.t]) pts.push({ t: l.t, c: l.c, dd: l.dd, low: true }); });   // the low's own day sits on the line
+    P.lows.forEach(function (l) { if (!have[l.t]) pts.push({ t: l.t, c: l.c, dd: l.dd, low: true }); });
     pts.sort(function (a, b) { return a.t - b.t; });
     P.xs = pts.map(function (p) { return p.t; }); P.c = pts.map(function (p) { return p.c; });
     P.lc = pts.map(function (p) { return Math.log(p.c); }); P.dd = pts.map(function (p) { return p.dd; });
@@ -358,18 +358,18 @@
       t: [], v: [], ref: [], p: [], lv: s.lv, now: s.now };
     s.pts.forEach(function (p) { S.t.push(dayNum(p[0])); S.v.push(p[1]); S.ref.push(p[2]); S.p.push(p[3]); });
     S.ev = s.ev.map(function (e) { return { t: dayNum(e[0]), type: e[1], v: e[2] }; });
-    // Korea price panels: 63-session changes around 0 (5th / 95th lines), read weekly; the KCS print ranks since Aug 2016
+
     S.osc = S.daily = s.unit === 'rel63' || s.unit === 'chg63';
     S.since = s.unit === 'yoy_print' ? '2016' : '2013';
-    // a series that stopped publishing (Korea chip exports via Comtrade) is not drawn flat to today
+
     var q = S.unit === 'yoyq' || S.unit === 'level', lp = S.t[S.t.length - 1];
     if (S.daily) S.staleAt = lp < last - 14 ? lp + 7 : null;
     else S.staleAt = lp < last - (q ? 120 : 60) ? lp + (q ? 100 : 45) : null;
     return S;
   }
-  // the Korea card's block (data contract section 5). A missing or broken block only hides the Korea card; it never stops
-  // the rest of the page. how: 'doc' = it came with the file on screen, 'graft' = the bundled snapshot's block shown
-  // next to a live feed that does not carry Korea yet
+
+
+
   function koreaBad(K) {
     if (typeof K !== 'object') return 'not an object';
     if (!Array.isArray(K.stack) || !Array.isArray(K.series) || !Array.isArray(K.cards)) return 'stack, series or cards missing';
@@ -397,21 +397,21 @@
     K.cards.forEach(function (c) { if (!c || !c.key) return; cards[c.key] = c; if (c.status === 'needs_key') nk.push(c); });
     return { K: K, stack: stack, cards: cards, nk: nk, how: how, built: built || '' };
   }
-  function serAt(S, dn) {                 // the reading as known on day dn: { j, gone }
+  function serAt(S, dn) {
     var j = bsearchLE(S.t, dn);
     return { j: j, gone: S.staleAt != null && dn > S.staleAt };
   }
   function cardFor(key) { return D.cards[CARD_OF[key] || key] || null; }
-  function recentPeak(S) {                // the highest of the last 6 readings (latest included); a tie goes to the earlier one
+  function recentPeak(S) {
     var n = S.v.length, best = -1;
     for (var j = Math.max(0, n - 6); j < n; j++) if (best < 0 || S.v[j] > S.v[best]) best = j;
     return best;
   }
 
-  // ---------- the shared time window: every chart on the page shows the same days ----------
+
   var RANGE_MONTHS = { '1Y': 12, '2Y': 24, '5Y': 60, '10Y': 120, 'All': 0 };
   var RANGE_WORDS = { '1Y': 'last year', '2Y': 'last 2 years', '5Y': 'last 5 years', '10Y': 'last 10 years' };
-  var MIN_SPAN = 120;          // calendar days: about 17 weekly closes and 4 monthly readings
+  var MIN_SPAN = 120;
   var ZOOM_STEP = 1.6;
   var view = { chip: '5Y', x0: 0, x1: 0, custom: false }, renders = 0;
   function normRange(s) { if (!s) return null; var u = String(s).trim().toUpperCase(); if (u === 'ALL') return 'All'; return RANGE_MONTHS.hasOwnProperty(u) ? u : null; }
@@ -460,7 +460,7 @@
     return dnDate(a).getUTCFullYear() === dnDate(b).getUTCFullYear() ? nb(fmtDay(a, false)) + ' – ' + nb(fmtDay(b, true)) : nb(fmtDay(a, true)) + ' – ' + nb(fmtDay(b, true));
   }
 
-  // ---------- x ticks (live.js): the finest calendar unit whose labels do not touch; every chart uses the same ----------
+
   var TICK_UNITS = [['w', 1], ['w', 2], ['m', 1], ['m', 2], ['m', 3], ['m', 6], ['y', 1], ['y', 2], ['y', 5], ['y', 10]];
   function genTicks(k, n, x0, x1) {
     var out = [], dn;
@@ -496,9 +496,9 @@
   }
   function tickUnit(pw) { return timeTicks(view.x0, view.x1, lin(view.x0, view.x1, 0, pw), 11).unit; }
 
-  // ---------- B: the 90th / 95th / 99th percentile lines of a series (live.js pctLines / pctDraw / pctLabels) ----------
+
   var PL = { 90: { c: '#A99CC8', op: 0.7, w: 1 }, 95: { c: '#B98AF2', op: 0.85, w: 1.15 }, 99: { c: '#D17BFF', op: 1, w: 1.4 } };
-  PL[5] = PL[95];                         // the Korea price panels swing around 0: both tails, 5th and 95th
+  PL[5] = PL[95];
   var PL_DASH = '6 4', PLDBG = {};
   function pctLines(g, S, Y, L, pw, top, bot, lineTop, zeroY, small) {
     var out = { g: g, L: L, pw: pw, lines: [], above: [], ys: zeroY != null ? [zeroY] : [] };
@@ -509,7 +509,7 @@
       if (y > bot - 1) return;
       out.lines.push({ q: q, v: v, y: y, s: s }); out.ys.push(y);
     });
-    // a short panel: the 90th line keeps its dashes but drops its label when it sits right under the 95th
+
     var l90 = out.lines.filter(function (l) { return l.q === 90; })[0], l95 = out.lines.filter(function (l) { return l.q === 95; })[0];
     if (small && l90 && l95 && Math.abs(l90.y - l95.y) < 14) l90.nolab = true;
     return out;
@@ -608,7 +608,7 @@
     if (tag) PLDBG[tag] = dbg;
     return placed;
   }
-  // does the filled step area of S reach into a box? (labels keep off the data first)
+
   function stepHit(S, X, Y, x0, stopT) {
     return function (bx) {
       var a = X.inv(bx.x - 2), b = Math.min(X.inv(bx.x + bx.w + 2), stopT), yz = Y(0);
@@ -621,7 +621,7 @@
     };
   }
 
-  // ---------- the SMH strip (log scale, weekly closes) with every 20%+ low and the E1/E2/E3 lines ----------
+
   function logTicks(lo, hi, Y, minPx) {
     var sets = [[1], [1, 2, 5], [1, 2, 3, 5, 7], [1, 1.5, 2, 3, 4, 5, 6, 7, 8]], best = null;
     sets.forEach(function (ms) {
@@ -661,7 +661,7 @@
     var ts = o.titleSize || 12.5, title = 'SMH weekly close (log)';
     tx(g, L + 8, top + 16, title, withHalo({ fill: C.text, 'font-size': ts }));
     var titleBox = { x: L + 6, y: top + 16 - ts - 1, w: textW(title, ts) + 4, h: ts + 5 };
-    // lows: filled = a low after a 20%+ drop, ring = one of the 6 false starts of the indicator test; E1-E3 labelled
+
     var dg = el('g', {}, g), snap = [], r = o.narrow ? 3.3 : 4, obs = [titleBox], seen = {};
     D.eps.forEach(function (e) { if (e.t >= x0 && e.t <= x1) seen.e = 1; });
     D.lows.forEach(function (l) {
@@ -671,7 +671,7 @@
       if (l.kind === 'false') { ringDot(dg, x, y, r); seen.ring = 1; } else { peakDot(dg, x, y, r); seen.low = 1; }
       snap.push({ x: x, y: y, dn: l.t });
       if (/^E\d$/.test(l.name)) {
-        // under the dot, else above it; never on the strip's title (a short strip in a sideways full screen)
+
         var lw = textW(l.name, 11.5, 700), lab = function (yy) { return { x: x - lw / 2 - 1, y: yy - 10, w: lw + 2, h: 13 }; };
         var ly = [y + r + 13, y - r - 5].filter(function (yy) { return yy <= top + h - 3 && yy - 10 >= top + 1 && !overlaps(titleBox, lab(yy)); })[0];
         if (ly != null) tx(dg, x, ly, l.name, withHalo({ fill: C.white, 'font-size': 11.5, 'font-weight': 700, 'text-anchor': 'middle' }));
@@ -683,7 +683,7 @@
     return { Y: Y, snap: snap, top: top, h: h, g: el('g', {}, g), titleBox: titleBox, nowB: nowB, seen: seen, L: L, w: w };
   }
 
-  // ---------- one data pane: the series as known on each day (a step that moves on its public date) ----------
+
   function seriesPane(svg, S, X, x0, x1, L, top, pw, h, o) {
     var g = el('g', {}, svg), bot = top + h, n = S.t.length;
     panelRect(g, L, top, pw, h);
@@ -713,7 +713,7 @@
       var yz = Y(Math.max(aLo, Math.min(aHi, 0)));
       el('path', { d: d + 'V' + yz.toFixed(1) + 'H' + X(S.t[j0]).toFixed(1) + 'Z', fill: C.fear, 'fill-opacity': 0.35, stroke: 'none', 'clip-path': clip }, g);
       el('path', { d: d, fill: 'none', stroke: C.fear, 'stroke-width': o.lw || 1.5, 'stroke-linejoin': 'round', 'clip-path': clip }, g);
-      if (S.staleAt != null && S.staleAt < x1) {     // stopped publishing: a faint dotted run to today, and a label
+      if (S.staleAt != null && S.staleAt < x1) {
         var xe = Math.min(L + pw, X(Math.min(D.last, x1)));
         el('line', { x1: xEnd.toFixed(1), x2: xe.toFixed(1), y1: yv.toFixed(1), y2: yv.toFixed(1), stroke: C.light, 'stroke-width': 1.2, 'stroke-dasharray': '2 4', opacity: 0.5, 'clip-path': clip }, g);
         var nt = 'no update after ' + fmtDay(S.t[n - 1], true), nw = textW(nt, 11);
@@ -752,11 +752,11 @@
     return { Y: Y, snap: snap, top: top, bot: bot, S: S, stopT: stopT, marks: kept, seen: seen };
   }
 
-  // ---------- chart 1: SMH strip + the selected series ----------
+
   function geo1(Wraw) { var W = Math.max(280, Math.round(Wraw)), narrow = W < 640, L = narrow ? 2 : 30; return { W: W, narrow: narrow, L: L, pw: W - L - (narrow ? 32 : 42) }; }
   function drawChart1(Wraw, tu, hFs) {
     var gm = geo1(Wraw), holder = $('chart1'), W = gm.W, narrow = gm.narrow, L = gm.L, pw = gm.pw;
-    // live.js chart 1 proportions: the price strip on top, the data series below is the main chart
+
     var smhH = narrow ? 112 : 210, gap = narrow ? 12 : 26, mH = narrow ? 270 : 380;
     if (hFs) { gap = hFs < 420 ? 10 : narrow ? 12 : 18; var av = hFs - 24 - gap; smhH = Math.round(av * 0.34); mH = av - smhH; }
     var mTop = smhH + gap, H = mTop + mH + 24, x0 = view.x0, x1 = view.x1, X = lin(x0, x1, L, L + pw);
@@ -766,7 +766,7 @@
     if (!narrow && textW(AXIS_WORDS[S.unit], 11.5) < mH - 30) tx(svg, 12, mTop + mH / 2, AXIS_WORDS[S.unit], { fill: C.muted, 'font-size': 11.5, 'text-anchor': 'middle', transform: 'rotate(-90 12 ' + (mTop + mH / 2) + ')' });
     var pane = seriesPane(svg, S, X, x0, x1, L, mTop, pw, mH, { ticks: ticks, title: title, titleSize: narrow ? 12.5 : 13, titleRoom: 20,
       lw: narrow ? 1.5 : 1.8, rPk: narrow ? 4 : 4.6, rNow: narrow ? 5 : 6, minPx: narrow ? 28 : 34, tag: 'c1' });
-    // each turn signal also gets a small copy on the SMH line in the same week (live.js: a peak dot + its same-day SPY dot)
+
     var rS = narrow ? 2.4 : 3, sameWk = 0;
     pane.marks.forEach(function (k) {
       var i = bsearchLE(D.xs, k.e.t); if (i < 0) return;
@@ -776,7 +776,7 @@
       evMark(sm.g, k.x, y, rS, k.e.type); sameWk++;
     });
     timeAxis(svg, X, ticks, H - 4, 0, W);
-    setLegend('lg1', [sm.seen, pane.seen], !FS.key, sameWk > 0);     // full screen: the short legend, so the chart keeps the room
+    setLegend('lg1', [sm.seen, pane.seen], !FS.key, sameWk > 0);
     var cross = crossLayer(svg);
     function set(dn) {
       clear(cross);
@@ -792,7 +792,7 @@
     GEO.c1 = { W: W, L: L, pw: pw, X: X, set: set, snap: sm.snap.concat(pane.snap) };
     set(hover.c1);
   }
-  // notes for the week that ends on day dn (lows, E-starts, turn signals of the given series)
+
   function weekNotes(dn, keys) {
     var wk0 = dn - 6, out = [];
     D.lows.forEach(function (l) {
@@ -821,7 +821,7 @@
     else if (a.gone) ro.appendChild(span('muted', S.short + ': no update after ' + fmtDay(S.t[S.t.length - 1], true)));
     else {
       ro.appendChild(span('p', S.short + ' ' + fmtV(S, S.v[a.j])));
-      ro.appendChild(span('', picked ? ' (' + refWord(S.ref[a.j]) + ' data, public ' + fmtDay(S.t[a.j], false) + ') · ' : ' · '));   // at rest the headline carries the date
+      ro.appendChild(span('', picked ? ' (' + refWord(S.ref[a.j]) + ' data, public ' + fmtDay(S.t[a.j], false) + ') · ' : ' · '));
       ro.appendChild(span('pc', ordinal(rnk(S.p[a.j])) + ' percentile'));
     }
     var notes = weekNotes(dn, [sel]);
@@ -829,11 +829,11 @@
     if (!picked) ro.appendChild(span('muted', ' · ' + TAP + ' the chart for any week'));
   }
 
-  // ---------- charts 2 + 3: SMH + a stack of small panels on one time axis ----------
+
   function geoS(Wraw, key) { var W = Math.max(280, Math.round(Wraw)), wide = W >= (FS.key === key ? 600 : 700), RC = wide ? 168 : 0; return { W: W, wide: wide, L: 2, RA: 32, RC: RC, pw: W - 2 - 32 - RC }; }
-  // the phone header strip of one panel: name · percentile · the value (big); row 2 = the data month + public date
+
   function stackHead(S, L, pw, RA) {
-    // live.js tfHead sizes: name 14/700, value 22/700, percentile 11.5, second line 11; 42 px high
+
     var j = S.t.length - 1, right = L + pw + RA, rows = [], val = fmtV(S, S.v[j]), vW = textW(val, 22, 700), stale = S.staleAt != null;
     var name = NAME[S.key];
     var o = ordinal(rnk(S.p[j])), pcs = topRec(S, j) ? ['highest since ' + S.since, 'highest', o] : [o + ' percentile', o + ' pct', o];
@@ -853,13 +853,13 @@
   function drawStack(key, Wraw, tu, hFs) {
     var keys = stackKeys(key), gm = geoS(Wraw, key), holder = $(CHART_ID[key]), W = gm.W, wide = gm.wide;
     var L = gm.L, RA = gm.RA, RC = gm.RC, pw = gm.pw, n = keys.length;
-    var smhH = wide ? 110 : 84, gap = wide ? 16 : 10, panH = wide ? 128 : 96, heads = {}, headSum = 0;   // live.js: SPY 110/84, panels 160/118
+    var smhH = wide ? 110 : 84, gap = wide ? 16 : 10, panH = wide ? 128 : 96, heads = {}, headSum = 0;
     keys.forEach(function (k) { heads[k] = wide ? { h: 0 } : stackHead(D.ser[k], L, pw, RA); headSum += heads[k].h; });
     if (hFs) {
       gap = wide ? (hFs < 400 ? 4 : 6) : 6;
       var av = hFs - 24 - n * gap - headSum;
       smhH = Math.max(wide && hFs < 400 ? 40 : 56, Math.round(av * 0.16)); panH = Math.max(56, Math.floor((av - smhH) / n));
-      smhH = Math.max(40, av - n * panH);        // exact fit: the slot is never below stackMinH (the overlay scrolls instead)
+      smhH = Math.max(40, av - n * panH);
     }
     var x0 = view.x0, x1 = view.x1, X = lin(x0, x1, L, L + pw);
     var H = smhH + n * (gap + panH) + headSum + 24;
@@ -877,7 +877,7 @@
       var pane = seriesPane(svg, S, X, x0, x1, L, y, pw, panH, { ticks: ticks, title: wide ? NAME[k] : null, titleSize: 12.5, titleRoom: wide ? 18 : 3,
         lw: wide ? 1.4 : 1.2, rPk: wide ? 3.8 : 3.2, rNow: wide ? 4.5 : 3.8, minPx: wide ? 24 : 20, tag: key + k });
       snap = snap.concat(pane.snap);
-      if (wide) {                 // right-hand column: the value, its percentile, the data month and public date
+      if (wide) {
         var cx = L + pw + RA + 14, cw = RC - 18, j = S.t.length - 1, stale = S.staleAt != null, yy = y + Math.min(30, panH * 0.36);
         var big = Math.max(17, Math.min(26, Math.round(panH * 0.27)));
         tx(svg, cx, yy, fmtV(S, S.v[j]), { fill: stale ? C.muted : C.light, 'font-size': big, 'font-weight': 700 });
@@ -917,11 +917,11 @@
     GEO[key] = { W: W, L: L, pw: pw, X: X, set: set, snap: snap };
     set(hover[key]);
   }
-  function stackMinH(key) {               // full screen: below this the overlay scrolls instead of squashing the panels
+  function stackMinH(key) {
     var n = stackKeys(key).length, wide = fsSlot('chart').clientWidth >= 600;
-    return 24 + 84 + n * (6 + (wide ? 0 : 42) + 56);      // SMH 84 + nine 56 px panels (the fear page's floor idea)
+    return 24 + 84 + n * (6 + (wide ? 0 : 42) + 56);
   }
-  // the readout grid: one tile per series with its reading as known that week (live.js readout2)
+
   function tile(S, j, gone) {
     var c = document.createElement('div');
     c.appendChild(span('k', TILE_NAME[S.key]));
@@ -938,7 +938,7 @@
       ', ' + ordinal(rnk(S.p[j])) + ' percentile since ' + S.since;
     return c;
   }
-  // a Korea series that needs an API key nobody has set up: a greyed tile, no number
+
   function nkTile(c) {
     var t = node('div', 'nk');
     t.appendChild(span('k', TILE_NAME[c.key] || c.title)); t.appendChild(span('v', c.val)); t.appendChild(span('s', c.unit || ''));
@@ -959,7 +959,7 @@
     ro.appendChild(grid);
   }
 
-  // ---------- card 1 text: SMH headline, the selected series' percentile words + gauge (live.js A + C) ----------
+
   var GAUGE_BANDS = [[0, 50, '#262B3D'], [50, 80, '#30335A'], [80, 90, '#41346E'], [90, 95, '#57408F'], [95, 99, '#7552BC'], [99, 100, '#A070F0']];
   var GAUGE_TICKS = [0, 50, 80, 90, 95, 99], GAUGE_TICK_PRIO = [0, 50, 90, 99, 80, 95];
   var heroNow = null, heroPk = null, gaugeKey = '';
@@ -979,7 +979,7 @@
   function zoneWord(r) { return r >= 95 ? 'Very high' : r >= 80 ? 'High' : r >= 20 ? 'Middle of its range' : r >= 5 ? 'Low' : 'Very low'; }
   function renderHero() {
     var sm = J.smh_last, S = D.ser[sel], n = S.t.length, j = n - 1, pk = recentPeak(S), same = pk === j, r = rnk(S.p[j]);
-    // live.js: the big number is exactly what the gauge ranks (the chosen series); SMH moves to the muted line
+
     $('heroK').textContent = TILE_NAME[S.key] || S.short; $('heroV').textContent = fmtV(S, S.v[j]);
     var hd = $('heroDate'); clear(hd);
     hd.textContent = refWord(S.ref[j]) + ' data · public ' + fmtDay(S.t[j], true);
@@ -987,7 +987,7 @@
     var acc = S.now.acc;
     if (topRec(S, j)) { hp.appendChild(span('hp-b', 'highest since 2013')); hp.appendChild(document.createTextNode(' (' + ordinal(r) + ' percentile: ' + S.now.n_lo + ' of ' + S.now.n + ' readings lower)')); }
     else { var h1 = span('hp-1', ''); h1.appendChild(span('hp-b', ordinal(r) + ' percentile')); h1.appendChild(document.createTextNode(' since 2013')); hp.appendChild(h1); }
-    if (acc != null) {          // "· accel +24 pp" keeps the phone line to one row; "vs 3 months earlier" shows on wider screens
+    if (acc != null) {
       hp.appendChild(document.createTextNode(' '));
       var h2 = span('hp-2', '· ' + (acc >= 0 ? 'accel ' : 'slowing ') + sgn(acc, 0) + ' pp'); h2.title = 'growth now vs 3 months earlier, in percentage points';
       h2.appendChild(span('hp-3', ' vs 3 months earlier')); hp.appendChild(h2);
@@ -1018,7 +1018,7 @@
     var zl = $('zoneLine'); clear(zl);
     zl.appendChild(span('zw', zoneWord(r)));
     zl.appendChild(span('', ' — ' + S.short + (S.unit === 'level' ? ' at ' : ' growth at ') + fmtV(S, S.v[j]) + ' is higher than ' + r + '% of its readings since 2013.'));
-    var sc0 = $('serCap'); clear(sc0);      // in "How to read it": what the lower panel shows right now
+    var sc0 = $('serCap'); clear(sc0);
     sc0.appendChild(node('b', '', S.label));
     sc0.appendChild(document.createTextNode(' · ' + S.unitText + ' · ' + S.src + (S.staleAt != null ? ' · no update after ' + fmtDay(S.t[n - 1], true) : '')));
     var rn2 = $('rightNow'); clear(rn2);
@@ -1053,7 +1053,7 @@
       kept.push({ x: x, w: w }); s.style.left = x.toFixed(1) + 'px'; s.style.visibility = '';
     });
   }
-  // card 1 tiles: buttons that pick the series under the SMH strip
+
   function renderTiles1() {
     var box = $('tiles1'); clear(box);
     TILES1.forEach(function (k) {
@@ -1074,14 +1074,14 @@
     try { localStorage.setItem('semisSeries', k); } catch (e) { }
     Array.prototype.forEach.call(tl.children, function (b) { setAttr(b, 'aria-pressed', String(b.getAttribute('data-k') === k)); });
     renderHero(); requestRender();
-    // the headline and legend above may change height: keep the tapped tile under the finger (after the redraw)
+
     requestAnimationFrame(function () {
       var dy = tl.getBoundingClientRect().top - y0;
       if (Math.abs(dy) >= 1) { if (FS.key) $('fs').scrollTop += dy; else window.scrollBy(0, dy); }
     });
   }
 
-  // ---------- legends: only what the current window draws (live.js keeps its legend to the marks on screen) ----------
+
   var LG_KEY = {};
   function setLegend(id, seens, long, sameWk) {
     var f = {};
@@ -1094,7 +1094,7 @@
     if (f.tt) items.push(['lg-tt', 'trough-turn' + (sameWk && !f.c0 ? ' (small: same week on SMH)' : '')]);
     if (f.c0) items.push(['lg-c0', 'growth crossed above 0' + (sameWk ? ' (small: same week on SMH)' : '')]);
     if (f.now) items.push(['lg-now', 'now']);
-    if (f.pl && f.pl2) items.push(['lg-pl', '90th · 95th · 99th percentile (5th · 95th on the price panels)']);   // the Korea card
+    if (f.pl && f.pl2) items.push(['lg-pl', '90th · 95th · 99th percentile (5th · 95th on the price panels)']);
     else if (f.pl) items.push(['lg-pl', '90th · 95th · 99th percentile' + (long ? ' of this series' : '') + ' since 2013']);
     else if (f.pl2) items.push(['lg-pl', '5th · 95th percentile since 2013']);
     var key = JSON.stringify(items), l = $(id);
@@ -1107,7 +1107,7 @@
     });
   }
 
-  // ---------- status, calendar and the text sections ----------
+
   function taipeiToday() { var t = new Date(nowMs() + 8 * 36e5); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) / 864e5; }
   function calState(e) { var a = dayNum(e.d0), b = dayNum(e.d1), now = taipeiToday(); return now > b ? 'past' : now >= a ? 'today' : 'next'; }
   function calWhen(e) {
@@ -1115,43 +1115,43 @@
     if (b !== a) { when += '–' + (da.getUTCMonth() === db.getUTCMonth() ? db.getUTCDate() : fmtDay(b, false)); wd += '–' + WD[db.getUTCDay()]; }
     return { when: when, wd: wd };
   }
-  // ---------- live status (live.js status(), on the phone clock) ----------
-  // LIVE = intraday build, fresh · LATE = an expected update is overdue · AFTER CLOSE = the preliminary close (16:15 pull)
-  // · CLOSED = the final close · STALE = more than one trading day old · SNAPSHOT = the bundled file (feed unavailable)
+
+
+
   function isLive() { return SRC.kind === 'live'; }
   function liveIntraday() { return isLive() && J.state === 'LIVE' && !J.live.session_closed; }
   function livePrelim() { return isLive() && J.state === 'LIVE' && !!J.live.session_closed; }
-  function asofEt() {                     // "14:31": the time of the (15-min delayed) SMH price
+  function asofEt() {
     var a = J.live && J.live.smh && J.live.smh.asof_et;
     if (a) return a;
     var m = /(\d\d:\d\d) ET/.exec((J.as_of && J.as_of.et) || '');
     return m ? m[1] : '';
   }
-  function smhWords() {                   // the moment the SMH price describes
+  function smhWords() {
     var d = fmtDay(dayNum(J.smh_last.date), false);
     return liveIntraday() ? d + ', ' + asofEt() + ' ET (15-min delayed)' : d + ' close' + (livePrelim() ? ' (preliminary)' : '');
   }
-  function missedSessions(sess, t) {      // sessions after the data's one that should have sent an update by t (open + 45 min)
+  function missedSessions(sess, t) {
     var n = 0, d = sess;
     for (var i = 0; i < 4; i++) { d = nextSession(d); if (etEpoch(d, 10, 15) <= t) n++; else break; }
     return n;
   }
-  function closingDue(sess) {             // the final close comes with the evening cache refresh (~05:45-06:40 Taipei)
+  function closingDue(sess) {
     var c = etEpoch(sess, closeHour(sess), 0), tp = new Date(c + 8 * 36e5);
     var due = Date.UTC(tp.getUTCFullYear(), tp.getUTCMonth(), tp.getUTCDate(), 7, 30) - 8 * 36e5;
     return due > c ? due : due + 864e5;
   }
-  function nextTick(t) {                  // the feed's next update, else the next session's first update (09:45 ET)
+  function nextTick(t) {
     var nu = J.next_update && J.next_update.utc ? Date.parse(J.next_update.utc) : NaN;
     if (nu > t) return nu;
     var d = etDayNum(t);
     if (isSession(d)) {
       if (t < etEpoch(d, 9, 45)) return etEpoch(d, 9, 45);
-      if (t < etEpoch(d, closeHour(d), 30)) return t;           // inside the intraday window: an update is due now
+      if (t < etEpoch(d, closeHour(d), 30)) return t;
     }
     return etEpoch(nextSession(d), 9, 45);
   }
-  function whenWords(at, t) {             // "~15:00 ET" today, else "~09:45 ET Mon Oct 5 (21:45 Taipei)"
+  function whenWords(at, t) {
     if (at <= t) return 'due any minute';
     if (etDayNum(at) === etDayNum(t)) return '~' + hm(at) + ' ET';
     return '~' + hm(at) + ' ET ' + fmtDay(etDayNum(at), false, true) + ' (' + fmtTz(at, 'Asia/Taipei', 'Taipei', false) + ')';
@@ -1182,11 +1182,11 @@
     }
     if (J.state === 'LIVE' && !L.session_closed) {
       var closeAt = etEpoch(sess, closeHour(sess), 0);
-      if (miss === 1 || t > closeAt + 45 * 6e4) {   // the closing update never came
+      if (miss === 1 || t > closeAt + 45 * 6e4) {
         s.chip = 'LATE'; s.cls = 'late';
         s.line = upd + ' · these numbers are from before the close of ' + sessW + ' (SMH ~' + asofEt() + ' ET); the closing update did not arrive.';
       } else {
-        // the feed names its next slot; allow 15 min more (the 5-min tick, the CDN's 5-min cache, the 5-min poll)
+
         var nu = J.next_update && J.next_update.utc ? Date.parse(J.next_update.utc) : NaN;
         var dueBy = (nu > g ? nu : g + 15 * 6e4) + 15 * 6e4;
         if (t <= dueBy) {
@@ -1199,7 +1199,7 @@
       }
       return s;
     }
-    if (J.state === 'LIVE') {             // the 16:15 pull: the close, before the evening cache refresh
+    if (J.state === 'LIVE') {
       if (miss === 1) {
         s.chip = 'LATE'; s.cls = 'late';
         s.line = upd + ' · no update yet for ' + fmtDay(nextSession(sess), false, true) + '; the numbers below are the preliminary close of ' + sessW + '.';
@@ -1226,7 +1226,7 @@
     if (/looked broken|not valid JSON|does not match|older than its manifest|could not be drawn/.test(w)) return 'the latest file failed its checks';
     return w ? 'it could not be used' : 'not loaded yet';
   }
-  // a failed refresh shows only once it is not a one-off (2 in a row, or no good check for 10 min)
+
   function refreshTrouble() { return !!SRC.lastErr && (SRC.fails >= 2 || nowMs() - (SRC.lastOk || 0) > 10 * 6e4); }
   function chipEl(s) { return span('chip chip-' + s.cls, s.chip); }
   function banner(kind, title, text) {
@@ -1235,7 +1235,7 @@
     d.appendChild(node('b', '', title)); d.appendChild(span('', text));
     return d;
   }
-  // card 4: the approved STATIC line for the snapshot; with the feed, the status chip and the readings' moment
+
   function renderSigAsof(s) {
     var sp = $('sigSpan'), pa = $('sigAsof'); if (!sp || !pa) return;
     var d = fmtDay(dayNum(J.smh_last.date), false); clear(pa);
@@ -1279,8 +1279,8 @@
     fst.appendChild(chipEl(s));
     fst.appendChild(span('', 'SMH ' + smhWords()));
     renderSigAsof(s);
-    // banners (live.js): preview feed, clock override, calendar end, old numbers (a failed refresh is in the status
-    // line). Rebuilt only when their text changes, so a screen reader does not re-announce them every 30 s
+
+
     var b = $('banners'), frag = document.createDocumentFragment();
     if (preview) frag.appendChild(banner('info', 'Preview data', isLive() ? 'Numbers below come from ' + preview + ', not the live feed.' :
       loading && !SRC.why ? 'The page is reading ' + preview + ' instead of the live feed; the bundled snapshot is shown meanwhile.' :
@@ -1293,8 +1293,8 @@
     var k = frag.textContent;
     if (b.getAttribute('data-k') !== k) { clear(b); b.appendChild(frag); b.setAttribute('data-k', k); }
   }
-  // Browsers without scroll anchoring (Safari): when content above the reader changes height, keep the first card
-  // below the header where it was on screen
+
+
   function keepPlace(fn) {
     var se = document.scrollingElement || document.documentElement;
     var anchored = window.CSS && CSS.supports && CSS.supports('overflow-anchor', 'auto') && getComputedStyle(se).overflowAnchor !== 'none';
@@ -1306,12 +1306,12 @@
     if (a && a.isConnected) { var dy = a.getBoundingClientRect().top - y0; if (Math.abs(dy) >= 0.5) window.scrollBy(0, dy); }
     return out;
   }
-  var CAL_SHOW = 6;          // the next six releases on the card (plus any from the past week); the rest collapsed under them
+  var CAL_SHOW = 6;
   function renderCal() {
     var ul = $('cal'), ul2 = $('cal2'); clear(ul); clear(ul2);
     var now = taipeiToday(), main = [], more = [], old = 0, cal = J.calendar || [];
-    // the visible six: the curated items first; generated ones (release windows, later candle closes) fill in only
-    // when fewer than six curated items are ahead; everything else goes under "Later releases", in date order
+
+
     var ahead = cal.filter(function (e) { return calState(e) !== 'past'; });
     var pick = ahead.filter(function (e) { return !e.gen; }).slice(0, CAL_SHOW);
     ahead.forEach(function (e) { if (e.gen && pick.length < CAL_SHOW) pick.push(e); });
@@ -1332,7 +1332,7 @@
       li.appendChild(d); li.appendChild(m); (idx < main.length ? ul : ul2).appendChild(li);
     });
   }
-  // every Now card of some groups, in full (value, date, percentile, extra, what it has meant before)
+
   function readingsList(target, groups, only) {
     var box = $(target); clear(box);
     groups.forEach(function (gid) {
@@ -1356,14 +1356,14 @@
     if (c.hist) r.appendChild(node('div', 'rl-hist', c.hist));
     return r;
   }
-  // card 2b: the Korea card's text (the panels and tiles are drawn with the other stacks)
+
   function koreaOn() { return !!(D && D.kor); }
   function renderKorea() {
     var on = koreaOn();
     $('korea').hidden = !on; $('krMore').hidden = !on;
     if (!on) return;
     var K = D.kor.K, a = K.asof || {}, pa = $('asof4'); clear(pa);
-    if (D.kor.how === 'graft') {             // a live page whose feed has no Korea block yet: the bundled one, labelled
+    if (D.kor.how === 'graft') {
       pa.appendChild(span('chip chip-snap', 'SNAPSHOT'));
       pa.appendChild(span('', 'Korea numbers from the snapshot bundled with the page' + (D.kor.built ? ' (built ' + D.kor.built + ')' : '') +
         '; the live feed does not carry them yet.'));
@@ -1384,14 +1384,14 @@
     box.appendChild(wrap);
     $('krAttr').textContent = K.attribution || '';
   }
-  function koreaFailed(e) {                 // a Korea problem hides the Korea card, never the rest of the page
+  function koreaFailed(e) {
     if (window.console) console.warn('Korea card hidden: ' + (e && e.message));
     if (D) D.kor = null;
     $('korea').hidden = true; $('krMore').hidden = true;
   }
   function renderTaiwanText() {
     var A = {}; (J.asof || []).forEach(function (a) { A[a.k] = a.v; });
-    var pa = $('asof2'); clear(pa);          // one line, like the fear page's "as of" (every tile carries its own public date)
+    var pa = $('asof2'); clear(pa);
     pa.appendChild(span('', 'Monthly data · each reading on its public date'));
     var sl = $('twSlow'); clear(sl);
     var warns = [];
@@ -1405,7 +1405,7 @@
     if (!warns.length) sl.textContent = 'No Taiwan series is slowing hard right now.';
     readingsList('twList', ['tw-chip', 'tw-server', 'trade'], function (c, gid) { return !(gid === 'trade' && c.key === 'KR_MEM'); });
   }
-  // the GPU table holds the newest collection day per source; the feed names that day (the snapshot only had the first)
+
   function gpuDay(col) {
     if (col.asof && /^\d{4}-\d\d-\d\d$/.test(col.asof)) return col.asof;
     var g = J.sources && J.sources.GPU && J.sources.GPU.last_public;
@@ -1419,7 +1419,7 @@
       return x.status === 'first pass' ? ['chip-late', 'FIRST PASS', fmtDay(dayNum(x.updated), false)] : ['chip-late', 'IN PROGRESS', 'still being built'];
     }
     var t = stat(hw.trade), m = stat(hw.memory), col = hw.collector, has = col && col.table && col.table.length;
-    // one chip + one line (the fear page's single as-of line); each part keeps its detail as a tooltip
+
     var parts = [];
     if (t && m && t[1] === m[1] && t[2] === m[2]) parts.push(['trade + memory calls · ' + t[2], 'Trade history 2014+: US AI-hardware imports, Korea memory exports, lead/lag vs SMH · ' + (hw.trade.recheck || '') + ' | Memory-price calls vs MU and SMH · ' + (hw.memory.recheck || '')]);
     else {
@@ -1497,12 +1497,12 @@
     readingsList('hwList', ['trade', 'us-hw'], function (c, gid) { return gid !== 'trade' || c.key === 'KR_MEM'; });
   }
   function renderSignals() {
-    // live.js tile row: small tiles (label · value · unit · detail); what each reading has meant before goes in the box
+
     var box = $('sigs'), hl = $('sigHist'); clear(box); clear(hl);
     ['market', 'chart', 'macro'].forEach(function (gid) {
       var g = J.now.filter(function (x) { return x.id === gid; })[0]; if (!g) return;
       box.appendChild(node('p', 'sig-h', g.title));
-      if (g.note && gid === 'chart') box.appendChild(node('p', 'sig-note', g.note));   // market note = the STATIC line, macro note = the box
+      if (g.note && gid === 'chart') box.appendChild(node('p', 'sig-note', g.note));
       var grid = node('div', 'sig-grid');
       g.cards.forEach(function (c) {
         var t = node('div', 'sig' + (c.warn ? ' warn' : ''));
@@ -1575,7 +1575,7 @@
     Object.keys(D.ser).forEach(function (k) {
       var S = D.ser[k], j = S.t.length - 1, vals;
       try { vals = [S.label, fmtV(S, S.v[j]), dataWord(S, j), fmtDay(S.t[j], true), ordinal(rnk(S.p[j])) + (S.since !== '2013' ? ' (' + S.since + '+)' : ''), S.osc ? '5th: ' + lvCell(S, 5) : lvCell(S, 90), lvCell(S, 95), lvCell(S, 99), S.unitText, S.src]; }
-      catch (e) { if (S.kr) return; throw e; }           // a bad Korea row is left out, never the table
+      catch (e) { if (S.kr) return; throw e; }
       var r = t.insertRow();
       vals.forEach(function (v, i) { var c = r.insertCell(); c.textContent = v; c.className = (i === 0 ? 'l tw ' : '') + cols[i][1].replace('w', 'wide-only').replace(/^l$/, ''); });
     });
@@ -1596,7 +1596,7 @@
     }
     var al = $('asofList'); clear(al);
     (J.asof || []).forEach(function (a) { al.appendChild(node('dt', '', a.k)); al.appendChild(node('dd', '', a.v)); });
-    if (koreaOn()) try {                     // the Korea card's sources, from its own block
+    if (koreaOn()) try {
       var K = D.kor.K, pr = K.prints || {}, ka = K.asof || {}, rows = [], f = function (x) { return fmtDay(dayNum(x), false); };
       var kp = [pr.p10, pr.p20].filter(function (x) { return x && x.public && x.ref; }).sort(function (x, y) { return x.public < y.public ? 1 : -1; })[0];
       if (kp) rows.push(['Korea customs (KCS)', MON[+kp.ref.slice(5, 7) - 1] + ' 1–' + (kp === pr.p20 ? '20' : '10') + ', ' + kp.ref.slice(0, 4) + ' print (public ' + f(kp.public) + ')']);
@@ -1613,7 +1613,7 @@
     $('built').textContent = 'Page data built ' + J.built + (isLive() ? ' (live feed)' : ' (the snapshot bundled with the page)') + '. Derived values, plus public list prices, US Census totals and SMH weekly closes for context. No cookies, no tracking.';
   }
 
-  // ---------- window controls: chips, zoom buttons, titles ----------
+
   function renderViewUi() {
     if (!D) return;
     var words = spanWords(), lim = spanLimits(), s = view.x1 - view.x0;
@@ -1654,11 +1654,11 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-range]'), function (b) { setAttr(b, 'aria-pressed', String(b.getAttribute('data-range') === view.chip)); });
   }
 
-  // ---------- gestures (live.js attachGestures; every chart moves the one shared window) ----------
-  // Phone: pinch zooms around the pinch centre, a sideways drag pans, vertical swipes stay with the page, tap = readout,
-  // touch-and-hold then slide = readout follows the finger, double-tap = full screen (and back).
-  // Desktop: trackpad pinch (wheel + ctrlKey) or ⌘/Ctrl/Alt + wheel zooms around the cursor; a plain wheel scrolls the PAGE
-  // unless the chart was just clicked; sideways wheel pans; drag pans, double-click = full screen, hover = readout.
+
+
+
+
+
   var HOLD_MS = 380, lastTip = -1e9;
   var mainCtl = { view: function () { return view; }, set: setView, limits: spanLimits, clamp: clampView, keepRight: keepRight,
     atLatest: atLatest, pan: panView, zoom: zoomView, reset: resetView, cmd: zoomCmd, xs: function () { return D.xs; }, last: function () { return D.last; } };
@@ -1784,7 +1784,7 @@
       if (!D || !G()) return;
       var g = G(); rect = holder.getBoundingClientRect();
       var px = pxOf(e.clientX);
-      if (px < g.L || px > g.L + g.pw) { if (e.ctrlKey) e.preventDefault(); return; }    // a trackpad pinch over the axis never zooms the page
+      if (px < g.L || px > g.L + g.pw) { if (e.ctrlKey) e.preventDefault(); return; }
       var k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? rect.height : 1, dx = e.deltaX * k, dy = e.deltaY * k, nv;
       if (e.shiftKey && !dx) { dx = dy; dy = 0; }
       var pinch = e.ctrlKey, modZoom = e.metaKey || e.altKey;
@@ -1793,7 +1793,7 @@
       var v = ctl.view(), s = v.x1 - v.x0;
       if (sideways) nv = ctl.pan(v, dx / g.pw * s);
       else nv = ctl.zoom(v, g.X.inv(px), Math.exp(Math.max(-300, Math.min(300, dy)) * (pinch ? 0.01 : 0.0015)), ctl.atLatest(v));
-      if (sameWindow(nv, v)) { if (pinch) e.preventDefault(); return; }       // at the zoom limit a pinch still never zooms the page
+      if (sameWindow(nv, v)) { if (pinch) e.preventDefault(); return; }
       e.preventDefault();
       ctl.set(nv);
     }, { passive: false });
@@ -1817,11 +1817,11 @@
     });
   }
 
-  // ---------- full screen: one overlay that hosts any chart (live.js) ----------
-  // Opening MOVES the chart's own nodes into the overlay's slots, leaving same-size placeholders, so every renderer, readout,
-  // button and gesture keeps working on the same window. Closes on ✕, Esc, double-tap / double-click, or Back.
+
+
+
   var FS = { sr: null, key: null, nodes: [], y: 0, pushed: false, pendingBack: false, queued: null, queuedPtr: false, at: -1e9, back: 0, vw: 0, vh: 0, off: 0 };
-  var FS_SLOTS = ['head', 'note', 'chips', 'ro', 'bar', 'chart', 'legend', 'pick'];   // live.js order; card 1's picker goes under the chart
+  var FS_SLOTS = ['head', 'note', 'chips', 'ro', 'bar', 'chart', 'legend', 'pick'];
   var SEC = { c1: ['now', 'ro1', 'chart1', 'lg1', 'Semis now'], c2: ['taiwan', 'ro2', 'chart2', 'lg2', 'Taiwan monthly data'], c3: ['hardware', 'ro3', 'chart3', 'lg3', 'GPU · CPU · memory'],
     c4: ['korea', 'ro4', 'chart4', 'lg4', 'Korea chip data'] };
   function fsSlot(name) { return $('fs').querySelector('[data-fs="' + name + '"]'); }
@@ -1831,7 +1831,7 @@
     return { label: s[4] + ', full screen', head: sec.querySelector('.card-head'), note: null, pick: key === 'c1' ? $('pick1') : null, ro: $(s[1]),
       bar: sec.querySelector('.zoombar'), chart: $(s[2]), legend: $(s[3]), chips: $('ranges') };
   }
-  function fsMinH(key) { var short = window.innerHeight <= 540; return key === 'c1' ? (short ? 180 : 220) : stackMinH(key); }   // live.js c1: 180 / 220
+  function fsMinH(key) { var short = window.innerHeight <= 540; return key === 'c1' ? (short ? 180 : 220) : stackMinH(key); }
   function fsSize() { if (FS.key) { var m = fsMinH(FS.key) + 'px'; if (fsSlot('chart').style.flexBasis !== m) fsSlot('chart').style.flexBasis = m; } }
   function fsDraw(now) { if (!FS.key || !D) return; if (now) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); } } else requestRender(); }
   function fsHint() {
@@ -1943,12 +1943,12 @@
     window.addEventListener('orientationchange', function () { if (FS.key) { fsSize(); fsDraw(false); } });
   }
 
-  // ---------- render all ----------
+
   var rafPending = false;
   function drawCharts() {
     var c1 = $('chart1'), c2 = $('chart2'), c3 = $('chart3'), w1 = c1.clientWidth, w2 = c2.clientWidth, w3 = c3.clientWidth;
     var h1 = fsHeight(c1), h2 = fsHeight(c2), h3 = fsHeight(c3);
-    // the Korea chart only when its card is on screen (a hidden card has no width and would coarsen everyone's ticks)
+
     var c4 = $('chart4'), k4 = koreaOn() && !$('korea').hidden, w4 = k4 ? c4.clientWidth : 0, h4 = k4 ? fsHeight(c4) : null;
     ['c1', 'c2', 'c3', 'c4'].forEach(function (k) { if (hover[k] != null && (hover[k] < view.x0 || hover[k] > view.x1)) hover[k] = null; });
     var u1 = tickUnit(geo1(w1).pw), u2 = tickUnit(geoS(w2, 'c2').pw), u3 = tickUnit(geoS(w3, 'c3').pw), u4 = k4 ? tickUnit(geoS(w4, 'c4').pw) : 0;
@@ -1964,7 +1964,7 @@
     renderViewUi();
     renders++;
   }
-  function renderAll(strict) {            // strict (a new live file): hand back the first error instead of a partial page
+  function renderAll(strict) {
     if (!J) return null;
     $('content').hidden = false;
     try { renderText(); } catch (e) { if (strict) return e; if (window.console) console.error(e); }
@@ -1997,7 +1997,7 @@
     b.appendChild(d);
   }
 
-  // ---------- fetching (live.js): the feed first, the bundled snapshot when the feed is missing / unreachable / invalid ----------
+
   function getBytes(url, name, cacheMode) {
     var ctl = ('AbortController' in window) ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, FETCH_TIMEOUT_MS);
@@ -2016,7 +2016,7 @@
   function parseJSON(buf, name) {
     try { return JSON.parse(new TextDecoder('utf-8').decode(buf)); } catch (e) { throw new Error(name + ' is not valid JSON'); }
   }
-  function sha256hex(buf) {               // null where WebCrypto is missing (an http:// page that is not localhost)
+  function sha256hex(buf) {
     if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.resolve(null);
     return crypto.subtle.digest('SHA-256', buf).then(function (h) {
       return Array.prototype.map.call(new Uint8Array(h), function (x) { return (x < 16 ? '0' : '') + x.toString(16); }).join('');
@@ -2024,7 +2024,7 @@
   }
   function getManifest() {
     SRC.manifests++;
-    var bust = Math.floor(Date.now() / 60000);   // 1-minute bucket so a stale CDN copy is not pinned
+    var bust = Math.floor(Date.now() / 60000);
     return getBytes(base + 'manifest.json?m=' + bust, 'manifest.json').then(function (buf) {
       var m = parseJSON(buf, 'manifest.json'), bad = validateManifest(m);
       if (bad) throw new Error('manifest.json looked broken: ' + bad);
@@ -2032,7 +2032,7 @@
     });
   }
   var RETRY_MS = 3000;
-  function getLive(m0, again) {           // -> { d, P }: the feed's semis.json, checked against its manifest, prepared
+  function getLive(m0, again) {
     return (m0 ? Promise.resolve(m0) : getManifest()).then(function (m) {
       var f = m.files['semis.json'];
       if (f.sha256 === SRC.badSha) throw new Error(SRC.badWhy);
@@ -2041,9 +2041,9 @@
         var d = parseJSON(buf, 'semis.json'), bad = validateLive(d);
         if (bad) throw new Error('semis.json looked broken: ' + bad);
         return sha256hex(buf).then(function (h) {
-          // the branch can move between the two fetches: a newer file is fine. An OLDER file that passed the checks is
-          // a real earlier build that the CDN still serves (it caches ~5 min and ignores ?v=): show it and look again
-          // in a minute. The same build time with different bytes is a broken file: read both once more, then refuse.
+
+
+
           var older = d.generated_at < m.generated_at, newer = d.generated_at > m.generated_at;
           if (h != null && h !== f.sha256 && !newer && !older) {
             if (!again) return new Promise(function (r) { setTimeout(r, RETRY_MS); }).then(function () { return getLive(null, true); });
@@ -2056,8 +2056,8 @@
       });
     });
   }
-  // -> null, or (a live file passed the checks but could not be drawn) 'kept' = the previous numbers stay on screen,
-  // 'fallback' = there were none, load the snapshot
+
+
   function apply(d, P, kind, sha) {
     var changed = !J || SRC.kind !== kind || d.generated_at !== J.generated_at;
     var prev = { J: J, D: D, kind: SRC.kind, view: view, sel: sel, hover: { c1: hover.c1, c2: hover.c2, c3: hover.c3, c4: hover.c4 } };
@@ -2065,7 +2065,7 @@
     J = d; D = P; SRC.kind = kind;
     if (prev.D) ['c1', 'c2', 'c3', 'c4'].forEach(function (k) { if (hover[k] === prev.D.last && D.xs.indexOf(prev.D.last) < 0) hover[k] = D.last; });
     if (!D.ser[sel]) sel = TILES1.filter(function (k) { return D.ser[k]; })[0] || d.series[0].key;
-    // keep the reader's window: a chip range follows the new data, a custom window grows to today only if it was at today
+
     if (!hadView || !view.custom) view = rangeView(view.chip);
     else view = wasLatest ? toLatest(view, view.x0) : clampView(view);
     if (kind === 'live') { SRC.fails = 0; SRC.lastOk = nowMs(); }
@@ -2073,7 +2073,7 @@
     var fk = document.activeElement && document.activeElement.getAttribute && document.activeElement.parentNode === $('tiles1') ?
       document.activeElement.getAttribute('data-k') : null;
     var err = keepPlace(function () { return renderAll(kind === 'live'); });
-    if (err) {                            // a live file that cannot be drawn: back to what was on screen, else the snapshot
+    if (err) {
       var msg = 'the live data could not be drawn: ' + err.message;
       SRC.badSha = sha || null; SRC.badWhy = msg;
       J = prev.J; D = prev.D; SRC.kind = prev.kind; view = prev.view; sel = prev.sel;
@@ -2086,11 +2086,11 @@
     SRC.lastErr = null; SRC.loads++;
     if (kind === 'live') SRC.why = '';
     keepPlace(renderStatus);
-    if (fk) { var nb = $('tiles1').querySelector('[data-k="' + fk + '"]'); if (nb) nb.focus({ preventScroll: true }); }   // a rebuilt tile keeps the focus
+    if (fk) { var nb = $('tiles1').querySelector('[data-k="' + fk + '"]'); if (nb) nb.focus({ preventScroll: true }); }
     return null;
   }
   var bundledP = null;
-  function getBundled() {                 // one request shared by every caller
+  function getBundled() {
     if (!bundledP) bundledP = getBytes(BUNDLED, 'the bundled semis.json', 'no-cache').then(function (buf) {
       var d = parseJSON(buf, 'the bundled semis.json'), bad = validate(d);
       if (bad) throw new Error('the bundled data looked broken: ' + bad);
@@ -2098,11 +2098,11 @@
     }).catch(function (e) { bundledP = null; throw e; });
     return bundledP;
   }
-  function loadBundled() {                // never replaces live numbers
+  function loadBundled() {
     return getBundled().then(function (d) { if (!(J && isLive())) apply(d, prepare(d), 'snapshot'); });
   }
-  // a live file from a pipeline that does not write the Korea block yet (no "korea" key at all): the Korea card shows the
-  // bundled snapshot's block, labelled SNAPSHOT with its build time. A file that says korea: null keeps the card hidden
+
+
   function withKorea(x) {
     if (!x.d || x.d.korea !== undefined || x.P.kor) return Promise.resolve(x);
     return getBundled().then(function (b) {
@@ -2118,25 +2118,25 @@
   function load(initial, m) {
     if (loading) return;
     loading = true;
-    // a first visit does not wait for a slow feed: the bundled snapshot (same origin) shows after 3.5 s and the live
-    // numbers replace it when they arrive
+
+
     var snapT = initial && !J ? setTimeout(function () { if (!J) loadBundled().catch(function () { }); }, FIRST_SNAPSHOT_MS) : 0;
     getLive(m).then(withKorea).then(function (x) {
-      if (J && isLive() && x.d.generated_at < J.generated_at) return;     // never step back to an older build
+      if (J && isLive() && x.d.generated_at < J.generated_at) return;
       if (apply(x.d, x.P, 'live', x.sha) === 'fallback') return loadBundled();
     }, function (e) {
-      if (J && isLive()) { liveError(e); keepPlace(renderStatus); return; }   // keep the newer live numbers
+      if (J && isLive()) { liveError(e); keepPlace(renderStatus); return; }
       SRC.why = e.message;
-      if (J) { keepPlace(renderStatus); return; }        // already on the snapshot: just say why
+      if (J) { keepPlace(renderStatus); return; }
       return loadBundled();
     }).catch(function (e) {
       if (!J) showFatal('Could not load the data (' + (SRC.why ? 'live feed: ' + SRC.why + '; ' : '') + e.message + ').');
       else if (window.console) console.error(e);
     }).then(function () { clearTimeout(snapT); loading = false; if (J) keepPlace(renderStatus); });
   }
-  function poll() {                       // cheap check of the manifest; fetch semis.json only when it changed
+  function poll() {
     if (document.hidden) return;
-    if (navigator.onLine === false) return;             // offline: the chip ages on its own; check again when back
+    if (navigator.onLine === false) return;
     SRC.polls++;
     SRC.lastPoll = Date.now();
     if (!J || !isLive()) { load(); return; }
@@ -2146,7 +2146,7 @@
     }, function (e) { liveError(e); keepPlace(renderStatus); });
   }
 
-  // ---------- wire up ----------
+
   (function initState() {
     var r = null, s = null;
     try { r = normRange(localStorage.getItem('semisRange')); s = localStorage.getItem('semisSeries'); } catch (e) { }
@@ -2166,7 +2166,7 @@
   attachGestures($('chart2'), 'c2');
   attachGestures($('chart3'), 'c3');
   attachGestures($('chart4'), 'c4');
-  try {   // read-only state for tests and debugging
+  try {
     Object.defineProperty(window, '__semisView', { configurable: true, get: function () {
       if (!D) return null;
       return { chip: view.chip, custom: view.custom, x0: view.x0, x1: view.x1, from: isoOf(Math.floor(view.x0)), to: isoOf(Math.floor(view.x1)),
@@ -2175,7 +2175,7 @@
         korea: D.kor ? { how: D.kor.how, stack: D.kor.stack.slice(), built: D.kor.built } : null };
     } });
     Object.defineProperty(window, '__semisPct', { configurable: true, get: function () { return D ? JSON.parse(JSON.stringify(PLDBG)) : null; } });
-    // where the numbers came from and what the status strip says (read-only copy)
+
     Object.defineProperty(window, '__semisLive', { configurable: true, get: function () {
       var s = J ? status() : null;
       return { source: SRC.kind, why: SRC.why, lastErr: SRC.lastErr ? SRC.lastErr.msg : null, fails: SRC.fails, older: SRC.older,
@@ -2194,10 +2194,10 @@
       if (w !== lastW) { lastW = w; gaugeKey = ''; requestRender(); }
     }).observe($('content'));
   } else window.addEventListener('resize', function () { gaugeKey = ''; requestRender(); });
-  // live.js: poll while the tab is visible (a hidden tab skips its polls and checks at once when it comes back)
+
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) return;
-    if (J) keepPlace(renderStatus);                     // the chip and ages are right at once, before the manifest answers
+    if (J) keepPlace(renderStatus);
     if (Date.now() - (SRC.lastPoll || 0) > 30000) poll();
   });
   window.addEventListener('online', function () { if (Date.now() - (SRC.lastPoll || 0) > 30000) poll(); });

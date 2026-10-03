@@ -1,5 +1,5 @@
-/* Price Seeker. Forked from the breadth page (docs/breadth/breadth.css): the tokens and the shared rules are unchanged,
-   the seeker additions follow below them. Gold #FFD84D = A+B / touched / the META touch dot; amber = the pile. */
+
+
 :root{
   --bg:#131722; --panel:#1E222D; --line:#2A2E39; --text:#D1D4DC; --muted:#8A8E99; --white:#FFFFFF;
   --fear:#3987E5; --light:#8EC0FA; --b200:#F0883E; --up:#26A69A; --down:#EF5350; --amber:#F2B04B; --stale:#EF5350;
@@ -19,7 +19,7 @@ button{font:inherit}
 :focus-visible{outline:2px solid var(--light);outline-offset:2px}
 .vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-/* top bar (shared) */
+
 .top{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(19,23,34,.94);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:5}
 .topbar{display:flex;align-items:center;gap:14px;height:48px}
 .brand{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap;padding:0;display:inline-flex;align-items:center;min-height:44px}
@@ -28,12 +28,12 @@ button{font:inherit}
 .tab{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;padding:13px 10px;border-bottom:2px solid transparent;white-space:nowrap}
 .tab[aria-current=page]{color:var(--white);border-bottom-color:var(--fear)}
 .t-short{display:none}
-/* phones: brand + 4 tabs in one row with nothing cut off, down to 320 px (short labels) */
+
 @media (max-width:440px){.topbar{gap:10px}.tabs{gap:0;flex:0 1 auto;min-width:0}.tab{padding:13px 6px;font-size:13.5px;letter-spacing:-.01em}
   .t-long{display:none}.t-short{display:inline}}
 @media (max-width:359px){.topbar{gap:8px}.brand{font-size:12px}.tab{padding:13px 4px;font-size:12.5px}}
 
-/* status strip (shared) */
+
 .status{padding:12px 0 6px}
 .status-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .asof{font-size:13px;color:var(--text)}
@@ -52,7 +52,7 @@ button{font:inherit}
 @keyframes pulse{50%{opacity:.25}}
 @media (prefers-reduced-motion:reduce){.chip-live::before{animation:none}}
 
-/* banners (shared) */
+
 .banner{margin:8px 0;padding:10px 12px;border-radius:6px;font-size:13.5px;line-height:1.4}
 .banner b{display:block;font-size:14px;margin-bottom:2px}
 .banner b.inl{display:inline;font-size:inherit;margin:0}
@@ -61,13 +61,13 @@ button{font:inherit}
 .banner-info{background:var(--panel);border:1px dashed var(--muted);color:var(--text)}
 .banner button{margin-top:8px;background:var(--panel);color:var(--white);border:1px solid var(--muted);border-radius:4px;padding:6px 14px;cursor:pointer;min-height:44px}
 
-/* segments (shared) */
+
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{background:transparent;color:var(--muted);border:0;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;touch-action:manipulation}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button[aria-pressed=true]{background:var(--fear);color:#fff}
 
-/* cards, headings (shared) */
+
 .card{padding:14px 0 22px;border-top:1px solid var(--line);margin-top:18px;scroll-margin-top:var(--stick)}
 h1,h2{margin:0;color:var(--white);font-weight:700;letter-spacing:-.01em;line-height:1.15}
 h1{font-size:23px}
@@ -75,7 +75,7 @@ h2{font-size:21px}
 .sub{margin:4px 0 0;color:var(--muted);font-size:14px}
 .src{margin:8px 0 0;font-size:12px;color:var(--muted);line-height:1.4}
 
-/* readout above each chart (shared: a fixed spot, nothing hides under a finger) */
+
 .readout{margin:8px 0 6px;min-height:2.9em;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
 .readout .d{color:var(--white);font-weight:700}
 .chart{position:relative;width:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:crosshair;overscroll-behavior-x:none}
@@ -86,13 +86,13 @@ h2{font-size:21px}
 @keyframes nowpulse{0%{transform:scale(1);opacity:.85}70%,100%{transform:scale(2.1);opacity:0}}
 @media (prefers-reduced-motion:reduce){.now-pulse{animation:none;opacity:.55}}
 
-/* the purple box (shared) */
+
 .box{margin-top:18px;background:var(--panel);border:1.5px solid var(--fear);border-radius:10px;padding:12px 14px}
 .box-row{display:grid;grid-template-columns:1fr;gap:2px;font-size:14.5px}
 .box-row+.box-row{margin-top:10px}
 .box-row b{color:var(--light);font-size:15px}
 
-/* tables (shared) */
+
 .table-card summary{cursor:pointer;color:var(--light);font-weight:600;font-size:14px;padding:10px 0;min-height:44px;display:flex;align-items:center}
 .table-scroll{overflow-x:auto;margin-top:10px}
 table{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:100%}
@@ -106,7 +106,7 @@ th{color:var(--muted);font-weight:600}
 .foot b{color:var(--text)}
 .noscript{color:var(--amber)}
 
-/* study tiles + eli5 (shared) */
+
 .study{margin-top:14px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 @media (max-width:1071.98px){.study .tile-bets{grid-column:1/-1}}
 @media (min-width:560px){.study.today{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}}
@@ -132,7 +132,7 @@ th{color:var(--muted);font-weight:600}
   .readout{font-size:14px;min-height:1.6em}
 }
 
-/* ================================================================ seeker additions */
+
 section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 .mut{color:var(--muted)}
 .up{color:var(--up)} .down{color:var(--down)}
@@ -144,13 +144,13 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 @media (hover:hover){.btn:hover,.tog:hover{border-color:var(--muted)}}
 .tog{min-height:44px;padding:0 12px;background:transparent;color:var(--light);border:1px solid var(--line);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex:0 0 auto;touch-action:manipulation}
 
-/* page head */
+
 .head{padding:8px 0 2px}
 .head-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 .chip-watch{color:var(--amber);border-color:rgba(242,176,75,.7);background:rgba(242,176,75,.1)}
 .chip-watch::before{display:none}
 
-/* today tiles: every tile is a 44 px+ target */
+
 .today .tile{display:block;width:100%;text-align:left;color:inherit;font:inherit;min-height:44px}
 .today button.tile{cursor:pointer;touch-action:manipulation}
 .today button.tile:disabled{cursor:default}
@@ -161,13 +161,13 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 .today .tile .t-v.tv-none{font-size:20px;color:var(--muted)}
 .today .tile .t-v .tk-wrap{display:flex;flex-wrap:wrap;align-items:center;margin:-8px 0 -8px}
 
-/* caveat line */
+
 .caveat .cv-row{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap}
 .caveat .cv-line{font-weight:600}
 .cv-list{margin:8px 0 2px;padding-left:20px;font-weight:400;color:var(--text)}
 .cv-list li+li{margin-top:6px}
 
-/* the META story */
+
 .story{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:8px 14px 14px;background:rgba(30,34,45,.4)}
 .story-top{display:flex;align-items:center;justify-content:space-between;gap:8px 12px}
 .kicker{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
@@ -193,7 +193,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 .ck-v .ok,.ok{color:var(--up)}
 .ck-x{font-size:12.5px;margin:6px 0 0;color:var(--text);line-height:1.4}
 .story-note{font-size:13px;color:var(--muted);margin:10px 0 0}
-/* the "i" button: 18 px drawn, a 44 px hit area */
+
 .ib{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--muted);background:transparent;color:var(--muted);font-size:11px;font-weight:700;font-style:italic;font-family:Georgia,serif;line-height:1;padding:0;cursor:pointer;flex:0 0 auto;vertical-align:middle;touch-action:manipulation}
 .ib::after{content:"";position:absolute;left:-13px;top:-13px;right:-13px;bottom:-13px}
 .ib[aria-expanded=true]{border-color:var(--light);color:var(--light);background:rgba(57,135,229,.18)}
@@ -207,7 +207,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
   .checks .ck:last-child{grid-column:auto}
 }
 
-/* filter bar */
+
 .filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:18px 0 8px}
 .seg-tier{display:flex;flex:0 0 auto}
 .seg-tier button{padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
@@ -245,7 +245,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 }
 @media (max-width:559px){.seg-tier button{flex-direction:column;gap:0;line-height:1.15}.seg-tier .sc{font-size:11px}}
 
-/* the list */
+
 .list{position:relative;margin-top:4px;outline:none}
 .lhead{display:none}
 .grp{display:flex;align-items:center;gap:8px;min-height:32px;padding:3px 8px;margin-top:12px;border-bottom:1px solid var(--line);font-size:12px;font-weight:700;letter-spacing:.03em;color:var(--white)}
@@ -279,7 +279,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 .c-stock{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px}
 .tk{color:var(--white);font-weight:700;font-size:15px;letter-spacing:.01em}
 .pills{display:inline-flex;flex-wrap:wrap;gap:3px;max-width:100%}
-.c-stock .pill{white-space:normal;max-width:100%;text-align:center}   /* long pills (TOUCHED today, Left the list 8:31 pm) wrap inside the column */
+.c-stock .pill{white-space:normal;max-width:100%;text-align:center}
 .c-price{white-space:nowrap}
 .c-price .px{border-bottom:2px solid transparent;padding-bottom:1px}
 .c-price .px.dup{border-bottom-color:var(--up)}
@@ -344,13 +344,13 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 .ph{background:var(--panel);border-bottom:1px solid var(--line);height:48px;position:relative;overflow:hidden}
 .ph i{position:absolute;left:12px;right:30%;top:17px;height:14px;background:var(--line);border-radius:3px}
 
-/* desktop and tablet: one grid row per name, 48 px */
+
 @media (min-width:720px){
   .lhead{display:grid;align-items:end;gap:0;padding:0 8px 6px;font-size:11.5px;font-weight:700;color:var(--muted);letter-spacing:.02em;border-bottom:1px solid var(--line);margin-top:10px}
   .lhead>span{white-space:nowrap;display:flex;align-items:center;gap:2px;color:var(--muted);font-size:11.5px;font-weight:700}
   .rsum>.c-price{white-space:normal}
   .rsum{min-height:48px;padding:3px 8px}
-  /* 720-959: tier stock price togo trip odds new $+biz chev (business shares the $ cell) */
+
   .lhead,.rsum{grid-template-columns:44px minmax(56px,1fr) 106px 60px 100px 92px 88px 84px 22px}
   .c-spark,.c-held,.c-r20,.c-biz{display:none!important}
   .lhead>span{flex-wrap:wrap;white-space:normal;row-gap:0;line-height:1.25}
@@ -360,7 +360,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
   .c-chev{padding-right:0!important}
   .c-trip svg{width:80px}
 }
-/* 960-1247: business gets its own column; the 60-day line and the held dots wait for more room */
+
 @media (min-width:960px){
   .lhead,.rsum{grid-template-columns:54px minmax(76px,1fr) 110px 64px 124px 104px 100px 92px 84px 60px 24px}
   .lhead>span{flex-wrap:nowrap;white-space:nowrap}
@@ -370,20 +370,20 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
   .c-bet .bz{display:none}
   .c-trip svg{width:auto}
 }
-/* 1248+: a wider page and every column */
+
 @media (min-width:1248px){
   .wrap{max-width:1200px}
   .lhead,.rsum{grid-template-columns:54px minmax(80px,1fr) 110px 64px 124px 128px 104px 100px 92px 84px 60px 70px 24px}
   .c-spark,.c-held{display:block!important}
   .lhead .c-spark,.lhead .c-held{display:flex!important}
 }
-/* phones: a card per name, 3 lines, the whole card is one button */
+
 @media (max-width:719px){
   .row{border:1px solid var(--line);border-radius:10px;margin-top:8px}
   .rsum{position:relative;grid-template-columns:auto minmax(80px,1fr) auto auto;grid-template-areas:"tier stock price togo" "spark spark odds odds" "trip trip trip new" "bet bet biz biz";
     gap:6px 7px;padding:10px 20px 10px 10px;min-height:88px;align-items:center}
   .c-tier{grid-area:tier}.c-stock{grid-area:stock}.c-price{grid-area:price;font-size:15px}.c-togo{grid-area:togo;font-size:15px;text-align:right}
-  .rsum>.c-price{white-space:normal;text-align:right}   /* a 4-digit price drops "-> pile" to a second line */
+  .rsum>.c-price{white-space:normal;text-align:right}
   .c-spark{grid-area:spark}.c-odds{grid-area:odds;text-align:right}.c-trip{grid-area:trip}.c-new{grid-area:new;text-align:right}
   .c-bet,.c-biz{border-top:1px solid var(--line);padding-top:6px;font-size:13px}
   .c-bet{grid-area:bet}.c-biz{grid-area:biz;text-align:right;color:var(--muted)}
@@ -410,7 +410,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 }
 .nd-w{white-space:nowrap}
 
-/* row detail */
+
 .detail{margin:0 8px 10px;padding:12px 14px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:14px;cursor:auto}
 @media (max-width:719px){.detail{margin:0 8px 10px;padding:10px 10px 12px}}
 .d-left{color:var(--amber);font-size:13.5px;margin:0 0 8px}
@@ -441,7 +441,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
   .d-ro{min-height:1.6em}
 }
 
-/* closing in */
+
 .cl-list{margin-top:10px}
 .cl{border-bottom:1px solid var(--line)}
 .cl-sum{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:6px 4px;background:none;border:0;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer;font-variant-numeric:tabular-nums;touch-action:manipulation}
@@ -459,7 +459,7 @@ section,.row,.cl,.hl{scroll-margin-top:var(--stick)}
 @media (max-width:719px){.cl-sp{display:none}}
 .more{margin:6px 0 0}
 
-/* recent hits */
+
 .hl-head,.hl-sum{display:grid;grid-template-columns:64px 64px minmax(0,1.3fr) minmax(0,1.3fr) minmax(0,1.2fr) 20px;gap:0 10px;align-items:center}
 .hl-head{font-size:11.5px;font-weight:700;color:var(--muted);padding:10px 4px 6px;border-bottom:1px solid var(--line);margin-top:6px}
 .hl{border-bottom:1px solid var(--line)}
@@ -482,7 +482,7 @@ button.hl-sum{cursor:pointer;touch-action:manipulation}
   .hl-sum .hk{display:inline}
 }
 
-/* scoreboard */
+
 .cal{margin-top:16px}
 .cal-t{margin:0 0 6px;font-size:13.5px;color:var(--text);font-weight:600}
 .cal-row{display:grid;grid-template-columns:64px minmax(0,1fr) 40px;align-items:center;gap:10px;font-size:13px;min-height:26px;font-variant-numeric:tabular-nums}
@@ -499,7 +499,7 @@ button.hl-sum{cursor:pointer;touch-action:manipulation}
 #scoreTable td.vd{text-align:left;white-space:normal;min-width:72px}
 #scoreTable th.vd{text-align:left}
 
-/* rules + numbers table */
+
 .rules-body{font-size:14px;line-height:1.5}
 .rules-body h3{font-size:14px;color:var(--white);margin:10px 0 4px}
 .rules-body ul{margin:0;padding-left:20px}
@@ -512,10 +512,10 @@ button.hl-sum{cursor:pointer;touch-action:manipulation}
 #numTable th[aria-sort=descending] button::after{content:" ▼";font-size:9px}
 #numTable td.tk-c{color:var(--white);font-weight:700}
 
-/* popover (column "i") */
+
 .pop{position:absolute;z-index:6;width:300px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--fear);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45;color:var(--text);box-shadow:0 8px 22px rgba(0,0,0,.45)}
 
-/* dialog */
+
 html.dlg-open,html.dlg-open body{overflow:hidden}
 .dlg-back{position:fixed;inset:0;z-index:40;background:rgba(10,12,18,.72);display:flex;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px 16px;overflow-y:auto;overscroll-behavior:contain}
 .dlg{background:var(--bg);border:1px solid var(--line);border-radius:12px;max-width:620px;width:100%;padding:12px 16px 18px;margin:auto 0}

@@ -1,4 +1,4 @@
-/* Fear meter · live. TradingView dark family; purple = the fear meter. Green/red only for up/down. */
+
 :root{
   --bg:#131722; --panel:#1E222D; --line:#2A2E39; --text:#D1D4DC; --muted:#8A8E99; --white:#FFFFFF;
   --fear:#7E57C2; --light:#B39DDB; --up:#26A69A; --down:#EF5350; --amber:#F2B04B; --stale:#EF5350;
@@ -15,7 +15,7 @@ button{font:inherit}
 .skip:focus{left:8px;top:8px;background:var(--panel);padding:6px 10px;z-index:10}
 :focus-visible{outline:2px solid var(--light);outline-offset:2px}
 
-/* top bar, room for more tabs later */
+
 .top{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(19,23,34,.94);backdrop-filter:blur(6px);z-index:5}
 .topbar{display:flex;align-items:center;gap:14px;height:48px}
 .brand{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap;padding:13px 0}
@@ -24,12 +24,12 @@ button{font:inherit}
 .tab{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;padding:13px 10px;border-bottom:2px solid transparent;white-space:nowrap}
 .tab[aria-current=page]{color:var(--white);border-bottom-color:var(--fear)}
 .t-short{display:none}
-/* phones: brand + 3 tabs in one row with nothing cut off, down to 320 px */
+
 @media (max-width:440px){.topbar{gap:10px}.tabs{gap:0;flex:0 1 auto;min-width:0}.tab{padding:13px 6px;font-size:13.5px;letter-spacing:-.01em}
   .t-long{display:none}.t-short{display:inline}}
 @media (max-width:359px){.topbar{gap:8px}.brand{font-size:12px}.tab{padding:13px 4px;font-size:12.5px}}
 
-/* status strip */
+
 .status{padding:12px 0 6px}
 .status-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .asof{font-size:13px;color:var(--text)}
@@ -47,7 +47,7 @@ button{font:inherit}
 @keyframes pulse{50%{opacity:.25}}
 @media (prefers-reduced-motion:reduce){.chip-live::before{animation:none}}
 
-/* banners */
+
 .banner{margin:8px 0;padding:10px 12px;border-radius:6px;font-size:13.5px;line-height:1.4}
 .banner b{display:block;font-size:14px;margin-bottom:2px}
 .banner-bad{background:rgba(239,83,80,.14);border:1px solid var(--stale);color:#fff}
@@ -55,7 +55,7 @@ button{font:inherit}
 .banner-info{background:var(--panel);border:1px dashed var(--muted);color:var(--text)}
 .banner button{margin-top:8px;background:var(--panel);color:var(--white);border:1px solid var(--muted);border-radius:4px;padding:6px 14px;cursor:pointer}
 
-/* controls */
+
 .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:10px 0 4px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{background:transparent;color:var(--muted);border:0;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px}
@@ -63,7 +63,7 @@ button{font:inherit}
 .seg button[aria-pressed=true]{background:var(--fear);color:#fff}
 .hint{font-size:12px;color:var(--muted)}
 
-/* cards */
+
 .card{padding:14px 0 22px;border-top:1px solid var(--line);margin-top:10px}
 .controls+.card{border-top:0;margin-top:0;padding-top:8px}
 .card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:6px 20px}
@@ -76,7 +76,7 @@ h2{font-size:21px}
 .hero-num{color:var(--light);font-weight:700;font-size:34px;line-height:1.05;white-space:nowrap}
 .hero-k{font-size:.7em}
 .hero-date{color:var(--muted);font-size:13px;margin-top:2px}
-/* A + C: the percentile words and the gauge under the headline */
+
 .hero-pct{margin:4px 0 0;font-size:14px;color:var(--text);line-height:1.35}
 .hero-pct .hp-b{color:var(--white);font-weight:700}
 .hero-pct .hp-2{color:var(--text);white-space:nowrap}
@@ -93,7 +93,7 @@ h2{font-size:21px}
 .g-m{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1.5px;border-radius:1px}
 .g-m-now{background:#fff;box-shadow:0 0 0 1px var(--bg)}
 .g-m-pk{background:#FFD84D;box-shadow:0 0 0 1px var(--bg)}
-.g-m-pk.g-m-near{top:-5px;bottom:-5px;width:9px;margin-left:-4.5px;border-radius:2px}   /* now ≈ peak: yellow shows around the white */
+.g-m-pk.g-m-near{top:-5px;bottom:-5px;width:9px;margin-left:-4.5px;border-radius:2px}
 .g-ticks{position:relative;height:15px;margin-top:5px}
 .g-t{position:absolute;top:0;left:0;color:var(--muted);font-size:11px;line-height:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .g-cap{display:block;color:var(--muted);font-size:11px;line-height:1.3;margin-top:1px}
@@ -101,8 +101,8 @@ h2{font-size:21px}
 .mb-m{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:#fff;border-radius:1px;box-shadow:0 0 0 1px var(--bg)}
 .readout .pc{color:var(--white);font-weight:600}
 .readout-grid .rg .pc{font-size:11.5px;color:var(--white);font-weight:600}
-/* phones: the readout above chart 1 gained "· 86th percentile", so it keeps room for 3 lines (a tap never moves the chart);
-   the tile percentile gets its own line on narrow phones, so a tap never re-wraps a tile */
+
+
 @media (max-width:719px){#ro1{min-height:4.35em}}
 @media (max-width:419px){.readout-grid .rg .pc{display:block;line-height:1.2}}
 .kb-val .kv-a,.kb-val .kv-b{white-space:nowrap}
@@ -113,7 +113,7 @@ h2{font-size:21px}
 .panel-asof{margin:4px 0 0;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .panel-asof .chip{font-size:11px;padding:1px 6px}
 
-/* readout above each chart (fixed spot: nothing hides under a finger) */
+
 .readout{margin:8px 0 6px;min-height:2.9em;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
 .readout-grid{min-height:0}
 .readout .d{color:var(--white);font-weight:700}
@@ -127,12 +127,12 @@ h2{font-size:21px}
 .readout-grid .rg .s{font-size:11px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .readout-grid .rg-date{min-height:2.9em}
 
-/* range chips: 8 equal chips in one row, even at 320 px */
+
 .seg-range{display:flex;width:100%;max-width:560px}
 .seg-range button{flex:1 1 0;min-width:0;padding:0 4px;min-height:44px;font-size:14px}
 .seg-range button.base{background:rgba(126,87,194,.18);color:var(--light);box-shadow:inset 0 0 0 1px var(--fear)}
 
-/* zoom bar above each chart: hint left, buttons right (32 px+ targets) */
+
 .zoombar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin:2px 0 6px}
 .zb-hint{font-size:12px;color:var(--muted);line-height:1.3;min-width:0;flex:1 1 160px}
 .zb-btns{display:inline-flex;gap:6px;flex:0 0 auto;margin-left:auto}
@@ -141,22 +141,22 @@ h2{font-size:21px}
 .zb-btns button[data-z=today]{color:var(--light);border-color:var(--fear)}
 .zb-btns button:disabled{opacity:.4;cursor:default}
 .zb-btns button[data-z=today]{order:-1}
-.zb-btns button.off{visibility:hidden}   /* keeps its space: the bar never changes height mid-gesture */
-.zb-btns button,.seg-range button{touch-action:manipulation}   /* no double-tap page zoom on the buttons (iOS) */
+.zb-btns button.off{visibility:hidden}
+.zb-btns button,.seg-range button{touch-action:manipulation}
 @media (max-width:479px){.zb-hint{flex-basis:100%}}
-/* phone/tablet: the window ("last 5 years" / "Sep 2025 – Oct 2026") gets its own line, so a zoom never re-wraps the
-   title and pushes the chart down mid-gesture */
+
+
 @media (max-width:719px){.tsep{display:none} .tspan{display:block;margin-top:3px;font-size:18px;font-weight:600;color:var(--light)}}
 @media (hover:hover){.zb-btns button:not(:disabled):hover{border-color:var(--muted);color:var(--white)}}
 
-/* plot areas: vertical swipes scroll the page, everything else is ours (pinch, sideways drag) */
+
 .chart{position:relative;width:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:crosshair;overscroll-behavior-x:none}
 .chart.dragging{cursor:grabbing}
 .chart svg{display:block;width:100%;height:auto;overflow:visible}
 .zoomtip{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);max-width:90%;background:rgba(19,23,34,.92);color:var(--white);border:1px solid var(--fear);border-radius:6px;padding:8px 12px;font-size:13px;line-height:1.3;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s}
 .zoomtip.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.zoomtip{transition:none}}
-/* dots: fear peaks + "now" (the SVG ring pulses gently; still under reduced motion) */
+
 .now-pulse{transform-box:fill-box;transform-origin:center;animation:nowpulse 2.4s ease-out infinite}
 @keyframes nowpulse{0%{transform:scale(1);opacity:.85}70%,100%{transform:scale(2.1);opacity:0}}
 @media (prefers-reduced-motion:reduce){.now-pulse{animation:none;opacity:.55}}
@@ -169,14 +169,14 @@ h2{font-size:21px}
 .chart:focus{outline:none}
 .chart:focus-visible{outline:2px solid var(--light);outline-offset:2px}
 
-/* the purple box */
+
 .box{margin-top:14px;background:var(--panel);border:1.5px solid var(--fear);border-radius:10px;padding:12px 14px}
 .box-row{display:grid;grid-template-columns:1fr;gap:2px;font-size:14.5px}
 .box-row+.box-row{margin-top:10px}
 .box-row b{color:var(--light);font-size:15px}
 .box-p{display:block;margin-top:6px}
 
-/* table view */
+
 .table-card summary{cursor:pointer;color:var(--light);font-weight:600;font-size:14px;padding:10px 0}
 .table-scroll{overflow-x:auto;margin-top:10px}
 table{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:100%}
@@ -204,7 +204,7 @@ caption{text-align:left;color:var(--muted);font-size:12px;padding-bottom:4px}
   .legend{font-size:12.5px;gap:2px 16px}
 }
 
-/* ---------- section 3: Fear meter · KDJ ---------- */
+
 .kdj-sub2{margin:6px 0 0;font-size:13px;color:var(--text)}
 .kdj-hint{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.35}
 .kblock{margin-top:18px;padding-top:12px;border-top:1px dashed var(--line)}
@@ -215,7 +215,7 @@ caption{text-align:left;color:var(--muted);font-size:12px;padding-bottom:4px}
 .kb-val.ghost{color:var(--light)}
 .kb-note{margin:3px 0 0;font-size:12.5px;line-height:1.35;color:var(--muted)}
 .kb-note.ghost{color:var(--light)}
-.kb-ro{margin:6px 0 4px;min-height:4.35em;font-size:12.5px}  /* 3 lines: the resting readout ("· tap for any …") never shrinks under the finger */
+.kb-ro{margin:6px 0 4px;min-height:4.35em;font-size:12.5px}
 .kb-ro .kk,.kb-ro .kd,.kb-ro .kj,.kb-ro .d{white-space:nowrap}
 .kb-ro .kk{color:#4FC3F7;font-weight:700} .kb-ro .kd{color:#FFB74D;font-weight:700} .kb-ro .kj{color:#A9ADBA;font-weight:600}
 .kb-bar{margin:0 0 6px}
@@ -241,13 +241,13 @@ caption{text-align:left;color:var(--muted);font-size:12px;padding-bottom:4px}
   .kb-ro{font-size:13.5px;min-height:1.6em}
 }
 
-/* KDJ range chips: the same chips as section 1, with an Auto chip in front (9 in one row, even at 320 px) */
+
 .kdj-controls{margin:12px 0 2px}
 .seg-krange button[data-krange=Auto]{flex-grow:1.3}
 @media (max-width:359px){.seg-krange button{padding:0 2px}}
 
-/* ---------- full screen (a fixed overlay, not element.requestFullscreen: iPhone has none for non-video) ---------- */
-html{scrollbar-gutter:stable}           /* locking the page never shifts it sideways */
+
+html{scrollbar-gutter:stable}
 html.fs-open body{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 .fs{position:fixed;inset:0;z-index:50;background:var(--bg);height:100vh;height:100dvh;overflow-x:hidden;overflow-y:auto;
   overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:manipulation;
@@ -268,22 +268,22 @@ html.fs-open body{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 .fs-bar .zoombar{margin:0}
 .fs-chart{position:relative;flex:1 0 240px;min-height:0;margin-top:2px}
 .fs-chart>.chart{position:absolute;inset:0;width:auto}
-.chart.ptr-focus:focus-visible{outline:none}      /* opened / closed by mouse or finger: no ring (any key brings it back) */
+.chart.ptr-focus:focus-visible{outline:none}
 .fs .zb-hint{display:none}
 .fs .card-head .sub{display:none}
 .fs .hero-num{font-size:30px}
-.fs .hero-peak,.fs .g-cap{display:none}          /* full screen: the gauge's own labels name the recent peak; the chart keeps its height */
+.fs .hero-peak,.fs .g-cap{display:none}
 .fs .card-head h1,.fs .card-head h2{font-size:22px}
 .fs .kb-head h3{font-size:20px}
 .fs .legend{margin-top:4px}
 .fs .readout{margin:6px 0 4px}
 .fs-hint{margin:4px 0 0;font-size:11.5px;color:var(--muted);line-height:1.3}
-/* phone held sideways: one compact header row, chips + zoom buttons share a row, the chart gets the height */
+
 @media (orientation:landscape) and (max-height:540px){
   .fs-headwrap{display:flex;flex-wrap:wrap;align-items:center;gap:2px 14px}
   .fs-head{flex:1 1 auto;min-width:0}
   .fs-status{margin:0}
-  .fs-status>span:not(.chip){display:none}      /* sideways: just the chip, beside the title */
+  .fs-status>span:not(.chip){display:none}
   .fs .card-head{flex-wrap:nowrap;align-items:baseline}
   .fs .card-head h1,.fs .card-head h2{font-size:18px}
   .fs .tspan{font-size:inherit}
@@ -296,30 +296,30 @@ html.fs-open body{position:fixed;left:0;right:0;width:100%;overflow:hidden}
   .fs-kicker{display:none}
   .fs-x{width:44px;height:44px}
   .fs-ctl{flex-wrap:nowrap;margin-top:4px}
-  /* chips and zoom buttons share the row: the chips give way first (never below ~32 px each), the buttons never clip */
+
   .fs-chips{flex:1 1 340px;min-width:288px}
   .fs-bar{min-width:auto}
   .fs-chips .seg-range{max-width:440px}
   .fs-chips .seg-range button{min-height:36px;font-size:13px}
   .fs-bar{flex:1 1 auto}
   .fs .kb-bar{flex-wrap:nowrap}
-  /* the window words may take two short lines (still within the 36 px row), so "(shortest view)" is never cut off */
+
   .fs .kb-win{flex:1 1 auto;min-width:0;font-size:12px;line-height:1.2;max-height:2.4em;overflow:hidden;
     display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
-  /* readouts stay ONE line sideways, so the chart never changes height under the finger */
+
   .fs .readout{margin:4px 0 2px;min-height:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fs .readout-grid{white-space:normal}
   .fs .readout-grid .rg-date{min-height:0;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fs .readout-grid .rg>div{display:flex;align-items:baseline;gap:6px;padding:1px 6px;white-space:nowrap;overflow:hidden}
   .fs .readout-grid .rg .k,.fs .readout-grid .rg .s{display:inline}
   .fs .readout-grid .rg .v{font-size:14px}
-  .fs .readout-grid .rg .mb{display:none}       /* one-line tiles: the percentile number stays, the mini-bar has no room */
+  .fs .readout-grid .rg .mb{display:none}
   .fs .readout-grid .rg>div{gap:4px}
-  .fs .readout-grid .rg .s .sp{display:none}     /* "wk of Sep 28" -> "Sep 28": the tile already names the candle size */
+  .fs .readout-grid .rg .s .sp{display:none}
   .fs .kb-ro{min-height:0}
   .fs .legend{font-size:11px;gap:0 10px;line-height:1.25;margin-top:2px}
   .fs-hint{display:none}
   .fs-status{margin-top:2px}
 }
-/* a small phone held sideways: the four readout cells keep the candle size + %, the dates are in the line above */
+
 @media (orientation:landscape) and (max-height:540px) and (max-width:760px){.fs .readout-grid .rg .s{display:none}}

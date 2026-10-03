@@ -1,18 +1,18 @@
-/* Price Seeker · preview. Big call-option piles (each stock's king node) parked far above the price, today's look-alikes
-   of the META pattern, and an honest record of hits and misses. The status chip, clock, ?now= / ?data= handling and the
-   NYSE calendar are copied from docs/breadth/breadth.js. Plain JS, no dependencies, no cookies. Every value from the data
-   is written with textContent. The tier is never recomputed here; the page only explains it.
-   Reads seeker.json version 1 (the current engine) and version 2 (node_hist, index[], q_day, closes …): anything a
-   version-1 file lacks is hidden or shown as "–", never guessed. */
+
+
+
+
+
+
 (function () {
   'use strict';
 
-  // ---------- config ----------
+
   var LIVE_URL = 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/seeker-data/seeker/seeker.json';
   var LIVE_HOST = 'lawrencekenshin.github.io';
-  var POLL_FAST = 5 * 60 * 1000;      // NY 9:30-16:30 on a session day
-  var POLL_SLOW = 30 * 60 * 1000;     // otherwise (catches the after-close and morning OI rebuilds)
-  var TICK_MS = 30 * 1000;            // recompute ages / chip from the phone clock
+  var POLL_FAST = 5 * 60 * 1000;
+  var POLL_SLOW = 30 * 60 * 1000;
+  var TICK_MS = 30 * 1000;
   var FETCH_TIMEOUT_MS = 15000;
   var C = { bg: '#131722', panel: '#1E222D', line: '#2A2E39', text: '#D1D4DC', muted: '#8A8E99', white: '#FFFFFF',
             fear: '#3987E5', light: '#8EC0FA', up: '#26A69A', down: '#EF5350', amber: '#F2B04B', gold: '#FFD84D' };
@@ -21,14 +21,14 @@
   var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   var NY = 'America/New_York', TPE = 'Asia/Taipei';
 
-  // NYSE calendar, copied from docs/breadth/breadth.js (same list as the data job). Extend every December.
+
   var HOLIDAYS = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03',
     '2026-09-07', '2026-11-26', '2026-12-25', '2027-01-01', '2027-01-18', '2027-02-15', '2027-03-26', '2027-05-31',
     '2027-06-18', '2027-07-05', '2027-09-06', '2027-11-25', '2027-12-24'];
   var HALF_DAYS = ['2026-11-27', '2026-12-24', '2027-11-26'];
   var CAL_END = '2027-12-31';
 
-  // the engine's rule; a version-1 file lacks the last three, these are the pre-registered values
+
   var RULE_DEF = { min_dist: 0.10, min_share: 0.15, or_min_gex_usd: 25e6, min_persist: 5, persist_window: 10, min_call_put: 2,
     max_z: 1.5, dte_lo: 2, dte_hi: 400, tierA_ret20: 0.05, tierB_growth: 0.10, tierB_min: 1000,
     min_closed: 100, test_start: '2026-10-05', borderline: { ret20: 0.01, growth: 0.02 } };
@@ -56,10 +56,10 @@
     C: 'C · old piles: big, not growing, price not moving. Often covered calls; likely noise'
   };
 
-  // ---------- URL params ----------
+
   var params = new URLSearchParams(location.search);
   var dataUrl = LIVE_URL, previewHost = null;
-  // only the project's own raw GitHub files, a local test server or this page's own origin may stand in for the live feed
+
   function dataHostOk(u) {
     var h = u.hostname;
     if (u.protocol === 'https:' && h === 'raw.githubusercontent.com' && /^\/lawrencekenshin\//.test(u.pathname)) return true;
@@ -77,9 +77,9 @@
           if (!/\.json$/i.test(href)) href = href.replace(/\/?$/, '/') + 'seeker.json';
           dataUrl = href; previewHost = u.host; return;
         }
-      } catch (e) { /* a bad override falls through */ }
+      } catch (e) {  }
     }
-    if (location.hostname !== LIVE_HOST && /^https?:$/.test(location.protocol)) {   // local preview: the file next to the page
+    if (location.hostname !== LIVE_HOST && /^https?:$/.test(location.protocol)) {
       dataUrl = location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') + 'seeker.json';
       previewHost = location.host;
     }
@@ -88,7 +88,7 @@
   if (params.get('now')) { var t0 = Date.parse(params.get('now')); if (!isNaN(t0)) nowOverride = t0 - Date.now(); }
   function now() { return Date.now() + (nowOverride || 0); }
 
-  // ---------- small helpers ----------
+
   var $ = function (id) { return document.getElementById(id); };
   function num(v) { return typeof v === 'number' && isFinite(v); }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
@@ -98,11 +98,11 @@
   function btn(cls, text) { var b = document.createElement('button'); b.type = 'button'; if (cls) b.className = cls; if (text != null) b.textContent = text; return b; }
   function add(parent) { for (var i = 1; i < arguments.length; i++) { var a = arguments[i]; if (a == null) continue; parent.appendChild(typeof a === 'string' ? document.createTextNode(a) : a); } return parent; }
   function sget(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage off: the page still works */ } }
+  function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) {  } }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function safeId(s) { return String(s).replace(/[^A-Za-z0-9_-]/g, '_'); }
 
-  // dates: day numbers (UTC days since 1970) for ET trading dates
+
   function dayNum(s) { return Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5; }
   function isoOf(dn) { return new Date(dn * 864e5).toISOString().slice(0, 10); }
   function dnDate(dn) { return new Date(dn * 864e5); }
@@ -118,7 +118,7 @@
     var e = Math.floor(epoch / 6e4) * 6e4, p = tzParts(e, tz);
     return Math.round((Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi) - e) / 6e4);
   }
-  function etEpoch(dn, h, m) { // New York wall clock -> epoch ms
+  function etEpoch(dn, h, m) {
     var wall = dn * 864e5 + h * 36e5 + m * 6e4, g = wall + 4 * 36e5;
     for (var i = 0; i < 3; i++) g = wall - tzOffsetMin(g, NY) * 6e4;
     return g;
@@ -126,8 +126,8 @@
   function etDayNum(epoch) { var p = tzParts(epoch, NY); return Date.UTC(p.y, p.mo - 1, p.d) / 864e5; }
   function curYear() { return tzParts(now(), NY).y; }
   function hm12(epoch, tz) { var p = tzParts(epoch, tz), h = p.h % 12 || 12; return h + ':' + pad2(p.mi) + ' ' + (p.h < 12 ? 'am' : 'pm'); }
-  function etHm(epoch) { return hm12(epoch, NY) + ' ET'; }                                          // "3:40 pm ET"
-  function tpeHmWd(epoch) { return hm12(epoch, TPE) + ' ' + tzParts(epoch, TPE).wd + ' Taipei'; }    // "3:40 am Sat Taipei"
+  function etHm(epoch) { return hm12(epoch, NY) + ' ET'; }
+  function tpeHmWd(epoch) { return hm12(epoch, TPE) + ' ' + tzParts(epoch, TPE).wd + ' Taipei'; }
   function fullTz(epoch, tz, label) { var p = tzParts(epoch, tz); return p.wd + ' ' + MON[p.mo - 1] + ' ' + p.d + ', ' + hm12(epoch, tz) + ' ' + label; }
   function etAndTpe(epoch) { return fullTz(epoch, NY, 'ET') + ' · ' + fullTz(epoch, TPE, 'Taipei'); }
   function ago(ms) {
@@ -140,30 +140,30 @@
   }
   function monD(dn, noYear) { var d = dnDate(dn), s = MON[d.getUTCMonth()] + ' ' + d.getUTCDate(); return noYear || d.getUTCFullYear() === curYear() ? s : s + ', ' + d.getUTCFullYear(); }
   function wmd(dn, noYear) { return WD[dnDate(dn).getUTCDay()] + ' ' + monD(dn, noYear); }
-  function dS(s, noYear) { return typeof s === 'string' && s.length >= 10 ? monD(dayNum(s), noYear) : '–'; }   // "Oct 16"
-  function wS(s, noYear) { return typeof s === 'string' && s.length >= 10 ? wmd(dayNum(s), noYear) : '–'; }   // "Fri Oct 16"
+  function dS(s, noYear) { return typeof s === 'string' && s.length >= 10 ? monD(dayNum(s), noYear) : '–'; }
+  function wS(s, noYear) { return typeof s === 'string' && s.length >= 10 ? wmd(dayNum(s), noYear) : '–'; }
   var HOL = {}, HALF = {};
   HOLIDAYS.forEach(function (s) { HOL[dayNum(s)] = 1; });
   HALF_DAYS.forEach(function (s) { HALF[dayNum(s)] = 1; });
   function isSession(dn) { var wd = (dn + 4) % 7; return wd >= 1 && wd <= 5 && !HOL[dn]; }
   function nextSession(dn) { var d = dn + 1; while (!isSession(d)) d++; return d; }
   function prevSession(dn) { var d = dn - 1; while (!isSession(d)) d--; return d; }
-  function sessionsAfter(a, b) { var n = 0; for (var d = a + 1; d <= b; d++) if (isSession(d)) n++; return n; }   // sessions in (a, b]
+  function sessionsAfter(a, b) { var n = 0; for (var d = a + 1; d <= b; d++) if (isSession(d)) n++; return n; }
   function nthSessionFrom(dn, k) { var d = dn; while (!isSession(d)) d++; for (var i = 0; i < k; i++) d = nextSession(d); return d; }
 
-  // numbers
+
   var NF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   var NFS = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
   var NFI = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-  function px(v) { return num(v) ? NF2.format(v) : '–'; }                         // prices: 2 dp
-  function strike(v) { return num(v) ? NFS.format(v) : '–'; }                     // strikes: no trailing zeros, 1,100
+  function px(v) { return num(v) ? NF2.format(v) : '–'; }
+  function strike(v) { return num(v) ? NFS.format(v) : '–'; }
   function int(v) { return num(v) ? NFI.format(v) : '–'; }
   function sgnInt(v) { return num(v) ? (v > 0 ? '+' : v < 0 ? '−' : '') + NFI.format(Math.abs(v)) : '–'; }
-  // percents round half away from zero (0.1505 -> 15.1%, not the float-edge 15.0%)
+
   function r0(f) { return (f < 0 ? -1 : 1) * Math.round(Math.abs(f) * 100 + 1e-7); }
   function r1(f) { return (f < 0 ? -1 : 1) * Math.round(Math.abs(f) * 1000 + 1e-6) / 10; }
   function p0(f) { return num(f) ? r0(f) + '%' : '–'; }
-  function a1(f) { return num(f) ? Math.abs(r1(f)).toFixed(1) + '%' : '–'; }     // unsigned, 1 dp
+  function a1(f) { return num(f) ? Math.abs(r1(f)).toFixed(1) + '%' : '–'; }
   function sp0(f) { if (!num(f)) return '–'; var r = r0(f); return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r) + '%'; }
   function sp1(f) { if (!num(f)) return '–'; var r = r1(f); return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toFixed(1) + '%'; }
   function compactSigned(v) {
@@ -186,7 +186,7 @@
   function oneIn(o) { if (!num(o) || o <= 0) return 'almost none'; return o < 0.5 ? '1 in ' + Math.max(2, Math.round(1 / o)) : Math.round(o * 10) + ' in 10'; }
   function tierName(t) { return t === 'AB' ? 'A+B' : t; }
 
-  // ---------- SVG ----------
+
   var NS = 'http://www.w3.org/2000/svg';
   function el(tag, attrs, parent) {
     var e = document.createElementNS(NS, tag);
@@ -219,14 +219,14 @@
   }
   function idxOnOrAfter(d, dn) { for (var i = 0; i < d.length; i++) if (d[i] >= dn) return i; return d.length - 1; }
 
-  // ---------- state ----------
-  var P = null;                 // the prepared document
+
+  var P = null;
   var lastErr = null, fatal = null, loading = false, lastFetchAt = 0, pollTimer = null, uid = 0, bannerSig = '';
   var rowRefs = {}, ghosts = {}, pendingOpen = null, helpBuilt = false, lastFocus = null, pop = null, popBtn = null;
   var GEO = { mode: geoNow(), spk: 0 };
   GEO.spk = spkW();
   var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all' };
-  // the lists the option-chain sweep is built from; the page can be narrowed to one of them
+
   var LISTS = {
     all: { label: 'Whole list', title: 'Every name we keep option chains for: the S&P 500, the Nasdaq-100 and the optionable names on Watchlist 1' },
     spx: { label: 'SPY list', title: 'S&P 500 members' },
@@ -234,21 +234,21 @@
     wl: { label: 'Watchlist 1', title: 'The OBV watchlist: hand-picked stocks and ETFs' }
   };
   function isList(k) { return typeof k === 'string' && Object.prototype.hasOwnProperty.call(LISTS, k); }
-  var RAW = null;                                         // the last data file as fetched; prep() narrows it to S.list
+  var RAW = null;
   var STORY = null;
 
   function geoNow() { var w = window.innerWidth || document.documentElement.clientWidth; return w >= 960 ? 'wide' : w >= 720 ? 'mid' : 'card'; }
-  function spkW() { return GEO.mode === 'card' ? ((window.innerWidth || 375) < 360 ? 84 : 112) : 120; }   // desktop: 128 px column incl. its gap
+  function spkW() { return GEO.mode === 'card' ? ((window.innerWidth || 375) < 360 ? 84 : 112) : 120; }
   function tripW() { return GEO.mode === 'card' ? 112 : 100; }
 
-  // ---------- validate + prepare ----------
+
   function check(d) {
     if (!d || typeof d !== 'object' || Array.isArray(d)) { var e0 = new Error('the file is not a JSON object'); throw e0; }
     if (d.version !== 1 && d.version !== 2) { var e = new Error('data format version ' + d.version); e.version = d.version; throw e; }
     if (!Array.isArray(d.names)) throw new Error('names[] is missing');
     if (typeof d.generated !== 'string' || isNaN(Date.parse(d.generated))) throw new Error('generated time is missing');
   }
-  function normSeries(s) {   // [[date, close] …] or {start, c:[…]} -> {d: [day numbers], c: [closes]}
+  function normSeries(s) {
     if (!s) return null;
     var d = [], c = [], h = [];
     if (Array.isArray(s)) {
@@ -262,7 +262,7 @@
     }
     return c.length >= 2 ? { d: d, c: c, h: h.length ? h : null } : null;
   }
-  // the series ends on the price day with today's price (v1 sparks stop at yesterday's close), still 60 points
+
   function withToday(ser, day, price) {
     if (!ser || typeof day !== 'string' || !num(price)) return ser;
     var dn = dayNum(day), last = ser.d[ser.d.length - 1];
@@ -310,7 +310,7 @@
       n._i = i;
       if (TIERS.indexOf(n.tier) < 0) n.tier = 'C';
       n._win = num(n.persist_window) && n.persist_window > 0 ? n.persist_window : R.persist_window;
-      n._persist = num(n.persist) ? Math.min(n.persist, n._win) : null;          // clamp: never "11 of 10"
+      n._persist = num(n.persist) ? Math.min(n.persist, n._win) : null;
       n._spk = withToday(normSeries(n.spark), n.price_day || d.prices_day, n.price);
       n._trip = tripOf(n);
       n._nc = ncOf(n, R);
@@ -322,7 +322,7 @@
     var closing = (Array.isArray(d.closing) ? d.closing : []).filter(function (c) { return c && typeof c.sym === 'string' && inL(c.sym); });
     closing.forEach(function (c) { c._spk = withToday(normSeries(c.spark), d.prices_day, c.price); c._touched = c.touched_today === true || (num(c.day_high) && num(c.node) && c.day_high >= c.node); });
     var rec = d.record && typeof d.record === 'object' ? d.record : {};
-    if (lk !== 'all') {                                   // the record's counts for this list (the engine counts each list)
+    if (lk !== 'all') {
       var bl = rec.by_list && rec.by_list[lk], r2 = {};
       Object.keys(rec).forEach(function (k) { r2[k] = rec[k]; });
       ['tracked', 'reached', 'still_open'].forEach(function (k) { r2[k] = bl && num(bl[k]) ? bl[k] : null; });
@@ -365,7 +365,7 @@
     };
   }
 
-  // ---------- status (from the phone clock) ----------
+
   function status() {
     var t = now(), gen = P.gen, age = t - gen, s = { age: age, gen: gen };
     var pdn = P.doc.prices_day ? dayNum(P.doc.prices_day) : etDayNum(gen);
@@ -388,7 +388,7 @@
       }
       return s;
     }
-    // CLOSED: fine until the next session's first update is due (9:40 ET + 15 min), LATE until 11:00 ET, then STALE
+
     var nxt = nextSession(pdn), late = etEpoch(nxt, 9, 55), stale = etEpoch(nxt, 11, 0);
     if (t < late) {
       s.chip = 'CLOSED'; s.cls = 'closed';
@@ -456,7 +456,7 @@
     list.forEach(function (b) { host.appendChild(banner(b[0], b[1], b[2], b[3], b[4])); });
   }
 
-  // ---------- today tiles ----------
+
   function tileBtn(k, v, small, note, fn) {
     var b = btn('tile');
     b.appendChild(span('t-k', k));
@@ -471,7 +471,7 @@
     var c = P.counts, n = P.names.length;
     T.appendChild(tileBtn('ON THE LIST', String(n), P.universe != null ? 'of ' + int(P.universe) : null, (c.AB + c.A + c.B) + ' outside the old piles',
       function () { setTier('all'); scrollToEl($('filters')); }));
-    // strongest: the A+B tickers, each a 44 px button that opens its row
+
     var t2 = div('tile'), ab = P.names.filter(function (x) { return x.tier === 'AB'; });
     if (ab.length) t2.className += ' hl';
     t2.appendChild(span('t-k', 'STRONGEST (A+B)'));
@@ -489,7 +489,7 @@
     t2.appendChild(v2);
     t2.appendChild(span('t-n', ab.length ? 'price moving toward it AND calls being added' : 'no name has both right now'));
     T.appendChild(t2);
-    // biggest bets: the most money in calls at a far pile, any tier
+
     var big = P.names.filter(function (x) { return num(x.prem_usd); }).sort(function (a, b) { return b.prem_usd - a.prem_usd; }).slice(0, 3);
     var t5 = div('tile tile-bets'); t5.appendChild(span('t-k', 'BIGGEST BETS'));
     var v5 = span('t-v', null);
@@ -507,14 +507,14 @@
     var n5 = span('t-n', '$ in calls at the pile · ');
     var rb = btn('linkbtn', 'Rank all'); rb.addEventListener('click', function () { setSort('bet'); scrollToEl($('filters')); });
     n5.appendChild(rb); t5.appendChild(n5);
-    // closing in
+
     var cl = P.closing, touched = cl.filter(function (x) { return x._touched; })[0], note3;
     var nT = cl.filter(function (x) { return x._touched; }).length;
     if (touched) note3 = touched.sym + ' touched ' + strike(touched.node) + ' today' + (nT > 1 ? ' (+' + (nT - 1) + ' more)' : '');
     else if (cl.length) { var nr = cl.slice().sort(function (a, b) { return a.dist - b.dist; })[0]; note3 = 'nearest: ' + nr.sym + ' ' + strike(nr.node) + ', ' + a1(nr.dist) + ' to go'; }
     else note3 = 'none right now';
     T.appendChild(tileBtn('CLOSING IN', String(cl.length), null, note3, function () { scrollToEl($('closing')); }));
-    // reached so far
+
     var rec = P.rec, h0 = P.hits[0], early = !P.scored || !num(P.scored.closed) || P.scored.closed < P.R.min_closed;
     T.appendChild(tileBtn('REACHED SO FAR', num(rec.reached) ? String(rec.reached) : '–', num(rec.tracked) ? 'of ' + int(rec.tracked) + ' tracked' : null,
       [h0 ? 'latest: ' + h0.sym + ' ' + strike(h0.node) + ' · ' + dS(h0.reached) : 'latest: none yet', early ? 'too early to grade' : 'graded in the scoreboard'],
@@ -522,9 +522,9 @@
     T.appendChild(t5);
   }
 
-  // ---------- caveat line + story folds ----------
+
   function initFolds() {
-    // first visit: open; later visits: folded unless the reader opened it again (each toggle is remembered)
+
     var cv = sget('ps.caveats'), st = sget('ps.story');
     setCaveat(cv !== 'closed');
     setStory(st !== 'closed');
@@ -544,7 +544,7 @@
   }
   function storyIsOpen() { return $('storyTog').getAttribute('aria-expanded') === 'true'; }
 
-  // ---------- the META story ----------
+
   function renderStory() {
     var m = P.meta, sec = $('story');
     if (!m || !num(m.node) || !m.seen || !m.base || !m.spike || !m.peak) { sec.hidden = true; STORY = null; return; }
@@ -580,7 +580,7 @@
       steps.push({ dn: P.doc.prices_day ? dayNum(P.doc.prices_day) : null, v: null, place: 1, now: true, text: 'Now · ' + wS(P.doc.prices_day) + '. Today’s ' + sym + ' close isn’t in this data file yet.' });
     }
     STORY = { m: m, sym: sym, node: node, closes: closes, steps: steps, seenDn: seenDn, active: STORY ? STORY.active : null };
-    // the steps list
+
     var ol = $('steps'); clear(ol);
     steps.forEach(function (st, i) {
       var li = document.createElement('li'), b = btn('', null);
@@ -589,7 +589,7 @@
       li.appendChild(b); ol.appendChild(li);
       st.btn = b;
     });
-    // the 5 checks, with META's values
+
     renderChecks();
     if (storyIsOpen()) drawStory();
     setStep(STORY.active, true);
@@ -643,7 +643,7 @@
     if (STORY.mark) STORY.mark(i == null ? null : STORY.steps[i]);
     if (i == null) storyRead(null);
     else { var st = STORY.steps[i]; storyRead(st.dn, st.v, st.high); }
-    if (!quiet && i != null && GEO.mode !== 'card') { /* desktop: steps sit beside the chart already */ }
+    if (!quiet && i != null && GEO.mode !== 'card') {  }
   }
   function drawStory() {
     if (!STORY) return;
@@ -651,7 +651,7 @@
     var W = Math.max(280, Math.round(h.clientWidth || 300)), H = W < 520 ? 200 : 240;
     var m = STORY.m, steps = STORY.steps, closes = STORY.closes, node = STORY.node;
     var L = 8, Rr = 10, T = 32, B = 22, pw = W - L - Rr, ph = H - T - B;
-    // x = trading-day position from the first close (or 4 sessions before step 1) to the last day shown
+
     var first = closes ? closes.d[0] : (function () { var d = steps[0].dn; for (var i = 0; i < 4; i++) d = prevSession(d); return d; })();
     var last = closes ? closes.d[closes.d.length - 1] : first;
     steps.forEach(function (st) { if (st.dn != null && st.dn > last) last = st.dn; });
@@ -667,19 +667,19 @@
     s.setAttribute('role', 'img');
     s.setAttribute('aria-label', STORY.sym + ' chart in 6 steps. ' + steps.map(function (st, i) { return (i + 1) + ': ' + st.text; }).join(' '));
     var xSeen = X(STORY.seenDn), ySeen = Y(m.seen.close), yNode = Y(node);
-    // our records start
+
     el('line', { x1: xSeen, x2: xSeen, y1: T - 6, y2: T + ph, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '1 3' }, s);
     tx(s, xSeen + 4, T + ph - 4, 'our records start', { fill: C.muted, 'font-size': 10.5 }, C.bg);
-    // the pile, from the first day of records only; label to its left at the same height
+
     el('line', { x1: xSeen, x2: L + pw, y1: yNode, y2: yNode, stroke: C.amber, 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, s);
     var lab = strike(node) + ' pile (Jan 2027 calls)';
     if (xSeen - 8 - textW(lab, 11, 700) < L) lab = strike(node) + ' pile';
     tx(s, xSeen - 6, yNode + 4, lab, { fill: C.amber, 'font-size': 11, 'font-weight': 700, 'text-anchor': 'end' }, C.bg);
-    // the +22% bracket at the first day of records
+
     el('path', { d: 'M' + (xSeen - 4) + ' ' + ySeen + 'H' + xSeen + 'V' + yNode + 'H' + (xSeen - 4), fill: 'none', stroke: C.amber, 'stroke-width': 1.6 }, s);
     var pct = num(m.seen.dist) ? m.seen.dist : node / m.seen.close - 1;
     tx(s, xSeen - 7, (ySeen + yNode) / 2 + 4, '+' + Math.round(pct * 100) + '%', { fill: C.amber, 'font-size': 12, 'font-weight': 700, 'text-anchor': 'end' }, C.bg);
-    // the closes
+
     var xs = [], pts = [];
     if (closes) {
       var dl = '';
@@ -691,9 +691,9 @@
       xs = ord.map(function (i) { return xs[i]; }); pts = ord.map(function (i) { return pts[i]; });
       pts.forEach(function (p) { el('circle', { cx: X(p.dn), cy: Y(p.v), r: 2.5, fill: C.light }, s); });
     }
-    // gold dot: the touch high
+
     el('circle', { cx: X(dayNum(m.spike.day)), cy: Y(m.spike.high), r: 4.5, fill: C.gold, stroke: C.bg, 'stroke-width': 1.6 }, s);
-    // x labels: first, records start, touch, last
+
     var labs = [{ x: L, t: monD(first, true), a: 'start' }, { x: xSeen, t: monD(STORY.seenDn, true), a: 'middle' },
       { x: X(dayNum(m.spike.day)), t: monD(dayNum(m.spike.day), true), a: 'middle' }, { x: L + pw, t: monD(last, true), a: 'end' }];
     var kept = [];
@@ -702,7 +702,7 @@
       if (kept.some(function (q) { return x0 < q.x1 + 8 && x0 + w + 8 > q.x0; })) return;
       kept.push({ x0: x0, x1: x0 + w }); tx(s, o.x, H - 6, o.t, { fill: C.muted, 'font-size': 11, 'text-anchor': o.a });
     });
-    // the numbered steps: 22 px circles with a 44 px hit area; step 6 = the pulsing now-dot
+
     var cross = el('g', { 'pointer-events': 'none' }, s);
     var marks = el('g', {}, s), circles = [];
     steps.forEach(function (st, i) {
@@ -738,8 +738,8 @@
     if (!closes) h.appendChild(para('cap', 'Key days only: the daily line arrives with the next version of the data file.'));
   }
 
-  // ---------- chart reading: hover (mouse), touch-and-hold or tap (finger), arrows (keyboard) ----------
-  // The readout sits ABOVE each chart; nothing is drawn under the finger except the thin crosshair.
+
+
   function attachReader(holder, api) {
     holder._rd = api;
     if (holder._rdBound) return;
@@ -766,7 +766,7 @@
     });
     function end(e) {
       if (e.pointerType === 'mouse') return;
-      if (holdT) { clearTimeout(holdT); holdT = null; if (e.type === 'pointerup') show(idx(e.clientX)); }   // a tap reads that day too
+      if (holdT) { clearTimeout(holdT); holdT = null; if (e.type === 'pointerup') show(idx(e.clientX)); }
       holding = false;
     }
     holder.addEventListener('pointerup', end);
@@ -783,7 +783,7 @@
     });
   }
 
-  // ---------- list rows ----------
+
   function tierPill(t) {
     var R = P ? P.R : RULE_DEF;
     var titles = { AB: 'A+B: price moving toward the pile AND calls being added', A: 'A: price moving toward the pile (up ' + p0(R.tierA_ret20) + '+ in 20 days)',
@@ -817,7 +817,7 @@
   }
   function fillTogo(r) { r.c.togo.textContent = num(r.n.dist) ? sp1(r.n.dist) : '–'; }
   function tripSvg(t, W) {
-    var H = 12, Z = 18, F = 7, x0 = Z, x1 = W - F;     // stub zone (to -100%) | track (to the pile) | flag
+    var H = 12, Z = 18, F = 7, x0 = Z, x1 = W - F;
     var s = svgNode(W, H);
     s.setAttribute('role', 'img'); s.setAttribute('aria-label', t < 0 ? 'Trip: the price went the other way' : 'Trip: ' + Math.round(t * 100) + '% of the way');
     el('rect', { x: x0, y: 4, width: x1 - x0, height: 4, rx: 1, fill: C.line }, s);
@@ -827,8 +827,8 @@
       el('rect', { x: x0 - Ls, y: 3, width: Math.max(1.5, Ls), height: 6, rx: 1, fill: C.down }, s);
       if (-t >= 1) el('path', { d: 'M' + (x0 - Ls + 3.5) + ' 1.5L' + (x0 - Ls) + ' 6L' + (x0 - Ls + 3.5) + ' 10.5', stroke: C.down, fill: 'none', 'stroke-width': 1.4 }, s);
     }
-    el('line', { x1: x0, x2: x0, y1: 1, y2: 11, stroke: C.text, 'stroke-width': 1.2 }, s);      // start = 20 days ago
-    el('line', { x1: x1, x2: x1, y1: 0, y2: 12, stroke: C.amber, 'stroke-width': 1.4 }, s);     // the pile
+    el('line', { x1: x0, x2: x0, y1: 1, y2: 11, stroke: C.text, 'stroke-width': 1.2 }, s);
+    el('line', { x1: x1, x2: x1, y1: 0, y2: 12, stroke: C.amber, 'stroke-width': 1.4 }, s);
     el('path', { d: 'M' + x1 + ' 0L' + (x1 + F - 0.5) + ' 2.6L' + x1 + ' 5.2Z', fill: C.amber }, s);
     return s;
   }
@@ -876,7 +876,7 @@
     if (Array.isArray(n.node_hist) && n.node_hist.length) {
       marks = n.node_hist.slice(-10).map(function (e) { var k = Array.isArray(e) ? e[1] : null; return !num(k) ? 'n' : Math.abs(k - n.node) < 1e-6 ? 'f' : 'h'; });
     } else if (n._persist != null && n._persist === n._win) {
-      marks = []; for (var i = 0; i < n._win; i++) marks.push('f');        // held in every session: the order doesn't matter
+      marks = []; for (var i = 0; i < n._win; i++) marks.push('f');
     }
     if (!marks) return span('held-t', n._persist == null ? '–' : n._persist + ' of ' + n._win);
     while (marks.length < 10) marks.unshift('n');
@@ -893,7 +893,7 @@
     else if (S.sort === 'betday') { v = num(n.per_day_usd) ? usd(n.per_day_usd) : '–'; lab = 'per day left'; }
     else { v = usd(n.prem_usd); lab = 'in calls'; }
     c.appendChild(span('bv', v)); c.appendChild(span('bl', lab));
-    var sc = num(n.score) ? Math.round(n.score) : null;                       // tablets: the business score shares this cell
+    var sc = num(n.score) ? Math.round(n.score) : null;
     c.appendChild(span('bz' + (sc == null ? ' none' : sc >= 70 ? ' hi' : ''), sc == null ? 'no score' : 'Biz ' + sc));
     c.title = '$ in calls ' + usd(n.prem_usd) + (num(n.prem_adv) ? ' · ' + pctTxt(n.prem_adv) + ' of a normal day’s trading' : '') +
       (num(n.per_day_usd) ? ' · ' + usd(n.per_day_usd) + ' per day left (each expiry’s $ ÷ its own days)' : '');
@@ -944,7 +944,7 @@
     return r;
   }
 
-  // ---------- list ----------
+
   var SORTS = {
     odds: function (a, b) { return (num(b.odds) ? b.odds : -1) - (num(a.odds) ? a.odds : -1); },
     near: function (a, b) { return (num(a.dist) ? a.dist : 9) - (num(b.dist) ? b.dist : 9); },
@@ -955,7 +955,7 @@
     newest: function (a, b) { return (b.first_seen || '').localeCompare(a.first_seen || ''); },
     az: function (a, b) { return a.sym.localeCompare(b.sym); }
   };
-  // rankings: every tier is ranked together (the money and the business don't care about the tier)
+
   var RANKS = {
     bet: { f: 'prem_usd', note: 'Ranked by $ in calls: what the calls at the pile were worth at the last saved option prices (open interest × option price × 100). The most money parked at a far strike comes first.' },
     betadv: { f: 'prem_adv', note: 'Ranked by $ in calls compared with a normal day’s trading in the stock (20-day average). A big bet in a quiet stock ranks high.' },
@@ -1125,7 +1125,7 @@
     return true;
   }
 
-  // hash: "#SYM" opens a row; "#t=AB&s=odds&o=DRAM" also sets the tier and the sort (and wins over storage)
+
   function parseHash() {
     var h = ''; try { h = decodeURIComponent(location.hash.replace(/^#/, '')); } catch (e) { h = location.hash.replace(/^#/, ''); }
     if (!h) return {};
@@ -1135,7 +1135,7 @@
   function setHash(sym) { try { history.replaceState(null, '', location.pathname + location.search + '#' + encodeURIComponent(sym)); } catch (e) { } }
   function clearHash() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } }
 
-  // ---------- row detail ----------
+
   function kick(t) { return para('d-k', t); }
   function plainEnglish(n) {
     var R = P.R, sym = n.sym, k = '$' + strike(n.node), parts = [];
@@ -1175,7 +1175,7 @@
     });
     return ul;
   }
-  // the calls side of the tier, in words (the B bar: growth AND a contract count)
+
   function callsWords(n, flatWords) {
     var R = P.R, x = n._nc; if (!x) return '';
     var w = ' over ' + x.w + (x.w === '1' ? ' session' : ' sessions');
@@ -1251,7 +1251,7 @@
     function fallback() {
       var ta = document.createElement('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select();
-      try { if (document.execCommand('copy')) done(); } catch (e) { /* nothing */ }
+      try { if (document.execCommand('copy')) done(); } catch (e) {  }
       document.body.removeChild(ta);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, fallback); else fallback();
@@ -1340,7 +1340,7 @@
       if (fsd >= d[0] && fsd <= today) {
         var xf = XH(idxOnOrAfter(d, fsd));
         el('line', { x1: xf, x2: xf, y1: T, y2: T + ph, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '1 3' }, s);
-        var yfs = num(n.node) && Y(n.node) - T < 18 ? Y(n.node) + 14 : T + 9;     // never on top of the pile line
+        var yfs = num(n.node) && Y(n.node) - T < 18 ? Y(n.node) + 14 : T + 9;
         tx(s, xf + 3, yfs, 'first seen', { fill: C.muted, 'font-size': 10.5 }, true);
       }
     }
@@ -1354,7 +1354,7 @@
     var dl = ''; for (var i = 0; i < N; i++) dl += (i ? 'L' : 'M') + XH(i).toFixed(1) + ' ' + Y(c[i]).toFixed(1);
     el('path', { d: dl, fill: 'none', stroke: C.light, 'stroke-width': 1.8, 'stroke-linejoin': 'round' }, g);
     el('circle', { cx: xt, cy: Y(c[N - 1]), r: 3.5, fill: '#fff', stroke: C.panel, 'stroke-width': 1.5 }, s);
-    // x labels: first day · today · main expiry
+
     var labs = [{ x: xt, t: monD(today, true) + ' today', a: 'middle', w: 0 }];
     if (spanD) labs.push({ x: L + pw, t: monD(exp, true), a: 'end' });
     labs.push({ x: L, t: monD(d[0], true), a: 'start' });
@@ -1406,7 +1406,7 @@
     tx(s, L + pw, H - 4, monD(d[N - 1], true), { fill: C.muted, 'font-size': 10.5, 'text-anchor': 'end' });
   }
 
-  // ---------- check any ticker (search + Enter) ----------
+
   var CHECK_ORDER = ['far', 'big', 'persist', 'calls', 'reach'];
   function hideCheck() { var c = $('checkCard'); c.hidden = true; clear(c); }
   function checkTicker(raw) {
@@ -1481,7 +1481,7 @@
   }
   function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
-  // ---------- closing in ----------
+
   function sortedClosing() {
     return P.closing.slice().sort(function (a, b) { return (b._touched ? 1 : 0) - (a._touched ? 1 : 0) || (num(a.dist) ? a.dist : 9) - (num(b.dist) ? b.dist : 9); });
   }
@@ -1527,7 +1527,7 @@
     return w;
   }
 
-  // ---------- recent hits ----------
+
   function onListFirst(h) {
     if (!('q_day' in h)) return '–';
     return h.q_day ? 'Yes, from ' + dS(h.q_day) : 'No: reached before it passed all 5 checks';
@@ -1566,7 +1566,7 @@
       }
       host.appendChild(w);
     });
-    // misses
+
     var ms = P.misses || [], n = P.missed != null ? P.missed : ms.length;
     $('missesH').textContent = 'Ran out of time (' + n + ')';
     var mh = $('missRows'); clear(mh);
@@ -1578,7 +1578,7 @@
   }
   function firstExpWords() { var e = P.byExp && P.byExp[0]; return e ? dS(e.exp) : 'Oct 16'; }
 
-  // ---------- scoreboard ----------
+
   var BUCKETS = [[0.13, 0.25, '13–25%'], [0.25, 0.40, '25–40%'], [0.40, 0.60, '40–60%'], [0.60, 1.01, '60%+']];
   function renderScore() {
     $('score').hidden = false;
@@ -1595,7 +1595,7 @@
     tile('STILL OPEN', num(rec.still_open) ? int(rec.still_open) : '–');
     tile('RAN OUT OF TIME', P.missed != null ? int(P.missed) : '–');
     tile('ON THE LIST FIRST', k != null ? String(k) : '–', 'of ' + (num(rec.reached) ? int(rec.reached) : '–'), 'the others were reached before they could pass all 5 checks');
-    // calendar
+
     var cal = $('cal'); clear(cal);
     cal.appendChild(para('cal-t', 'When the piles on today’s list resolve'));
     var rows = P.byExp.slice(0, 4).map(function (e) { return { t: dS(e.exp, true), n: e.n }; });
@@ -1608,7 +1608,7 @@
       var bw = span('', null), bar = span('cal-bar', null); bar.style.width = (r.n / mx * 100).toFixed(1) + '%'; bw.appendChild(bar); row.appendChild(bw);
       row.appendChild(span('cal-n', String(r.n))); cal.appendChild(row);
     });
-    // early bias: piles on today's list that expire two months out or later
+
     var N = P.names.length, cut = null, nLate = 0;
     if (N && P.doc.prices_day) {
       var c60 = dayNum(P.doc.prices_day) + 60;
@@ -1653,12 +1653,12 @@
   }
   function verdict(hit, ex, closed) {
     if (!closed || ex == null) return '–';
-    var p = ex / closed, se = Math.sqrt(closed * p * (1 - p));   // Σp(1−p) with the bucket's mean odds
+    var p = ex / closed, se = Math.sqrt(closed * p * (1 - p));
     if (Math.abs(hit - ex) <= 2 * se) return 'about what the odds said';
     return hit > ex ? 'more than the odds said' : 'fewer than the odds said';
   }
 
-  // ---------- rules + numbers table + footer ----------
+
   function renderRules() {
     var R = P.R, b = $('rulesBody'); clear(b);
     function h3(t) { var h = document.createElement('h3'); h.textContent = t; b.appendChild(h); }
@@ -1758,7 +1758,7 @@
       (P.doc.price_source ? ' (' + P.doc.price_source + ')' : '') + '. Only computed values are shown, not quotes.';
   }
 
-  // ---------- "How to read a row" dialog + column popovers ----------
+
   function demoName() {
     if (P && P.names) {
       var full = P.names.filter(function (x) { return num(x.score) && num(x.prem_usd) && x._trip && x._spk && x._nc; });
@@ -1777,7 +1777,7 @@
   function buildHelp() {
     var demo = $('helpDemo'); clear(demo); demo.className = 'demo';
     var savedP = P;
-    if (!P) P = { R: RULE_DEF, doc: {}, newest: null };     // the static sample also works before the data arrives
+    if (!P) P = { R: RULE_DEF, doc: {}, newest: null };
     var r = buildRow(demoName(), true);
     P = savedP;
     [['tier', 1], ['price', 2], ['trip', 3], ['spark', 4], ['odds', 5], ['nc', 6], ['bet', 7], ['biz', 8]].forEach(function (o) { var b = span('cn', String(o[1])); b.setAttribute('aria-hidden', 'true'); r.c[o[0]].insertBefore(b, r.c[o[0]].firstChild); });
@@ -1811,7 +1811,7 @@
     var k = +b.getAttribute('data-pop'), list = $('list');
     pop = div('pop'); pop.id = 'colpop'; pop.setAttribute('role', 'note');
     pop.appendChild(add(document.createElement('b'), CALLOUTS[k - 1][0] + ': ')); pop.appendChild(document.createTextNode(CALLOUTS[k - 1][1]));
-    if (k === 7 && GEO.mode === 'mid') {                  // tablets: Business shares this column, so its (i) explains both
+    if (k === 7 && GEO.mode === 'mid') {
       pop.appendChild(document.createElement('br')); pop.appendChild(add(document.createElement('b'), CALLOUTS[7][0] + ': ')); pop.appendChild(document.createTextNode(CALLOUTS[7][1]));
     }
     list.appendChild(pop);
@@ -1826,7 +1826,7 @@
     pop = null; popBtn = null;
   }
 
-  // ---------- live refresh: in-place updates, never a reorder under the finger ----------
+
   function flashCell(node) {
     if (reduced() || !node) return;
     node.classList.remove('flash'); void node.offsetWidth; node.classList.add('flash');
@@ -1861,7 +1861,7 @@
   function applyUpdate(np, viaVisible) {
     var old = P;
     P = np;
-    if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }   // nothing under the finger: re-sort
+    if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }
     var t = hm12(np.gen, NY), nNew = 0;
     np.names.forEach(function (n) { if (!old.by[n.sym]) nNew++; });
     Object.keys(rowRefs).forEach(function (sym) {
@@ -1891,7 +1891,7 @@
     document.documentElement.style.setProperty('--stick', (58 + (b.hidden ? 0 : b.offsetHeight + 6)) + 'px');
   }
 
-  // ---------- render everything ----------
+
   function renderAll() {
     $('content').hidden = false;
     renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
@@ -1909,7 +1909,7 @@
     bannerSig = ''; renderBanners();
   }
 
-  // ---------- fetching ----------
+
   function getJSON() {
     var ctl = ('AbortController' in window) ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, FETCH_TIMEOUT_MS);
@@ -1948,7 +1948,7 @@
   }
   function schedule() { clearTimeout(pollTimer); if (!document.hidden) pollTimer = setTimeout(function () { load(false, false); }, pollDelay()); }
 
-  // ---------- wire up ----------
+
   (function initState() {
     var t = sget('ps.tier'), s = sget('ps.sort'), c = sget('ps.cOpen'), li = sget('ps.list');
     if (isList(li)) S.list = li;
@@ -2024,7 +2024,7 @@
     if (Date.now() - lastFetchAt > 30 * 1000) load(false, true); else schedule();
   });
   setInterval(function () { if (P) renderStatus(); else renderBanners(); }, TICK_MS);
-  // read-only state for tests and debugging
+
   try {
     Object.defineProperty(window, '__seeker', { configurable: true, get: function () {
       if (!P) return { loaded: false, fatal: fatal, dataUrl: dataUrl };

@@ -249,7 +249,7 @@
     }).join('');
     if(active>=0) inspect(active);else if(visible.length)draw();
   }
-  // Baseline and conditional groups share the exact eligible rows; zero is not positive.
+
   function outcomes(selected, symbol, horizon) {
     const eligible=selected.filter(r=>regimes.includes(r.signal_regime)&&Number.isFinite(r.signal_mii)&&Number.isFinite(r[symbol+'_fwd'][horizon]));
     const summarize = group => {
@@ -299,7 +299,7 @@
     ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,width,height);
     layout=geometry();const g=layout;
     ctx.font='10px system-ui,sans-serif';ctx.textBaseline='middle';
-    // Bands start at the session whose close produced that label. Prices and stats stay independent.
+
     let start=0;
     while(start<visible.length){
       let end=start+1;while(end<visible.length&&visible[end].regime===visible[start].regime)end++;
