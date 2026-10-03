@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="How many S&amp;P 500 stocks are scared right now: the purple fear meter on daily, weekly, 2-week and monthly candles, updated through the trading day.">
+<title>Fear meter · live</title>
+<link rel="stylesheet" href="live.css">
+</head>
+<body>
+<a class="skip" href="#daily">Skip to the chart</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../semis/"><span class="t-long">Semis Tracking</span><span class="t-short">Semis</span></a>
+      <a class="tab" href="../price-seeker/"><span class="t-long">Price Seeker</span><span class="t-short">Seeker</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="status" id="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Fetching the latest numbers…</span>
+    </div>
+    <p class="status-line" id="statusLine"></p>
+    <p class="status-line muted" id="membersLine"></p>
+  </section>
+
+  <div id="banners" aria-live="assertive"></div>
+
+  <div id="content" hidden>
+    <div class="controls">
+      <div class="seg seg-range" role="group" aria-label="Time window" id="ranges">
+        <button type="button" data-range="1M" aria-pressed="false" aria-label="Last month">1M</button>
+        <button type="button" data-range="3M" aria-pressed="false" aria-label="Last 3 months">3M</button>
+        <button type="button" data-range="6M" aria-pressed="false" aria-label="Last 6 months">6M</button>
+        <button type="button" data-range="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+        <button type="button" data-range="2Y" aria-pressed="false" aria-label="Last 2 years">2Y</button>
+        <button type="button" data-range="5Y" aria-pressed="true" aria-label="Last 5 years">5Y</button>
+        <button type="button" data-range="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+        <button type="button" data-range="All" aria-pressed="false" aria-label="All data">All</button>
+      </div>
+    </div>
+
+    <!-- Chart 1: the daily fear meter -->
+    <section class="card" id="daily" aria-labelledby="t1">
+      <div class="card-head">
+        <div class="card-title">
+          <h1 id="t1">The fear meter<span class="tsep"> · </span><span class="tspan" data-span>last 5 years</span></h1>
+          <p class="sub">How many S&amp;P 500 stocks are scared, every day</p>
+        </div>
+        <div class="hero">
+          <div class="hero-num"><span class="hero-k" id="heroK">today</span> <span id="heroV">–</span></div>
+          <div class="hero-date" id="heroDate"></div>
+          <p class="hero-pct" id="heroPct"></p>
+          <p class="hero-peak" id="heroPeak"></p>
+          <div class="gauge" id="gauge1" role="img" aria-label="Percentile gauge"></div>
+        </div>
+      </div>
+      <p class="zone-line" id="zoneLine"></p>
+      <p class="panel-asof" id="asof1"></p>
+      <div class="readout" id="ro1" aria-live="polite"></div>
+      <div class="zoombar">
+        <span class="zb-hint" data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span>
+        <span class="zb-btns">
+          <button type="button" data-z="out" aria-label="Zoom out">−</button>
+          <button type="button" data-z="in" aria-label="Zoom in">+</button>
+          <button type="button" data-z="reset" aria-label="Back to the chosen range">Reset</button>
+          <button type="button" data-z="today" class="off" aria-label="Move to today" aria-hidden="true" disabled>→ Today</button>
+        </span>
+      </div>
+      <div class="chart" id="chart1" tabindex="0" role="group" aria-label="Daily fear meter chart. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      <p class="legend" id="lg1"></p>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span><span id="howTo"></span><span class="box-p zone-key" id="zoneKey"></span></span></div>
+        <div class="box-row"><b>Right now</b><span id="rightNow"></span></div>
+      </div>
+    </section>
+
+    <!-- Chart 2: the same meter on 4 candle sizes -->
+    <section class="card" id="tf" aria-labelledby="t2">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t2">The fear meter on 4 candle sizes<span class="tsep"> · </span><span class="tspan" data-span>last 5 years</span></h2>
+          <p class="sub" id="tfSub">Same rule — % of S&amp;P 500 stocks scared — on daily, weekly, 2-week and monthly candles.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asof2"></p>
+      <div class="readout readout-grid" id="ro2" aria-live="polite"></div>
+      <div class="zoombar">
+        <span class="zb-hint" data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span>
+        <span class="zb-btns">
+          <button type="button" data-z="out" aria-label="Zoom out">−</button>
+          <button type="button" data-z="in" aria-label="Zoom in">+</button>
+          <button type="button" data-z="reset" aria-label="Back to the chosen range">Reset</button>
+          <button type="button" data-z="today" class="off" aria-label="Move to today" aria-hidden="true" disabled>→ Today</button>
+        </span>
+      </div>
+      <div class="chart" id="chart2" tabindex="0" role="group" aria-label="Fear meter on four candle sizes. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      <p class="legend" id="lg2"></p>
+      <div class="box">
+        <div class="box-row"><b>What changes</b><span><span id="whatChanges"></span><span class="box-p" id="tfClaim"></span></span></div>
+      </div>
+    </section>
+
+    <!-- Section 3: KDJ(9,3,3) of the fear meter, one block per candle size, each with its own zoom window -->
+    <section class="card" id="kdj" aria-labelledby="t3">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t3">Fear meter · KDJ</h2>
+          <p class="sub">SPY price · fear bars · KDJ(9,3,3) of the fear %, per candle size</p>
+        </div>
+      </div>
+      <div class="controls kdj-controls">
+        <div class="seg seg-range seg-krange" role="group" aria-label="Time window for all four KDJ blocks" id="kranges">
+          <button type="button" data-krange="Auto" aria-pressed="true" aria-label="Each block's default window">Auto</button>
+          <button type="button" data-krange="1M" aria-pressed="false" aria-label="Last month">1M</button>
+          <button type="button" data-krange="3M" aria-pressed="false" aria-label="Last 3 months">3M</button>
+          <button type="button" data-krange="6M" aria-pressed="false" aria-label="Last 6 months">6M</button>
+          <button type="button" data-krange="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+          <button type="button" data-krange="2Y" aria-pressed="false" aria-label="Last 2 years">2Y</button>
+          <button type="button" data-krange="5Y" aria-pressed="false" aria-label="Last 5 years">5Y</button>
+          <button type="button" data-krange="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+          <button type="button" data-krange="All" aria-pressed="false" aria-label="All data">All</button>
+        </div>
+      </div>
+      <p class="kdj-sub2" id="kdjSub2"></p>
+      <p class="panel-asof" id="asof3"></p>
+      <p class="kdj-hint"><span data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span> · pick a range for all four blocks, or zoom each block on its own</p>
+      <p class="banner banner-warn" id="kdjErr" hidden></p>
+      <div class="kblock" data-k="1D" aria-label="Daily candles">
+        <div class="kb-head"><h3>Daily</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (daily)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (daily)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (daily)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="Daily candles: SPY, fear % and KDJ of the fear meter. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <div class="kblock" data-k="1W" aria-label="Weekly candles">
+        <div class="kb-head"><h3>Weekly</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (weekly)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (weekly)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (weekly)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="Weekly candles: SPY, fear % and KDJ of the fear meter. Left and right arrows move through weeks, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <div class="kblock" data-k="2W" aria-label="2-week candles">
+        <div class="kb-head"><h3>2-week</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (2-week)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (2-week)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (2-week)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="2-week candles: SPY, fear % and KDJ of the fear meter. Left and right arrows move through candles, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <div class="kblock" data-k="1M" aria-label="Monthly candles">
+        <div class="kb-head"><h3>Monthly</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (monthly)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (monthly)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (monthly)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="Monthly candles: SPY, fear % and KDJ of the fear meter. Left and right arrows move through months, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <p class="legend kdj-legend" id="lg3"></p>
+      <p class="kdj-honest">KDJ of the fear meter describes the swing in fear; it has not been tested as a buy or sell signal.</p>
+    </section>
+
+    <details class="card table-card">
+      <summary>The numbers as a table</summary>
+      <div class="table-scroll"><table id="tfTable"></table></div>
+      <div class="table-scroll"><table id="dayTable"></table></div>
+    </details>
+  </div>
+
+  <footer class="foot">
+    <p id="footRule">Scared = TET mood below −0.5 (6 RSIs + 6 ‘where it closed in its range’). Today’s S&amp;P 500 members. Describes, doesn’t predict. Not advice.</p>
+    <p><b>Informational only. Not investment advice.</b> Nothing here says when to buy or sell.</p>
+    <p id="footPct">Percentile = the share of CLOSED candles of the same size since 2013 (or since 2021) whose fear was at or below that value; the candle itself is never counted, and an open candle is ranked against the closed ones (“so far”). Dashed purple lines = the 90th, 95th and 99th percentile levels of 2013+ closed candles. Recent peak = the highest reading in the last 30 calendar days (daily), the last 6 weekly, 4 two-week or 3 monthly candles.</p>
+    <p>Method: Trend Emotion Timing (TET) by Dr. Oliver Reiss (NAAIM 2025). This is an independent re-implementation, not affiliated with or endorsed by the author or NAAIM. Alarm line = the 90th percentile of 2013–2020 for that candle size.</p>
+    <p id="footData">Derived values only (shares of stocks, SPY close). Prices about 15 minutes delayed during the session. No cookies, no tracking.</p>
+  </footer>
+</main>
+
+<!-- Full screen: one overlay for any chart. Its slots receive the chart's own nodes while open (no requestFullscreen). -->
+<div class="fs" id="fs" role="dialog" aria-modal="true" aria-label="Full screen chart" hidden>
+  <div class="fs-in">
+    <div class="fs-top">
+      <div class="fs-headwrap">
+        <p class="fs-kicker" id="fsKicker" hidden></p>
+        <div class="fs-slot fs-head" data-fs="head"></div>
+        <p class="fs-status panel-asof" id="fsStatus"></p>
+      </div>
+      <button type="button" class="fs-x" id="fsClose" aria-label="Close full screen">✕</button>
+    </div>
+    <div class="fs-slot" data-fs="note"></div>
+    <div class="fs-ctl">
+      <div class="fs-slot fs-chips" data-fs="chips"></div>
+      <div class="fs-slot fs-bar" data-fs="bar"></div>
+    </div>
+    <div class="fs-slot" data-fs="ro"></div>
+    <div class="fs-chart" data-fs="chart"></div>
+    <div class="fs-slot" data-fs="legend"></div>
+    <p class="fs-hint" id="fsHint"></p>
+  </div>
+</div>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="live.js" defer></script>
+</body>
+</html>

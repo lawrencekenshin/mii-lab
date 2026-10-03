@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="How many S&amp;P 500 stocks are above their 50-day and 200-day averages right now, the washouts since 2013, and what came after them. Updated through the trading day.">
+<title>Market breadth · live</title>
+<link rel="stylesheet" href="breadth.css">
+</head>
+<body>
+<a class="skip" href="#daily">Skip to the chart</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../semis/"><span class="t-long">Semis Tracking</span><span class="t-short">Semis</span></a>
+      <a class="tab" href="../price-seeker/"><span class="t-long">Price Seeker</span><span class="t-short">Seeker</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="status" id="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Fetching the latest numbers…</span>
+    </div>
+    <p class="status-line" id="statusLine"></p>
+    <p class="status-line muted" id="membersLine"></p>
+  </section>
+
+  <div id="banners" aria-live="assertive"></div>
+
+  <div id="content" hidden>
+    <div class="controls">
+      <div class="seg seg-range" role="group" aria-label="Time window" id="ranges">
+        <button type="button" data-range="1M" aria-pressed="false" aria-label="Last month">1M</button>
+        <button type="button" data-range="3M" aria-pressed="false" aria-label="Last 3 months">3M</button>
+        <button type="button" data-range="6M" aria-pressed="false" aria-label="Last 6 months">6M</button>
+        <button type="button" data-range="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+        <button type="button" data-range="2Y" aria-pressed="false" aria-label="Last 2 years">2Y</button>
+        <button type="button" data-range="5Y" aria-pressed="true" aria-label="Last 5 years">5Y</button>
+        <button type="button" data-range="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+        <button type="button" data-range="All" aria-pressed="false" aria-label="All data">All</button>
+      </div>
+    </div>
+
+    <!-- Chart 1: daily breadth (50-day + 200-day) under SPY -->
+    <section class="card" id="daily" aria-labelledby="t1">
+      <div class="card-head">
+        <div class="card-title">
+          <h1 id="t1">Market breadth<span class="tsep"> · </span><span class="tspan" data-span>last 5 years</span></h1>
+          <p class="sub">How many S&amp;P 500 stocks are above their 50-day and 200-day averages</p>
+        </div>
+        <div class="hero">
+          <div class="hero-num"><span class="hero-k" id="heroK">today</span> <span id="heroV">–</span><span class="hero-2" id="heroV2"></span><span class="hero-2k" id="heroV2k"></span></div>
+          <div class="hero-date" id="heroDate"></div>
+          <p class="hero-pct" id="heroPct"></p>
+          <p class="hero-peak" id="heroPeak"></p>
+          <div class="gauge" id="gauge1" role="img" aria-label="Percentile gauge"></div>
+        </div>
+      </div>
+      <p class="zone-line" id="zoneLine"></p>
+      <p class="wash-state" id="washState"></p>
+      <p class="panel-asof" id="asof1"></p>
+      <div class="readout" id="ro1" aria-live="polite"></div>
+      <div class="zoombar">
+        <span class="zb-hint" data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span>
+        <span class="zb-btns">
+          <button type="button" data-z="out" aria-label="Zoom out">−</button>
+          <button type="button" data-z="in" aria-label="Zoom in">+</button>
+          <button type="button" data-z="reset" aria-label="Back to the chosen range">Reset</button>
+          <button type="button" data-z="today" class="off" aria-label="Move to today" aria-hidden="true" disabled>→ Today</button>
+        </span>
+      </div>
+      <div class="chart" id="chart1" tabindex="0" role="group" aria-label="Daily breadth chart. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      <p class="legend" id="lg1"></p>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span><span id="howTo"></span><span class="box-p zone-key" id="zoneKey"></span></span></div>
+        <div class="box-row"><b>Right now</b><span id="rightNow"></span></div>
+      </div>
+    </section>
+
+    <!-- Risk gauges: 3 cards from the 2013+ study (plain counts, fixed windows; not tied to the zoom window above) -->
+    <section class="card" id="gauges" aria-labelledby="tg">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tg">Risk gauges</h2>
+          <p class="sub">What the 2013+ study found worth watching. Two gauges are about how rough the next months may get, not which way the market goes; the small-cap thrust is a small tilt in IWM’s favour. Each is suggestive: it pointed the same way in every period checked but rests on few separate episodes.</p>
+        </div>
+      </div>
+
+      <article class="gz" id="gzThin" aria-labelledby="gzThinT">
+        <div class="gz-head">
+          <div class="gz-ttl"><h3 id="gzThinT">Thin rally check</h3><p class="gz-sub" data-g="sub"></p></div>
+          <div class="gz-side"><span class="gz-chip" data-g="chip" hidden></span><span class="gz-tag">suggestive · 2013+ study</span></div>
+        </div>
+        <p class="gz-asof" data-g="asof"></p>
+        <p class="gz-na" data-g="na" hidden></p>
+        <div class="gz-body" data-g="body" hidden>
+          <div class="gz-left">
+            <div class="gz-hero"><span class="gz-big" data-g="big"></span><span class="gz-unit" data-g="unit"></span></div>
+            <p class="gz-line" data-g="l1"></p>
+            <p class="gz-line" data-g="l2"></p>
+            <p class="gz-cap" data-g="cap"></p>
+            <div class="gz-mini" data-g="mini" role="img" aria-label="Share of near-high days followed by a 10% drop, by breadth band, since 2013 and since 2021"></div>
+          </div>
+          <div class="gz-right">
+            <p class="gz-ct" data-g="ct"></p>
+            <div class="gz-ro" data-g="ro" aria-live="polite"></div>
+            <div class="gz-chart" data-g="chart" role="img" aria-label="QQQ since 2013 on a log scale with the days QQQ first closed 10% under its 52-week high and the thin-rally days"></div>
+          </div>
+        </div>
+        <div class="box gz-box" data-g="box" hidden>
+          <div class="box-row"><b>How to read it</b><span data-g="how"></span></div>
+          <div class="box-row"><b>Right now</b><span data-g="now"></span></div>
+        </div>
+        <p class="src gz-src" data-g="src" hidden></p>
+      </article>
+
+      <article class="gz" id="gzThrust" aria-labelledby="gzThrustT">
+        <div class="gz-head">
+          <div class="gz-ttl"><h3 id="gzThrustT">Small-cap thrust tracker</h3><p class="gz-sub" data-g="sub"></p></div>
+          <div class="gz-side"><span class="gz-chip" data-g="chip" hidden></span><span class="gz-tag">suggestive · 2013+ study</span></div>
+        </div>
+        <p class="gz-asof" data-g="asof"></p>
+        <p class="gz-na" data-g="na" hidden></p>
+        <div class="gz-body" data-g="body" hidden>
+          <div class="gz-left">
+            <div class="gz-hero"><span class="gz-big" data-g="big"></span><span class="gz-unit" data-g="unit"></span></div>
+            <p class="gz-line" data-g="l1"></p>
+            <p class="gz-line" data-g="l2"></p>
+            <div class="gz-prog" aria-hidden="true"><div class="gz-pfill" data-g="pfill"></div></div>
+            <div class="gz-plabs"><span class="gz-parm" data-g="parm"></span><span class="gz-pfire" data-g="pfire"></span></div>
+            <p class="gz-states" data-g="states"></p>
+          </div>
+          <div class="gz-right">
+            <p class="gz-ct" data-g="ct"></p>
+            <div class="gz-ro" data-g="ro" aria-live="polite"></div>
+            <div class="gz-chart" data-g="chart" role="img" aria-label="Russell 2000 percent above 50-day, last 4 months, with the arm and fire lines"></div>
+            <p class="gz-ct gz-ct2" data-g="ct2"></p>
+            <div class="gz-ro" data-g="ro2" aria-live="polite"></div>
+            <div class="gz-chart" data-g="chart2" role="img" aria-label="IWM return over the 3 months after each past thrust"></div>
+          </div>
+        </div>
+        <div class="box gz-box" data-g="box" hidden>
+          <div class="box-row"><b>How to read it</b><span data-g="how"></span></div>
+          <div class="box-row"><b>Right now</b><span data-g="now"></span></div>
+        </div>
+        <p class="src gz-src" data-g="src" hidden></p>
+      </article>
+
+      <article class="gz" id="gzStorms" aria-labelledby="gzStormsT">
+        <div class="gz-head">
+          <div class="gz-ttl"><h3 id="gzStormsT">Trend and storms</h3><p class="gz-sub" data-g="sub"></p></div>
+          <div class="gz-side"><span class="gz-chip" data-g="chip" hidden></span><span class="gz-tag">suggestive · 2013+ study</span></div>
+        </div>
+        <p class="gz-asof" data-g="asof"></p>
+        <p class="gz-na" data-g="na" hidden></p>
+        <div class="gz-body" data-g="body" hidden>
+          <div class="gz-left">
+            <div class="gz-hero"><span class="gz-big" data-g="big"></span><span class="gz-unit" data-g="unit"></span></div>
+            <p class="gz-line" data-g="l1"></p>
+            <p class="gz-line" data-g="l2"></p>
+            <p class="gz-cap" data-g="cap"></p>
+            <div class="gz-mini" data-g="mini" role="img" aria-label="What VIX expected against how much SPY really moved the next month, above and below the 200-day"></div>
+          </div>
+          <div class="gz-right">
+            <p class="gz-ct" data-g="ct"></p>
+            <div class="gz-ro" data-g="ro" aria-live="polite"></div>
+            <div class="gz-chart" data-g="chart" role="img" aria-label="SPY over the last 2 years with its 200-day average"></div>
+          </div>
+        </div>
+        <div class="box gz-box" data-g="box" hidden>
+          <div class="box-row"><b>How to read it</b><span data-g="how"></span></div>
+          <div class="box-row"><b>Right now</b><span data-g="now"></span></div>
+        </div>
+        <p class="src gz-src" data-g="src" hidden></p>
+      </article>
+    </section>
+
+    <!-- Chart 2: the same breadth on 4 indices -->
+    <section class="card" id="idx" aria-labelledby="t2">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t2">Breadth across 3 indices<span class="tsep"> · </span><span class="tspan" data-span>last 5 years</span></h2>
+          <p class="sub" id="idxSub">The same 50-day and 200-day lines on each index’s own members.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asof2"></p>
+      <div class="readout readout-grid" id="ro2" aria-live="polite"></div>
+      <div class="zoombar">
+        <span class="zb-hint" data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span>
+        <span class="zb-btns">
+          <button type="button" data-z="out" aria-label="Zoom out">−</button>
+          <button type="button" data-z="in" aria-label="Zoom in">+</button>
+          <button type="button" data-z="reset" aria-label="Back to the chosen range">Reset</button>
+          <button type="button" data-z="today" class="off" aria-label="Move to today" aria-hidden="true" disabled>→ Today</button>
+        </span>
+      </div>
+      <div class="chart" id="chart2" tabindex="0" role="group" aria-label="Breadth of the S&amp;P 500, Nasdaq-100 and Russell 2000. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      <p class="legend" id="lg2"></p>
+      <div class="box">
+        <div class="box-row"><b>Right now</b><span id="idxNow"></span></div>
+        <div class="box-row"><b>How to read it</b><span id="idxHow"></span></div>
+      </div>
+    </section>
+
+    <!-- Chart 3: the S&P 500 at 4 speeds -->
+    <section class="card" id="speeds" aria-labelledby="t5">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t5">S&amp;P 500 breadth at 4 speeds<span class="tsep"> · </span><span class="tspan" data-span>last 5 years</span></h2>
+          <p class="sub">% of S&amp;P 500 stocks above their 20-, 50-, 100- and 200-day averages</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asof4"></p>
+      <div class="readout readout-grid" id="ro3" aria-live="polite"></div>
+      <div class="zoombar">
+        <span class="zb-hint" data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span>
+        <span class="zb-btns">
+          <button type="button" data-z="out" aria-label="Zoom out">−</button>
+          <button type="button" data-z="in" aria-label="Zoom in">+</button>
+          <button type="button" data-z="reset" aria-label="Back to the chosen range">Reset</button>
+          <button type="button" data-z="today" class="off" aria-label="Move to today" aria-hidden="true" disabled>→ Today</button>
+        </span>
+      </div>
+      <div class="chart" id="chart3" tabindex="0" role="group" aria-label="S&amp;P 500 breadth at 20, 50, 100 and 200 days. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      <p class="legend" id="lg4"></p>
+      <div class="box">
+        <div class="box-row"><b>Right now</b><span id="spNow"></span></div>
+        <div class="box-row"><b>How to read it</b><span id="spHow"></span></div>
+      </div>
+    </section>
+
+    <!-- Section 3: what came after past washouts (the live list + the 2013+ study) -->
+    <section class="card" id="after" aria-labelledby="t4">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t4">After past washouts</h2>
+          <p class="sub">Every daily washout since 2013 and what SPY did next</p>
+        </div>
+      </div>
+      <div class="study" id="studyTiles"></div>
+      <p class="eli5" id="studyEli5"></p>
+      <div class="table-scroll"><table id="washTable"></table></div>
+      <p class="src" id="studySrc"></p>
+    </section>
+
+    <!-- Section 4: KDJ(9,3,3) of the 50-day breadth, one block per candle size, each with its own zoom window -->
+    <section class="card" id="kdj" aria-labelledby="t3">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t3">Breadth · KDJ</h2>
+          <p class="sub">SPY price · 50-day breadth · KDJ(9,3,3) of the 50-day breadth, per candle size</p>
+        </div>
+      </div>
+      <div class="controls kdj-controls">
+        <div class="seg seg-range seg-krange" role="group" aria-label="Time window for all four KDJ blocks" id="kranges">
+          <button type="button" data-krange="Auto" aria-pressed="true" aria-label="Each block's default window">Auto</button>
+          <button type="button" data-krange="1M" aria-pressed="false" aria-label="Last month">1M</button>
+          <button type="button" data-krange="3M" aria-pressed="false" aria-label="Last 3 months">3M</button>
+          <button type="button" data-krange="6M" aria-pressed="false" aria-label="Last 6 months">6M</button>
+          <button type="button" data-krange="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+          <button type="button" data-krange="2Y" aria-pressed="false" aria-label="Last 2 years">2Y</button>
+          <button type="button" data-krange="5Y" aria-pressed="false" aria-label="Last 5 years">5Y</button>
+          <button type="button" data-krange="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+          <button type="button" data-krange="All" aria-pressed="false" aria-label="All data">All</button>
+        </div>
+      </div>
+      <p class="kdj-sub2" id="kdjSub2"></p>
+      <p class="panel-asof" id="asof3"></p>
+      <p class="kdj-hint"><span data-zoomhint>Pinch to zoom · drag sideways to move · hold to read a day · double-tap for full screen</span> · pick a range for all four blocks, or zoom each block on its own</p>
+      <p class="banner banner-warn" id="kdjErr" hidden></p>
+      <div class="kblock" data-k="1D" aria-label="Daily candles">
+        <div class="kb-head"><h3>Daily</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (daily)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (daily)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (daily)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="Daily candles: SPY, 50-day breadth and its KDJ. Left and right arrows move through days, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <div class="kblock" data-k="1W" aria-label="Weekly candles">
+        <div class="kb-head"><h3>Weekly</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (weekly)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (weekly)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (weekly)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="Weekly candles: SPY, 50-day breadth and its KDJ. Left and right arrows move through weeks, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <div class="kblock" data-k="2W" aria-label="2-week candles">
+        <div class="kb-head"><h3>2-week</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (2-week)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (2-week)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (2-week)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="2-week candles: SPY, 50-day breadth and its KDJ. Left and right arrows move through candles, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <div class="kblock" data-k="1M" aria-label="Monthly candles">
+        <div class="kb-head"><h3>Monthly</h3><span class="kb-val" data-kv></span></div>
+        <p class="kb-note" data-kn></p>
+        <div class="readout kb-ro" data-kro aria-live="polite"></div>
+        <div class="zoombar kb-bar">
+          <span class="kb-win" data-kw></span>
+          <span class="zb-btns">
+            <button type="button" data-kz="out" aria-label="Zoom out (monthly)">−</button>
+            <button type="button" data-kz="in" aria-label="Zoom in (monthly)">+</button>
+            <button type="button" data-kz="reset" aria-label="Back to the chosen range (monthly)">Reset</button>
+          </span>
+        </div>
+        <div class="chart kb-chart" data-kc tabindex="0" role="group" aria-label="Monthly candles: SPY, 50-day breadth and its KDJ. Left and right arrows move through months, plus and minus zoom, 0 resets, F opens full screen."></div>
+      </div>
+      <p class="legend kdj-legend" id="lg3"></p>
+      <p class="kdj-honest">KDJ of the breadth line describes its swing; it has not been tested as a buy or sell signal.</p>
+    </section>
+
+    <details class="card table-card">
+      <summary>The numbers as a table</summary>
+      <div class="table-scroll"><table id="tfTable"></table></div>
+      <div class="table-scroll"><table id="dayTable"></table></div>
+    </details>
+  </div>
+
+  <footer class="foot">
+    <p>Breadth = the share of today’s index members whose close is above its 20-, 50-, 100- or 200-day simple average, with TradingView’s convention (a member with fewer closes than the average needs, such as a recent listing, counts as above). Checked against TradingView’s own indices on the days since the Sep 21, 2026 rebalance: the S&amp;P 500 20- and 50-day lines and the Nasdaq-100 50-day line equal S5TW / S5FI / NDFI; the 100- and 200-day lines (S5OH / S5TH / NDTH) and the Russell 2000 (IWM’s holdings, not the exact index list; R2FI / R2TH) are within a fraction of a point. Earlier readings run higher than the official indices, because names that later left an index are not counted: since mid-2024 about 1–2 points on the S&amp;P 500, 4–6 on the Nasdaq-100, 1–2 on the Russell 2000.</p>
+    <p>Washout = the 50-day line closes at or under 25% after it had closed back at or above 50% since the previous washout. Hollow ring = the deepest close of a washout that had not reset, at least 5 points under the washout day. The KDJ blocks’ weekly, 2-week and monthly candles use the breadth of their last trading day.</p>
+    <p>Nasdaq-100 and Russell 2000: the same rule on today’s members of each index (screener price caches), updated after each close; the S&amp;P 500 also updates during the session. Today’s Russell 2000 list holds many young companies, so its early years count fewer, surviving names. The Russell 1000 is left out: it moves with the S&amp;P 500 almost exactly.</p>
+    <p><b>Informational only. Not investment advice.</b> Nothing here says when to buy or sell.</p>
+    <p id="footPct">Percentile = the share of CLOSED candles of the same size since 2013 (or since 2021) whose 50-day breadth was at or below that value; the candle itself is never counted, and an open candle is ranked against the closed ones (“so far”). Low percentile = few stocks above their average, rare.</p>
+    <p id="footData">Derived values only (counts of stocks; SPY, QQQ and IWM closes). Prices about 15 minutes delayed during the session. No cookies, no tracking.</p>
+  </footer>
+</main>
+
+<!-- Full screen: one overlay for any chart. Its slots receive the chart's own nodes while open (no requestFullscreen). -->
+<div class="fs" id="fs" role="dialog" aria-modal="true" aria-label="Full screen chart" hidden>
+  <div class="fs-in">
+    <div class="fs-top">
+      <div class="fs-headwrap">
+        <p class="fs-kicker" id="fsKicker" hidden></p>
+        <div class="fs-slot fs-head" data-fs="head"></div>
+        <p class="fs-status panel-asof" id="fsStatus"></p>
+      </div>
+      <button type="button" class="fs-x" id="fsClose" aria-label="Close full screen">✕</button>
+    </div>
+    <div class="fs-slot" data-fs="note"></div>
+    <div class="fs-ctl">
+      <div class="fs-slot fs-chips" data-fs="chips"></div>
+      <div class="fs-slot fs-bar" data-fs="bar"></div>
+    </div>
+    <div class="fs-slot" data-fs="ro"></div>
+    <div class="fs-chart" data-fs="chart"></div>
+    <div class="fs-slot" data-fs="legend"></div>
+    <p class="fs-hint" id="fsHint"></p>
+  </div>
+</div>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="breadth.js" defer></script>
+</body>
+</html>

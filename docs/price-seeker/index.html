@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Big call-option piles parked far above the price, today's look-alikes of the META pattern, and an honest record of hits and misses.">
+<title>Price Seeker · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="seeker.css">
+</head>
+<body>
+<a class="skip" href="#list">Skip to the list</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../semis/"><span class="t-long">Semis Tracking</span><span class="t-short">Semis</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Price Seeker</span><span class="t-short">Seeker</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="status" id="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Fetching the latest numbers…</span>
+    </div>
+    <p class="status-line" id="statusLine"></p>
+    <p class="status-line muted" id="pilesLine"></p>
+  </section>
+
+  <div id="banners" aria-live="polite"></div>
+
+  <div class="head">
+    <div class="head-row">
+      <h1>Price Seeker</h1>
+      <span class="chip chip-watch">WATCH LIST · UNTESTED</span>
+    </div>
+    <p class="sub">Big piles of call options parked far above the price, and whether the price is heading to them.</p>
+  </div>
+
+  <div id="content">
+    <!-- which list: the whole sweep, or one of the lists it is built from -->
+    <div class="rankbar listbar" id="listBar" role="group" aria-label="Which list" hidden>
+      <span class="rb-k">List</span>
+      <span class="rb-btns">
+        <button type="button" data-list="all" aria-pressed="true">Whole list <span class="lc" data-lcount="all"></span></button>
+        <button type="button" data-list="spx" aria-pressed="false">SPY list <span class="lc" data-lcount="spx"></span></button>
+        <button type="button" data-list="ndx" aria-pressed="false">QQQ list <span class="lc" data-lcount="ndx"></span></button>
+        <button type="button" data-list="wl" aria-pressed="false">Watchlist 1 <span class="lc" data-lcount="wl"></span></button>
+      </span>
+    </div>
+    <!-- 5 today tiles -->
+    <div class="study today" id="tiles">
+      <button type="button" class="tile" disabled><span class="t-k">ON THE LIST</span><span class="t-v">–</span><span class="t-n">&nbsp;</span></button>
+      <div class="tile"><span class="t-k">STRONGEST (A+B)</span><span class="t-v">–</span><span class="t-n">&nbsp;</span></div>
+      <button type="button" class="tile" disabled><span class="t-k">CLOSING IN</span><span class="t-v">–</span><span class="t-n">&nbsp;</span></button>
+      <button type="button" class="tile" disabled><span class="t-k">REACHED SO FAR</span><span class="t-v">–</span><span class="t-n">&nbsp;</span></button>
+      <div class="tile tile-bets"><span class="t-k">BIGGEST BETS</span><span class="t-v">–</span><span class="t-n">&nbsp;</span></div>
+    </div>
+
+    <!-- caveat line -->
+    <div class="eli5 caveat" id="caveat">
+      <div class="cv-row">
+        <span class="cv-line">Watch list, not a buy signal. Nothing here is tested yet.</span>
+        <button type="button" class="tog" id="cvTog" aria-expanded="true" aria-controls="cvList">Hide</button>
+      </div>
+      <ol class="cv-list" id="cvList">
+        <li>This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</li>
+        <li>We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</li>
+        <li>Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</li>
+        <li>Nothing on this page has been tested yet. The scoreboard below will tell us once enough piles have resolved.</li>
+      </ol>
+    </div>
+
+    <!-- the META pattern -->
+    <section class="story" id="story" aria-labelledby="storyK" hidden>
+      <div class="story-top">
+        <p class="kicker" id="storyK">THE META PATTERN</p>
+        <p class="story-fold" id="storyFold" hidden></p>
+        <button type="button" class="tog" id="storyTog" aria-expanded="true" aria-controls="storyBody">Hide the story</button>
+      </div>
+      <div id="storyBody">
+        <h2 id="storyH"></h2>
+        <div class="readout story-ro" id="storyRo" aria-live="polite">Tap a step, or touch the chart, to read a day.</div>
+        <div class="story-grid">
+          <div class="chart story-chart" id="storyChart" tabindex="0" role="group" aria-label="META chart. Left and right arrows move through days."></div>
+          <ol class="steps" id="steps"></ol>
+        </div>
+        <div class="checks" id="checks"></div>
+        <p class="story-note">We picked META because it worked. That is why the misses get as much room as the hits, further down.</p>
+      </div>
+    </section>
+
+    <!-- filter bar -->
+    <div class="filters" id="filters">
+      <div class="seg seg-tier" role="group" aria-label="Tier" id="tierSeg">
+        <button type="button" data-tier="all" aria-pressed="true"><span class="sl">All</span><span class="sc" data-count="all">–</span></button>
+        <button type="button" data-tier="AB" aria-pressed="false"><span class="sl">★ A+B</span><span class="sc" data-count="AB">–</span></button>
+        <button type="button" data-tier="A" aria-pressed="false"><span class="sl">A</span><span class="sc" data-count="A">–</span></button>
+        <button type="button" data-tier="B" aria-pressed="false"><span class="sl">B</span><span class="sc" data-count="B">–</span></button>
+        <button type="button" data-tier="C" aria-pressed="false"><span class="sl">C</span><span class="sc" data-count="C">–</span></button>
+      </div>
+      <div class="fl-2">
+        <label class="srch"><span class="vh">Find a ticker</span><input type="search" id="q" placeholder="Find a ticker…" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search"><kbd class="slash" aria-hidden="true">/</kbd></label>
+        <label class="sort"><span class="sort-k">Sort</span>
+          <select id="sort">
+            <option value="best">Best match</option>
+            <option value="odds">Best odds</option>
+            <option value="near">Nearest pile</option>
+            <option value="far">Farthest pile</option>
+            <option value="size">Biggest pile ($)</option>
+            <option value="new">Most new calls</option>
+            <option value="r20">Strongest 20 days</option>
+            <option value="newest">Newest pile</option>
+            <option value="az">A–Z</option>
+            <optgroup label="Rankings (all tiers)">
+              <option value="bet">Biggest bet ($ in calls)</option>
+              <option value="betadv">Bet vs daily trading</option>
+              <option value="betday">Bet per day left</option>
+              <option value="biz">Business score</option>
+              <option value="combo">All three combined</option>
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      <button type="button" class="help-btn" id="helpBtn" aria-haspopup="dialog">? How to read a row</button>
+    </div>
+    <div class="rankbar" id="rankBar" role="group" aria-label="Rank the list by">
+      <span class="rb-k">Rank by</span>
+      <span class="rb-btns">
+        <button type="button" data-sort="best" aria-pressed="true">Best match</button>
+        <button type="button" data-sort="bet" aria-pressed="false">$ in calls</button>
+        <button type="button" data-sort="betadv" aria-pressed="false">vs daily trading</button>
+        <button type="button" data-sort="betday" aria-pressed="false">$ per day left</button>
+        <button type="button" data-sort="biz" aria-pressed="false">Business score</button>
+        <button type="button" data-sort="combo" aria-pressed="false">All three</button>
+      </span>
+    </div>
+    <p class="back-best" id="backBest" hidden><button type="button" class="linkbtn" id="backBestBtn">Back to best match</button></p>
+    <p class="banner banner-info" id="rankNote" hidden></p>
+    <p class="banner banner-info" id="tierNote" hidden>Tier C = old piles. Often covered-call writing; likely noise. Shown so you can check them.</p>
+    <div class="check-card" id="checkCard" aria-live="polite" hidden></div>
+    <div class="updbar" id="updateBar" aria-live="polite" hidden></div>
+
+    <!-- the list -->
+    <section class="list" id="list" aria-label="Today's list" tabindex="-1">
+      <div class="lhead" id="lhead">
+        <span class="c-tier">Tier <button type="button" class="ib" data-pop="1" aria-expanded="false" aria-label="About the tier">i</button></span>
+        <span class="c-stock">Stock</span>
+        <span class="c-price">Price → Pile <button type="button" class="ib" data-pop="2" aria-expanded="false" aria-label="About price, pile and to go">i</button></span>
+        <span class="c-togo">To go</span>
+        <span class="c-trip">Trip · 20 days <button type="button" class="ib" data-pop="3" aria-expanded="false" aria-label="About the trip bar">i</button></span>
+        <span class="c-spark">Last 60 days <button type="button" class="ib" data-pop="4" aria-expanded="false" aria-label="About the last 60 days">i</button></span>
+        <span class="c-odds">Odds <button type="button" class="ib" data-pop="5" aria-expanded="false" aria-label="About the odds">i</button></span>
+        <span class="c-new" title="Calls added at this strike over the last 1, 3 or 5 sessions (counting expiries 2+ days out). Changes once a day.">New calls <button type="button" class="ib" data-pop="6" aria-expanded="false" aria-label="About new calls and held">i</button></span>
+        <span class="c-bet"><span class="hl-long">$ in calls</span><span class="hl-short">$ calls · Biz</span> <button type="button" class="ib" data-pop="7" aria-expanded="false" aria-label="About $ in calls">i</button></span>
+        <span class="c-biz"><span class="hl-long">Business</span><span class="hl-short">Biz</span> <button type="button" class="ib" data-pop="8" aria-expanded="false" aria-label="About the business score">i</button></span>
+        <span class="c-r20">20 days</span>
+        <span class="c-held">Held</span>
+        <span class="c-chev"></span>
+      </div>
+      <div id="rows">
+        <div class="ph"><i></i></div><div class="ph"><i></i></div><div class="ph"><i></i></div>
+        <div class="ph"><i></i></div><div class="ph"><i></i></div><div class="ph"><i></i></div>
+      </div>
+    </section>
+
+    <!-- closing in -->
+    <section class="card" id="closing" aria-labelledby="closingH" hidden>
+      <h2 id="closingH">Closing in</h2>
+      <p class="sub">Far piles we tracked (10%+ away and big when first seen) that the price is now within 10% of. They left the main list because they got close.</p>
+      <div id="closingRows" class="cl-list"></div>
+      <p class="more"><button type="button" class="linkbtn" id="closingMore" aria-expanded="false" hidden></button></p>
+    </section>
+
+    <!-- recent hits -->
+    <section class="card" id="hits" aria-labelledby="hitsH" hidden>
+      <h2 id="hitsH">Recent hits</h2>
+      <p class="sub">Far piles we tracked that the price later reached, and how many did not.</p>
+      <p class="src" id="hitsCount"></p>
+      <div class="hl-head" aria-hidden="true"><span>Stock</span><span>Pile</span><span>First seen</span><span>Reached</span><span>On the list first?</span><span></span></div>
+      <div id="hitRows" class="hl-list"></div>
+      <details class="misses" id="misses">
+        <summary id="missesH">Ran out of time</summary>
+        <div id="missRows"></div>
+      </details>
+    </section>
+
+    <!-- scoreboard -->
+    <section class="card" id="score" aria-labelledby="scoreH" hidden>
+      <h2 id="scoreH">Scoreboard: do the piles beat their odds?</h2>
+      <p class="sub">If the odds are fair, piles with a 30% chance get reached about 3 times in 10. If A+B and A piles are reached clearly more often than their odds said, the META idea has an edge.</p>
+      <div class="study" id="scoreTiles"></div>
+      <div class="cal" id="cal"></div>
+      <p class="eli5" id="earlyBias"></p>
+      <p class="eli5 test" id="testBox"></p>
+      <div class="prog-wrap"><p class="prog-t" id="progT"></p><div class="prog" id="prog" role="progressbar" aria-valuemin="0"><i></i></div></div>
+      <div class="seg seg-score" role="group" aria-label="Group the scoreboard" id="scoreSeg">
+        <button type="button" data-sv="odds" aria-pressed="true">By odds</button>
+        <button type="button" data-sv="tier" aria-pressed="false">By tier</button>
+      </div>
+      <div class="table-scroll"><table id="scoreTable"></table></div>
+    </section>
+
+    <details class="card table-card" id="rules">
+      <summary>The 5 checks and the 4 tiers</summary>
+      <div id="rulesBody" class="rules-body"></div>
+    </details>
+
+    <details class="card table-card" id="numbers">
+      <summary>The numbers as a table</summary>
+      <p class="tbl-tools"><button type="button" class="btn" id="csvBtn">Download CSV</button></p>
+      <div class="table-scroll"><table id="numTable"></table></div>
+    </details>
+  </div>
+
+  <div class="box" id="caveatBox">
+    <div class="box-row"><b>Not a buy signal</b><span>This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</span></div>
+    <div class="box-row"><b>Who’s on the other side? We guess.</b><span>We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</span></div>
+    <div class="box-row"><b>Yesterday’s piles, today’s prices</b><span>Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</span></div>
+    <div class="box-row"><b>Not tested yet</b><span>Nothing on this page has been tested yet. The scoreboard above will tell us once enough piles have resolved.</span></div>
+  </div>
+
+  <footer class="foot">
+    <p>Pile (the king node) = the strike with the biggest positive net gamma exposure across expiries 2 to 400 days out, counting calls as plus and puts as minus.</p>
+    <p>Odds = 2 × (1 − N(z)), z = ln(pile / price) ÷ (at-the-money IV of the main expiry × √years left): the chance a price swinging the way its options expect, with no drift, trades at the pile at least once before that expiry. Ignores skew.</p>
+    <p id="footRec">Pile records start Sep 8; open-interest history starts Sep 28.</p>
+    <p id="footData">Derived from delayed public options data (previous-session open interest) and ~15-minute delayed prices. Only computed values are shown, not quotes.</p>
+    <p><b>Informational only. Not investment advice.</b> Nothing here says when to buy or sell.</p>
+    <p>No cookies, no tracking.</p>
+  </footer>
+</main>
+
+<!-- "How to read a row" -->
+<div class="dlg-back" id="help" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="helpT">
+    <div class="dlg-top">
+      <h2 id="helpT">How to read a row</h2>
+      <button type="button" class="x-btn" id="helpClose" aria-label="Close">✕</button>
+    </div>
+    <div id="helpDemo"></div>
+    <ol class="callouts" id="helpList"></ol>
+  </div>
+</div>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the list.</p></noscript>
+<script src="seeker.js" defer></script>
+</body>
+</html>
