@@ -4,6 +4,9 @@
 
 
 
+
+
+
 (function () {
   'use strict';
 
@@ -28,33 +31,68 @@
   var HALF_DAYS = ['2026-11-27', '2026-12-24', '2027-11-26'];
   var CAL_END = '2027-12-31';
 
-
-  var RULE_DEF = { min_dist: 0.10, min_share: 0.15, or_min_gex_usd: 25e6, min_persist: 5, persist_window: 10, min_call_put: 2,
-    max_z: 1.5, dte_lo: 2, dte_hi: 400, tierA_ret20: 0.05, tierB_growth: 0.10, tierB_min: 1000,
-    min_closed: 100, test_start: '2026-10-05', borderline: { ret20: 0.01, growth: 0.02 } };
-  var TEST_WRITTEN = 'Sat Oct 3, 2026';
   var TIERS = ['AB', 'A', 'B', 'C'];
-  var ORD = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
   var PREVIEW_PAGE = /\/price-seeker-preview\//.test(location.pathname);
   var mqRM = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   function reduced() { return !!(mqRM && mqRM.matches); }
 
-  var CALLOUTS = [
-    ['Tier', 'A+B = price moving toward the pile AND calls being added. A = price moving (up 5%+ in 20 days). B = calls at the pile up 10%+ (1,000+ contracts). C = old pile; often covered calls; likely noise.'],
-    ['Price → pile and To go', 'The pile is the strike where options traders’ biggest call bet sits (the king node). To go = how far the price has to rise to reach it.'],
-    ['Trip', 'Start line = the price 20 days ago, flag = the pile. Green = how much of the trip is done. Red = the price went the other way.'],
-    ['Last 60 days', 'The last 60 daily closes. The dashed amber line is the pile, so the gap you see is the distance left.'],
-    ['Odds', 'The options’ own chance that the price trades at the pile at least once by the date shown. Priced by the market, not our forecast, and not tested. Different dates are not like-for-like.'],
-    ['New calls + Held', 'Calls added at the pile over the last few sessions (changes once a day). Held dots: was this the top strike in each of the last 10 sessions, oldest on the left.'],
-    ['$ in calls', 'What the calls at the pile were worth at the last saved option prices (open interest × option price × 100, expiries 2–400 days out). It is money parked at that strike, bought or sold: public data can’t say which side. Ranked by “vs daily trading” it shows this as a share of a normal day’s trading in the stock; by “$ per day left” each expiry’s money is divided by its own days to expiry and added up.'],
-    ['Business', 'A business score out of 100 built from six numbers: revenue growth (on the year and on the last quarter), EPS growth, free-cash-flow growth and margin, and PEG, scored against large US companies. Green = 70 or more. Funds, and companies outside the large-company list the score covers or without enough reported numbers, have no score (–).']
-  ];
-  var GROUP_TEXT = {
-    AB: '★ STRONGEST · price moving toward it AND calls being added',
-    A: 'A · price moving toward it',
-    B: 'B · calls being added',
-    C: 'C · old piles: big, not growing, price not moving. Often covered calls; likely noise'
+
+  var SIDES = {
+    calls: { key: 'calls', opt: 'call', opts: 'calls', Opts: 'Calls', dir: 'above', rise: 'rise', mv: 'up', gam: 'upside', sign: 1, ext: 'high',
+      reach: 'trades at or above', seek: 'upward', other: 'puts', mostly: 'Mostly calls', bet: 'call bet', away: 'below',
+      oldPile: 'Often a fund selling calls against shares it owns, not a bet on a jump.', noise: 'often covered calls; likely noise',
+      sub: 'Big piles of call options parked far above the price, and whether the price is heading to them.',
+      cv1: 'This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.',
+      cv2: 'We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
+      king: '', noteC: 'Often covered-call writing', sig: 'buy',
+      foot: 'Pile (the king node) = the strike where the biggest call bet in the stock’s option map sits, estimated from public open interest.' },
   };
+  function SW() {
+    var k = (typeof P !== 'undefined' && P && P.side) || (typeof S !== 'undefined' && S && S.side) || 'calls';
+    return SIDES[k] || SIDES.calls;
+  }
+  var CALLOUTS = [], GROUP_TEXT = {};
+  function sideCopy() {
+    var w = SW();
+    CALLOUTS = [
+      ['Tier', 'A+B = price moving toward the pile AND ' + w.opts + ' being added. A = price moving toward the pile over the last 20 days. B = ' + w.opts + ' being added at the pile, in size. C = old pile; ' + w.noise + '.'],
+      ['Price → pile and To go', 'The pile is the strike where options traders’ biggest ' + w.bet + ' sits (the king node' + w.king + '). To go = how far the price has to ' + w.rise + ' to reach it.'],
+      ['Trip', 'Start line = the price 20 days ago, flag = the pile. Green = how much of the trip is done. Red = the price went the other way.'],
+      ['Last 60 days', 'The last 60 daily closes. The dashed amber line is the pile, so the gap you see is the distance left.'],
+      ['Odds', 'The options’ own chance that the price trades at the pile at least once by the date shown. Priced by the market, not our forecast, and not tested. Different dates are not like-for-like.'],
+      ['New ' + w.opts + ' + Held', w.Opts + ' added at the pile over the last few sessions (changes once a day). Held dots: was this the top strike in each of the last 10 sessions, oldest on the left.'],
+      ['$ in ' + w.opts, 'What the ' + w.opts + ' at the pile were worth at the last saved option prices. It is money parked at that strike, bought or sold: public data can’t say which side. “vs daily trading” compares it with a normal day’s trading in the stock; “$ per day left” weights money on a shorter clock more.'],
+      ['Business', 'A 0–100 business-quality score from reported growth, cash flow and valuation, scored against large US companies. Green = a high score. Funds, and companies outside the large-company list or without enough reported numbers, have no score (–).']
+    ];
+    GROUP_TEXT = {
+      AB: '★ STRONGEST · price moving toward it AND ' + w.opts + ' being added',
+      A: 'A · price moving toward it',
+      B: 'B · ' + w.opts + ' being added',
+      C: 'C · old piles: big, not growing, price not moving. ' + w.noise.charAt(0).toUpperCase() + w.noise.slice(1)
+    };
+    if (typeof RANKS !== 'undefined') {
+      RANKS.bet.note = 'Ranked by $ in ' + w.opts + ': what the ' + w.opts + ' at the pile were worth at the last saved option prices. The most money parked at a far strike comes first.';
+      RANKS.betadv.note = 'Ranked by $ in ' + w.opts + ' compared with a normal day’s trading in the stock. A big bet in a quiet stock ranks high.';
+      RANKS.combo.note = 'All three combined: a blend of each name’s standing on $ in ' + w.opts + ', $ per day left and the business score. Names without a business score sit at the bottom.';
+    }
+    var set = function (id, t) { var e = document.getElementById(id); if (e) e.textContent = t; };
+    set('pageSub', w.sub); set('cv1', w.cv1); set('cv2', w.cv2);
+    set('hdBet', '$ in ' + w.opts); set('hdBetS', '$ ' + w.opts + ' · Biz'); set('hdNew', 'New ' + w.opts); set('rbBet', '$ in ' + w.opts);
+    set('tierNote', 'Tier C = old piles. ' + w.noteC + '; likely noise. Shown so you can check them.');
+    set('cvLine', 'Watch list, not a ' + w.sig + ' signal. Nothing here is tested yet.');
+    set('cv3', 'Open interest is the previous session’s settle, so ' + w.opt + ' counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.');
+    set('optNew', 'Most new ' + w.opts);
+    set('optBet', 'Biggest bet ($ in ' + w.opts + ')');
+    set('bxNot', 'Not a ' + w.sig + ' signal'); set('bx1', w.cv1); set('bx2', w.cv2);
+    set('bx3', 'Open interest is the previous session’s settle, so ' + w.opt + ' counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.');
+    var ibN = document.querySelector('#lhead .c-new .ib'), ibB = document.querySelector('#lhead .c-bet .ib');
+    if (ibN) ibN.setAttribute('aria-label', 'About new ' + w.opts + ' and held');
+    if (ibB) ibB.setAttribute('aria-label', 'About $ in ' + w.opts);
+    set('footPile', w.foot);
+    var hn = document.querySelector('#lhead .c-new'); if (hn) hn.title = w.Opts + ' added at this strike over the last 1, 3 or 5 sessions. Changes once a day.';
+    document.body.classList.toggle('side-puts', w.key !== 'calls');
+  }
+  sideCopy();
 
 
   var params = new URLSearchParams(location.search);
@@ -179,10 +217,17 @@
     if (!num(v)) return '–';
     if (v >= 1e9) return '$' + (v / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
     if (v >= 1e6) return '$' + (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (v < 1000) return '$' + Math.round(v);
     return '$' + Math.round(v / 1e3) + 'k';
   }
   function ratioTxt(r) { return !num(r) ? '–' : r >= 10 ? String(Math.round(r)) : String(Math.round(r * 10) / 10); }
-  function cpOf(n) { return num(n.call_oi) && num(n.put_oi) ? (n.put_oi > 0 ? n.call_oi / n.put_oi : Infinity) : null; }
+  function ownOi(n) { return n[SW().opt + '_oi']; }
+  function othOi(n) { return n[SW().other.slice(0, -1) + '_oi']; }
+  function sideExt(o) { return o['day_' + SW().ext]; }
+  function cpOf(n) {
+    var own = ownOi(n), oth = othOi(n);
+    return num(own) && num(oth) ? (oth > 0 ? own / oth : Infinity) : null;
+  }
   function oneIn(o) { if (!num(o) || o <= 0) return 'almost none'; return o < 0.5 ? '1 in ' + Math.max(2, Math.round(1 / o)) : Math.round(o * 10) + ' in 10'; }
   function tierName(t) { return t === 'AB' ? 'A+B' : t; }
 
@@ -225,7 +270,7 @@
   var rowRefs = {}, ghosts = {}, pendingOpen = null, helpBuilt = false, lastFocus = null, pop = null, popBtn = null;
   var GEO = { mode: geoNow(), spk: 0 };
   GEO.spk = spkW();
-  var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all' };
+  var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all', side: 'calls' };
 
   var LISTS = {
     all: { label: 'Whole list', title: 'Every name we keep option chains for: the S&P 500, the Nasdaq-100 and the optionable names on Watchlist 1' },
@@ -242,51 +287,47 @@
   function tripW() { return GEO.mode === 'card' ? 112 : 100; }
 
 
+  function fmtErr(msg) { var e = new Error(msg); e.shown = true; return e; }
   function check(d) {
-    if (!d || typeof d !== 'object' || Array.isArray(d)) { var e0 = new Error('the file is not a JSON object'); throw e0; }
-    if (d.version !== 1 && d.version !== 2) { var e = new Error('data format version ' + d.version); e.version = d.version; throw e; }
-    if (!Array.isArray(d.names)) throw new Error('names[] is missing');
-    if (typeof d.generated !== 'string' || isNaN(Date.parse(d.generated))) throw new Error('generated time is missing');
+    if (!d || typeof d !== 'object' || Array.isArray(d)) throw fmtErr('the data looked broken');
+    if (!(d.version === 3 || (d.version === 2 && Array.isArray(d.idx)))) { var e = fmtErr('data format changed'); e.version = d.version; throw e; }
+    if (!Array.isArray(d.names)) throw fmtErr('the data looked broken');
+    if (typeof d.generated !== 'string' || isNaN(Date.parse(d.generated))) throw fmtErr('the data looked broken');
   }
   function normSeries(s) {
     if (!s) return null;
-    var d = [], c = [], h = [];
+    var d = [], c = [];
     if (Array.isArray(s)) {
       s.forEach(function (p) { if (p && typeof p[0] === 'string' && num(p[1])) { d.push(dayNum(p[0])); c.push(p[1]); } });
     } else if (typeof s.start === 'string' && Array.isArray(s.c)) {
       var dn = dayNum(s.start); while (!isSession(dn)) dn++;
       s.c.forEach(function (v, i) {
         if (i) dn = nextSession(dn);
-        if (num(v)) { d.push(dn); c.push(v); h.push(Array.isArray(s.h) && num(s.h[i]) ? s.h[i] : null); }
+        if (num(v)) { d.push(dn); c.push(v); }
       });
     }
-    return c.length >= 2 ? { d: d, c: c, h: h.length ? h : null } : null;
+    return c.length >= 2 ? { d: d, c: c } : null;
   }
 
   function withToday(ser, day, price) {
     if (!ser || typeof day !== 'string' || !num(price)) return ser;
     var dn = dayNum(day), last = ser.d[ser.d.length - 1];
     if (dn === last) ser.c[ser.c.length - 1] = price;
-    else if (dn > last) { ser.d.push(dn); ser.c.push(price); if (ser.h) ser.h.push(null); if (ser.c.length > 60) { ser.d.shift(); ser.c.shift(); if (ser.h) ser.h.shift(); } }
+    else if (dn > last) { ser.d.push(dn); ser.c.push(price); if (ser.c.length > 60) { ser.d.shift(); ser.c.shift(); } }
     return ser;
   }
-  function tripOf(n) {
-    if (!num(n.price) || !num(n.node) || !num(n.ret20) || n.ret20 <= -1) return null;
-    var p20 = n.price / (1 + n.ret20);
-    if (p20 >= n.node) return { above: true, p20: p20 };
-    return { t: (n.price - p20) / (n.node - p20), p20: p20 };
+
+  function viewName(n, pricesDay) {
+    n._win = num(n.persist_window) && n.persist_window > 0 ? n.persist_window : (typeof n.held === 'string' ? n.held.length : null);
+    n._persist = num(n.persist) ? (n._win ? Math.min(n.persist, n._win) : n.persist) : null;
+    n._spk = withToday(normSeries(n.spark), n.price_day || pricesDay, n.price);
+    n._trip = n.trip === 'above' ? { above: true } : num(n.trip) ? { t: n.trip } : null;
+    var x = Array.isArray(n.nc) ? n.nc : null, ch = n.oi_chg && x ? n.oi_chg[x[0]] : null;
+    n._nc = x && Array.isArray(ch) && num(ch[0]) && num(ch[1]) ? { w: String(x[0]), kind: x[1], chg: ch[0], pct: ch[1] } : null;
+    return n;
   }
-  function ncOf(n, R) {
-    var ch = n.oi_chg || {}, w = null;
-    if (n.b_window != null && Array.isArray(ch[String(n.b_window)])) w = String(n.b_window);
-    else if (Array.isArray(ch['3'])) w = '3';
-    else if (Array.isArray(ch['1'])) w = '1';
-    if (!w || !num(ch[w][0]) || !num(ch[w][1])) return null;
-    var chg = ch[w][0], pct = ch[w][1];
-    var kind = pct >= R.tierB_growth && chg >= R.tierB_min ? 'strong' : pct >= 0.01 ? 'up' : pct > -0.01 ? 'flat' : 'down';
-    return { w: w, chg: chg, pct: pct, kind: kind };
-  }
-  function prep(d, listKey) {
+  function prep(d, listKey, side) {
+    var sideKey = 'calls', full = d;
     var lists = {};
     if (d.lists && typeof d.lists === 'object') Object.keys(LISTS).forEach(function (k) {
       if (k !== 'all' && Array.isArray(d.lists[k])) { lists[k] = {}; d.lists[k].forEach(function (x) { if (typeof x === 'string') lists[k][x] = 1; }); }
@@ -300,33 +341,25 @@
       allSyms[n.sym] = 1; listCounts.all++;
       Object.keys(lists).forEach(function (k) { if (lists[k][n.sym]) listCounts[k]++; });
     });
-    var R = {};
-    Object.keys(RULE_DEF).forEach(function (k) { R[k] = RULE_DEF[k]; });
-    if (d.rule && typeof d.rule === 'object') Object.keys(d.rule).forEach(function (k) { if (d.rule[k] != null) R[k] = d.rule[k]; });
-    if (!R.borderline || typeof R.borderline !== 'object') R.borderline = RULE_DEF.borderline;
     var names = d.names.filter(function (n) { return n && typeof n.sym === 'string' && inL(n.sym); });
     var by = {}, settles = [];
     names.forEach(function (n, i) {
       n._i = i;
       if (TIERS.indexOf(n.tier) < 0) n.tier = 'C';
-      n._win = num(n.persist_window) && n.persist_window > 0 ? n.persist_window : R.persist_window;
-      n._persist = num(n.persist) ? Math.min(n.persist, n._win) : null;
-      n._spk = withToday(normSeries(n.spark), n.price_day || d.prices_day, n.price);
-      n._trip = tripOf(n);
-      n._nc = ncOf(n, R);
+      viewName(n, d.prices_day);
       by[n.sym] = n;
       if (n.oi_settle) settles.push(n.oi_settle);
     });
-    var cmb = names.filter(function (n) { return num(n.combined); }).sort(function (a, b) { return b.combined - a.combined; });
+
+    var cmb = names.filter(function (n) { return num(n.combo); }).sort(function (a, b) { return a.combo - b.combo || a._i - b._i; });
     cmb.forEach(function (n, i) { n._comboRank = i + 1; n._comboN = cmb.length; });
     var closing = (Array.isArray(d.closing) ? d.closing : []).filter(function (c) { return c && typeof c.sym === 'string' && inL(c.sym); });
-    closing.forEach(function (c) { c._spk = withToday(normSeries(c.spark), d.prices_day, c.price); c._touched = c.touched_today === true || (num(c.day_high) && num(c.node) && c.day_high >= c.node); });
+    closing.forEach(function (c) { c._spk = withToday(normSeries(c.spark), d.prices_day, c.price); c._touched = c.touched === true; });
     var rec = d.record && typeof d.record === 'object' ? d.record : {};
+    var bl = rec.by_list && typeof rec.by_list === 'object' ? rec.by_list[lk] : null;
     if (lk !== 'all') {
-      var bl = rec.by_list && rec.by_list[lk], r2 = {};
-      Object.keys(rec).forEach(function (k) { r2[k] = rec[k]; });
-      ['tracked', 'reached', 'still_open'].forEach(function (k) { r2[k] = bl && num(bl[k]) ? bl[k] : null; });
-      r2.missed = null; r2.by_exp = null;
+      var r2 = Object.create(rec);
+      ['tracked', 'reached', 'still_open', 'missed'].forEach(function (k) { r2[k] = bl && num(bl[k]) ? bl[k] : null; });
       if (Array.isArray(rec.misses)) r2.misses = rec.misses.filter(function (m) { return m && inL(m.sym); });
       rec = r2;
     }
@@ -334,34 +367,25 @@
       .map(function (h, i) { h._i = i; h._path = normSeries(h.path); return h; });
     hits.sort(function (a, b) { return (b.reached || '').localeCompare(a.reached || '') || a._i - b._i; });
     var missed = num(rec.missed) ? rec.missed : (num(rec.tracked) && num(rec.reached) && num(rec.still_open) ? Math.max(0, rec.tracked - rec.reached - rec.still_open) : null);
-    var byExp = null;
-    if (Array.isArray(rec.by_exp)) byExp = rec.by_exp.filter(function (x) { return x && typeof x.exp === 'string' && num(x.n); });
-    else {
-      var m = {};
-      names.forEach(function (n) { if (n.main_exp) m[n.main_exp] = (m[n.main_exp] || 0) + 1; });
-      byExp = Object.keys(m).sort().map(function (k) { return { exp: k, n: m[k] }; });
-    }
+    var byExp = (bl && Array.isArray(bl.by_exp) ? bl.by_exp : []).filter(function (x) { return x && typeof x.exp === 'string' && num(x.n); });
+    var late = bl && Array.isArray(bl.late) && typeof bl.late[0] === 'string' && num(bl.late[1]) ? { cut: bl.late[0], n: bl.late[1] } : null;
     var counts = { AB: 0, A: 0, B: 0, C: 0 };
     names.forEach(function (n) { counts[n.tier]++; });
     var newest = d.oi_settle || (settles.length ? settles.slice().sort().pop() : null), older = {}, nOlder = 0;
     names.forEach(function (n) { if (newest && n.oi_settle && n.oi_settle < newest) { nOlder++; older[n.oi_settle] = (older[n.oi_settle] || 0) + 1; } });
-    var index = null;
-    if (Array.isArray(d.index) || (d.index && typeof d.index === 'object')) {
-      index = {};
-      (Array.isArray(d.index) ? d.index : Object.keys(d.index).map(function (k) { return d.index[k]; })).forEach(function (r) {
-        if (Array.isArray(r) && typeof r[0] === 'string') index[r[0].toUpperCase()] = r;
-      });
+    var idx = null;
+    if (Array.isArray(d.idx)) {
+      idx = {};
+      d.idx.forEach(function (r) { if (Array.isArray(r) && typeof r[0] === 'string') idx[r[0].toUpperCase()] = r; });
     }
-    var oiStart = null;
-    names.forEach(function (n) { if (Array.isArray(n.oi_hist) && n.oi_hist[0] && n.oi_hist[0][0] && (!oiStart || n.oi_hist[0][0] < oiStart)) oiStart = n.oi_hist[0][0]; });
     return {
-      doc: d, R: R, names: names, by: by, counts: counts, closing: closing, index: index, newest: newest, nOlder: nOlder,
-      olderDates: Object.keys(older).sort(), hits: hits, missed: missed, misses: Array.isArray(rec.misses) ? rec.misses : null,
-      byExp: byExp, scored: rec.scored && typeof rec.scored === 'object' ? rec.scored : null, rec: rec, meta: d.meta_case || null,
-      oiStart: oiStart, gen: Date.parse(d.generated), comboN: cmb.length,
+      doc: d, names: names, by: by, counts: counts, closing: closing, idx: idx, newest: newest, nOlder: nOlder,
+      olderDates: Object.keys(older).sort(), hits: hits, missed: missed, missList: Array.isArray(rec.misses) ? rec.misses : null,
+      byExp: byExp, late: late, board: rec.board && typeof rec.board === 'object' ? rec.board : null, rec: rec, meta: d.meta_case || null,
+      oiStart: typeof d.oi_since === 'string' ? d.oi_since : null, gen: Date.parse(d.generated), comboN: cmb.length,
       universeAll: num(d.universe) ? d.universe : null,
-      universe: lk === 'all' ? (num(d.universe) ? d.universe : null) : (index ? Object.keys(index).filter(inL).length : null),
-      list: lk, lists: lists, listCounts: listCounts, allSyms: allSyms
+      universe: lk === 'all' ? (num(d.universe) ? d.universe : null) : (idx ? Object.keys(idx).filter(inL).length : null),
+      list: lk, lists: lists, listCounts: listCounts, allSyms: allSyms, side: sideKey
     };
   }
 
@@ -446,7 +470,7 @@
         list.push(['warn', 'Option piles are from ' + dS(P.newest) + ':', 'today’s open interest hasn’t arrived. Distances and odds still use the latest prices.', null, true]);
     }
     if (fatal) {
-      if (fatal.version !== undefined) list.push(['bad', 'The data format changed (version ' + fatal.version + ').', 'This page needs an update.', null, true]);
+      if (fatal.version !== undefined) list.push(['bad', 'The data format changed.', 'This page needs an update.', null, true]);
       else list.push(['bad', 'Couldn’t load the data.', '(' + fatal.msg + ')', { label: 'Try again', fn: function () { load(true); } }, false]);
     }
     var sig = JSON.stringify(list.map(function (b) { return [b[0], b[1], b[2]]; }));
@@ -487,7 +511,7 @@
       v2.appendChild(w);
     } else { v2.textContent = 'none today'; v2.className += ' tv-none'; }
     t2.appendChild(v2);
-    t2.appendChild(span('t-n', ab.length ? 'price moving toward it AND calls being added' : 'no name has both right now'));
+    t2.appendChild(span('t-n', ab.length ? 'price moving toward it AND ' + SW().opts + ' being added' : 'no name has both right now'));
     T.appendChild(t2);
 
     var big = P.names.filter(function (x) { return num(x.prem_usd); }).sort(function (a, b) { return b.prem_usd - a.prem_usd; }).slice(0, 3);
@@ -497,14 +521,14 @@
       var w5 = span('tk-wrap', null);
       big.forEach(function (x) {
         var b = btn('tkb', null); b.appendChild(span('', x.sym)); b.appendChild(span('tkm', usd(x.prem_usd)));
-        b.setAttribute('aria-label', 'Open ' + x.sym + ', ' + usd(x.prem_usd) + ' in calls');
+        b.setAttribute('aria-label', 'Open ' + x.sym + ', ' + usd(x.prem_usd) + ' in ' + SW().opts);
         b.addEventListener('click', function () { if (S.sort !== 'bet') setSort('bet'); goToRow(x.sym, true); });
         w5.appendChild(b);
       });
       v5.appendChild(w5);
     } else { v5.textContent = '–'; v5.className += ' tv-none'; }
     t5.appendChild(v5);
-    var n5 = span('t-n', '$ in calls at the pile · ');
+    var n5 = span('t-n', '$ in ' + SW().opts + ' at the pile · ');
     var rb = btn('linkbtn', 'Rank all'); rb.addEventListener('click', function () { setSort('bet'); scrollToEl($('filters')); });
     n5.appendChild(rb); t5.appendChild(n5);
 
@@ -515,7 +539,7 @@
     else note3 = 'none right now';
     T.appendChild(tileBtn('CLOSING IN', String(cl.length), null, note3, function () { scrollToEl($('closing')); }));
 
-    var rec = P.rec, h0 = P.hits[0], early = !P.scored || !num(P.scored.closed) || P.scored.closed < P.R.min_closed;
+    var rec = P.rec, h0 = P.hits[0], early = !P.board || P.board.early !== false;
     T.appendChild(tileBtn('REACHED SO FAR', num(rec.reached) ? String(rec.reached) : '–', num(rec.tracked) ? 'of ' + int(rec.tracked) + ' tracked' : null,
       [h0 ? 'latest: ' + h0.sym + ' ' + strike(h0.node) + ' · ' + dS(h0.reached) : 'latest: none yet', early ? 'too early to grade' : 'graded in the scoreboard'],
       function () { scrollToEl($('hits')); }));
@@ -549,12 +573,12 @@
     var m = P.meta, sec = $('story');
     if (!m || !num(m.node) || !m.seen || !m.base || !m.spike || !m.peak) { sec.hidden = true; STORY = null; return; }
     sec.hidden = false;
-    var sym = m.sym || 'META', node = m.node, R = P.R;
+    var sym = m.sym || 'META', node = m.node;
     var closes = normSeries(m.closes);
     function closeAt(dn) { if (!closes) return null; var i = closes.d.indexOf(dn); return i >= 0 ? closes.c[i] : null; }
     var baseDn = dayNum(m.base.day), seenDn = dayNum(m.seen.day), spikeDn = dayNum(m.spike.day), peakDn = dayNum(m.peak.day);
-    var qdn = m.q_day ? dayNum(m.q_day) : nthSessionFrom(seenDn, R.min_persist - 1);
-    var qv = num(m.q_close) ? m.q_close : closeAt(qdn);
+    var qdn = typeof m.q_day === 'string' ? dayNum(m.q_day) : null;
+    var qv = num(m.q_close) ? m.q_close : (qdn != null ? closeAt(qdn) : null);
     var nw = m.now && m.now.day && num(m.now.close) ? { dn: dayNum(m.now.day), v: m.now.close } :
       (closes ? { dn: closes.d[closes.d.length - 1], v: closes.c[closes.c.length - 1] } : null);
     var seenDist = num(m.seen.dist) ? m.seen.dist : (num(m.seen.close) ? node / m.seen.close - 1 : null);
@@ -567,7 +591,7 @@
       p0(seenDist) + ' above the price, mostly January 2027 calls.';
     if (num(m.seen_odds)) t2 += ' The options gave it about a ' + p0(m.seen_odds) + ' chance (about ' + oneIn(m.seen_odds) + ') of a touch by its main expiry.';
     steps.push({ dn: seenDn, v: m.seen.close, place: 1, text: t2 });
-    steps.push({ dn: qdn, v: qv, place: 1, text: wmd(qdn) + (qv != null ? ' · ' + px(qv) : '') + '. ' + (ORD[R.min_persist] || 'Fifth') + ' session with the same pile. Under this page’s rules, this is the day ' + sym + ' would have joined the list.' });
+    steps.push({ dn: qdn, v: qv, place: 1, text: (qdn != null ? wmd(qdn) : '–') + (qv != null ? ' · ' + px(qv) : '') + '. The pile has now held long enough: under this page’s rules, this is the day ' + sym + ' would have joined the list.' });
     var past = Math.round((m.spike.high - node) * 100) / 100;
     steps.push({ dn: spikeDn, v: m.spike.high, place: -1, high: true, text: wS(m.spike.day) + ' · high ' + px(m.spike.high) + '. Touched: ' + sym + ' traded $' + strike(past) + ' past the pile, ' +
       sessionsAfter(seenDn, spikeDn) + ' sessions after we first saw it.' });
@@ -575,7 +599,7 @@
     if (nw) {
       var d6 = node / nw.v - 1;
       steps.push({ dn: nw.dn, v: nw.v, place: 1, now: true, text: 'Now · ' + wmd(nw.dn) + ' · ' + px(nw.v) + '. ' + (nw.v > node ? 'Above the pile.' :
-        'Back under the pile, ' + a1(d6) + ' away' + (d6 < R.min_dist ? ': too close to make today’s list.' : '.')) });
+        'Back under the pile, ' + a1(d6) + ' away' + (m.now_close === true ? ': too close to make today’s list.' : '.')) });
     } else {
       steps.push({ dn: P.doc.prices_day ? dayNum(P.doc.prices_day) : null, v: null, place: 1, now: true, text: 'Now · ' + wS(P.doc.prices_day) + '. Today’s ' + sym + ' close isn’t in this data file yet.' });
     }
@@ -595,32 +619,33 @@
     setStep(STORY.active, true);
   }
   function renderChecks() {
-    var m = P.meta, R = P.R, ck = m.checks && typeof m.checks === 'object' ? m.checks : {}, host = $('checks'); clear(host);
-    var dist = num(ck.dist) ? ck.dist : (m.seen && num(m.seen.dist) ? m.seen.dist : null);
-    var pn = num(ck.persist_n) ? Math.min(ck.persist_n, R.persist_window) : null, pr = num(ck.persist) ? Math.min(ck.persist, pn || R.persist_window) : null;
+    var m = P.meta, host = $('checks'); clear(host);
+    var ck = {};
+    (Array.isArray(m.ck) ? m.ck : []).forEach(function (c) { if (Array.isArray(c) && typeof c[0] === 'string') ck[c[0]] = c; });
     var rows = [
-      ['FAR', 'At least ' + p0(R.min_dist) + ' above the price', num(dist) ? p0(dist) : null, num(dist) && dist >= R.min_dist,
+      ['FAR', 'far', 'Far above the price',
         'Far enough that the price needs a real move to get there. A pile 3% away is just where the price already is.'],
-      ['BIG', 'At least ' + p0(R.min_share) + ' of the stock’s upside gamma, or ' + usd(R.or_min_gex_usd) + '+', num(ck.share) ? p0(ck.share) : null, num(ck.share) && ck.share >= R.min_share,
+      ['BIG', 'big', 'One of the biggest piles on the stock',
         'Gamma measures how strongly option bets react when the price moves. If one strike holds this much of it, it is THE pile on that stock, not one of many.'],
-      ['STAYS PUT', 'Top pile in ' + R.min_persist + ' of the last ' + R.persist_window + ' sessions', pr != null && pn != null ? pr + ' of ' + pn : null, pr != null && pr >= R.min_persist,
+      ['STAYS PUT', 'persist', 'The top pile in most recent sessions',
         'A pile that is there one day and gone the next is noise. One that sits there for weeks is a position somebody is holding.'],
-      ['MOSTLY CALLS', 'At least ' + strike(R.min_call_put) + ' calls for every put at that strike', num(ck.cp) ? ratioTxt(ck.cp) + ' to 1' : null, num(ck.cp) && ck.cp >= R.min_call_put,
+      ['MOSTLY CALLS', 'calls', 'Mostly calls at that strike',
         'Calls pay if the price goes up. A strike with lots of puts too is usually a hedged trade, not a one-way bet.'],
-      ['REACHABLE', 'No more than ' + strike(R.max_z) + ' typical moves away by its main expiry', num(ck.z) ? ck.z.toFixed(1) : null, num(ck.z) && ck.z <= R.max_z,
-        'A typical move is how far the options expect the price to swing by that date. 20% away with four months left is reachable; 20% away with one week left isn’t. It also means every name here has at least a 13% chance of touching its pile.']
+      ['REACHABLE', 'reach', 'Within reach by its main expiry',
+        'A typical move is how far the options expect the price to swing by that date. 20% away with four months left is reachable; 20% away with one week left isn’t.']
     ];
     rows.forEach(function (r, i) {
+      var c = ck[r[1]] || [], val = typeof c[1] === 'string' ? c[1] : null;
       var t = div('ck'), k = div('ck-k'), id = 'ckx' + i;
       k.appendChild(span('', r[0]));
       var ib = btn('ib', 'i'); ib.setAttribute('aria-expanded', 'false'); ib.setAttribute('aria-controls', id); ib.setAttribute('aria-label', 'What ' + r[0] + ' means');
       k.appendChild(ib); t.appendChild(k);
-      t.appendChild(div('ck-r')).textContent = r[1];
+      t.appendChild(div('ck-r')).textContent = r[2];
       var v = div('ck-v');
-      if (r[2] == null) { v.textContent = '–'; v.title = 'Not in this data file yet'; }
-      else { v.textContent = r[2] + ' '; if (r[3]) v.appendChild(span('ok', '✓')); }
+      if (val == null) { v.textContent = '–'; v.title = 'Not in this data file yet'; }
+      else { v.textContent = val + ' '; if (c[2] === true) v.appendChild(span('ok', '✓')); }
       t.appendChild(v);
-      var x = para('ck-x', r[4]); x.id = id; x.hidden = true; t.appendChild(x);
+      var x = para('ck-x', r[3]); x.id = id; x.hidden = true; t.appendChild(x);
       ib.addEventListener('click', function () { var o = ib.getAttribute('aria-expanded') !== 'true'; ib.setAttribute('aria-expanded', o ? 'true' : 'false'); x.hidden = !o; });
       host.appendChild(t);
     });
@@ -785,27 +810,27 @@
 
 
   function tierPill(t) {
-    var R = P ? P.R : RULE_DEF;
-    var titles = { AB: 'A+B: price moving toward the pile AND calls being added', A: 'A: price moving toward the pile (up ' + p0(R.tierA_ret20) + '+ in 20 days)',
-      B: 'B: calls at the pile up ' + p0(R.tierB_growth) + '+ (' + int(R.tierB_min) + '+ contracts)', C: 'C: old pile; often covered calls; likely noise' };
+    var w = SW();
+    var titles = { AB: 'A+B: price moving toward the pile AND ' + w.opts + ' being added', A: 'A: price moving toward the pile',
+      B: 'B: ' + w.opts + ' at the pile being added', C: 'C: old pile; ' + w.noise };
     var s = span('pill p-' + t, tierName(t)); s.title = titles[t] || ''; return s;
   }
-  function fuseDays(n) { return n.main_exp && P.doc.prices_day ? dayNum(n.main_exp) - dayNum(P.doc.prices_day) : null; }
-  function touchedRow(n) { return num(n.day_high) && num(n.node) && n.day_high >= n.node; }
+
+  var BORDERS = { A: 1, Ao: 1, B: 1, Bo: 1, Bn: 1 };
   function borderTitle(n) {
-    var R = P.R;
-    if (n.borderline === 'A') return (n.ret20 >= 0 ? 'Up ' : 'Down ') + a1(n.ret20) + ' in 20 days, just ' + (n.ret20 >= R.tierA_ret20 ? 'over' : 'under') + ' the ' + p0(R.tierA_ret20) + ' bar for A.';
+    var b = n.border;
+    if (b === 'A' || b === 'Ao') return (n.ret20 >= 0 ? 'Up ' : 'Down ') + a1(n.ret20) + ' in 20 days, just ' + (b === 'Ao' ? 'over' : 'under') + ' the bar for A.';
     var x = n._nc; if (!x) return 'Close to the bar for B.';
-    if (x.pct >= R.tierB_growth && x.chg < R.tierB_min) return 'Calls up ' + p0(x.pct) + ', but only ' + int(x.chg) + ' contracts, just under the ' + int(R.tierB_min) + ' B needs.';
-    return 'Calls ' + (x.pct >= 0 ? 'up ' : 'down ') + a1(x.pct) + ', just ' + (x.pct >= R.tierB_growth ? 'over' : 'under') + ' the ' + p0(R.tierB_growth) + ' bar for B.';
+    if (b === 'Bn') return SW().Opts + ' up ' + p0(x.pct) + ', but just short on contracts for B.';
+    return SW().Opts + ' ' + (x.pct >= 0 ? 'up ' : 'down ') + a1(x.pct) + ', just ' + (b === 'Bo' ? 'over' : 'under') + ' the bar for B.';
   }
   function fillPills(r) {
     var n = r.n, P0 = r.pills; clear(P0);
     function pill(t, cls, title) { var s = span('pill ' + cls, t); if (title) s.title = title; P0.appendChild(s); }
     if (n.new === true) pill('NEW', 'p-new', 'New since the previous close’s list.');
-    if (n.borderline === 'A' || n.borderline === 'B') pill('Borderline', 'p-bord', borderTitle(n));
-    var fd = fuseDays(n); if (fd != null && fd >= 0 && fd <= 21) pill('Short fuse', 'p-fuse', 'The main expiry is ' + fd + ' days away' + (num(n.main_share) ? ' (' + p0(n.main_share) + ' of these calls).' : '.'));
-    if (touchedRow(n)) pill('TOUCHED today', 'p-touch', 'The price traded at or above the pile today (high ' + px(n.day_high) + ').');
+    if (BORDERS[n.border] === 1) pill('Borderline', 'p-bord', borderTitle(n));
+    if (num(n.fuse)) pill('Short fuse', 'p-fuse', 'The main expiry is ' + n.fuse + ' days away' + (num(n.main_share) ? ' (' + p0(n.main_share) + ' of these ' + SW().opts + ').' : '.'));
+    if (n.touched === true) pill('TOUCHED today', 'p-touch', 'The price traded at or ' + SW().dir + ' the pile today (' + SW().ext + ' ' + px(sideExt(n)) + ').');
     if (r.leftAt) pill('Left the list ' + r.leftAt, 'p-left', r.leftWhy || '');
     P0.hidden = !P0.firstChild;
   }
@@ -815,7 +840,7 @@
     if (num(n.prev_close) && num(n.price) && n.price !== n.prev_close) { p.className += n.price > n.prev_close ? ' dup' : ' ddn'; p.title = 'Today ' + sp1(n.price / n.prev_close - 1); }
     add(c, p, ' ', add(span('nd-w', null), span('ar', '→ '), span('nd', strike(n.node))));
   }
-  function fillTogo(r) { r.c.togo.textContent = num(r.n.dist) ? sp1(r.n.dist) : '–'; }
+  function fillTogo(r) { r.c.togo.textContent = num(r.n.dist) ? sp1(r.n.dist * SW().sign) : '–'; }
   function tripSvg(t, W) {
     var H = 12, Z = 18, F = 7, x0 = Z, x1 = W - F;
     var s = svgNode(W, H);
@@ -835,14 +860,14 @@
   function fillTrip(r) {
     var c = r.c.trip, T = r.n._trip; clear(c);
     if (!T) { c.appendChild(span('mut', '–')); return; }
-    if (T.above) { c.appendChild(span('tr-l', 'was above the pile 20 days ago')); return; }
+    if (T.above) { c.appendChild(span('tr-l', 'was ' + SW().dir + ' the pile 20 days ago')); return; }
     c.appendChild(tripSvg(T.t, tripW()));
     c.appendChild(span('tr-l' + (T.t < 0 ? ' dn' : ' upl'), T.t < 0 ? 'went the other way' : Math.round(Math.min(1, T.t) * 100) + '%'));
   }
   function sparkSvg(ser, node, W, H) {
     var s = svgNode(W, H); s.setAttribute('aria-hidden', 'true');
     if (!ser) return s;
-    var c = ser.c, lo = Math.min.apply(null, c), hi = Math.max(num(node) ? node : -Infinity, Math.max.apply(null, c));
+    var c = ser.c, lo = Math.min(num(node) ? node : Infinity, Math.min.apply(null, c)), hi = Math.max(num(node) ? node : -Infinity, Math.max.apply(null, c));
     var pd = (hi - lo) * 0.06 || hi * 0.01; lo -= pd; hi += pd;
     var X = function (i) { return 1.5 + i / (c.length - 1) * (W - 5); }, Y = lin(lo, hi, H - 1.5, 1.5);
     if (num(node)) el('line', { x1: 0, x2: W, y1: Y(node), y2: Y(node), stroke: C.amber, 'stroke-width': 1, 'stroke-dasharray': '3 2' }, s);
@@ -866,20 +891,14 @@
     var pt = sp0(x.pct), w = ' · ' + x.w + 's';
     c.className += x.kind === 'strong' ? ' strong' : x.kind === 'down' ? ' dnc' : ' mutc';
     c.appendChild(span('nc-long', x.kind === 'strong' ? compactSigned(x.chg) + ' ' + pt + w : (x.kind === 'flat' ? 'flat' : pt) + w));
-    c.appendChild(span('nc-short', 'calls ' + (x.kind === 'flat' ? 'flat' : pt)));
-    c.title = 'Calls added at this strike over the last ' + x.w + ' sessions (counting expiries ' + P.R.dte_lo + '+ days out). Changes once a day.';
+    c.appendChild(span('nc-short', SW().opts + ' ' + (x.kind === 'flat' ? 'flat' : pt)));
+    c.title = SW().Opts + ' added at this strike over the last ' + x.w + ' sessions. Changes once a day.';
   }
   function fillR20(r) { var v = r.n.ret20, c = r.c.r20; c.textContent = sp1(v); c.className = 'c-r20' + (num(v) ? (v >= 0 ? ' up' : ' down') : ''); }
   function heldDots(n) {
     var txt = n._persist == null ? null : n._persist + ' of last ' + n._win + ' sessions';
-    var marks = null;
-    if (Array.isArray(n.node_hist) && n.node_hist.length) {
-      marks = n.node_hist.slice(-10).map(function (e) { var k = Array.isArray(e) ? e[1] : null; return !num(k) ? 'n' : Math.abs(k - n.node) < 1e-6 ? 'f' : 'h'; });
-    } else if (n._persist != null && n._persist === n._win) {
-      marks = []; for (var i = 0; i < n._win; i++) marks.push('f');
-    }
+    var marks = typeof n.held === 'string' && /^[fhn]+$/.test(n.held) ? n.held.split('') : null;
     if (!marks) return span('held-t', n._persist == null ? '–' : n._persist + ' of ' + n._win);
-    while (marks.length < 10) marks.unshift('n');
     var box = span('held', null); box.setAttribute('role', 'img'); box.setAttribute('aria-label', 'Held: ' + (txt || '–')); if (txt) box.title = txt;
     marks.forEach(function (m) { var i = document.createElement('i'); i.className = 'h' + m; box.appendChild(i); });
     return box;
@@ -891,12 +910,12 @@
     var v, lab;
     if (S.sort === 'betadv') { v = num(n.prem_adv) ? pctTxt(n.prem_adv) : '–'; lab = 'of a day'; }
     else if (S.sort === 'betday') { v = num(n.per_day_usd) ? usd(n.per_day_usd) : '–'; lab = 'per day left'; }
-    else { v = usd(n.prem_usd); lab = 'in calls'; }
+    else { v = usd(n.prem_usd); lab = 'in ' + SW().opts; }
     c.appendChild(span('bv', v)); c.appendChild(span('bl', lab));
     var sc = num(n.score) ? Math.round(n.score) : null;
-    c.appendChild(span('bz' + (sc == null ? ' none' : sc >= 70 ? ' hi' : ''), sc == null ? 'no score' : 'Biz ' + sc));
-    c.title = '$ in calls ' + usd(n.prem_usd) + (num(n.prem_adv) ? ' · ' + pctTxt(n.prem_adv) + ' of a normal day’s trading' : '') +
-      (num(n.per_day_usd) ? ' · ' + usd(n.per_day_usd) + ' per day left (each expiry’s $ ÷ its own days)' : '');
+    c.appendChild(span('bz' + (sc == null ? ' none' : n.biz_hi === true ? ' hi' : ''), sc == null ? 'no score' : 'Biz ' + sc));
+    c.title = '$ in ' + SW().opts + ' ' + usd(n.prem_usd) + (num(n.prem_adv) ? ' · ' + pctTxt(n.prem_adv) + ' of a normal day’s trading' : '') +
+      (num(n.per_day_usd) ? ' · ' + usd(n.per_day_usd) + ' per day left' : '');
   }
   function fillBiz(r) {
     var n = r.n, c = r.c.biz; clear(c);
@@ -906,7 +925,7 @@
       return;
     }
     var sc = Math.max(0, Math.min(100, Math.round(n.score)));
-    c.appendChild(span('zv' + (sc >= 70 ? ' hi' : ''), String(sc)));
+    c.appendChild(span('zv' + (n.biz_hi === true ? ' hi' : ''), String(sc)));
     c.appendChild(span('zph', '/100'));
     var bar = span('zbar', null), i = document.createElement('i'); i.style.width = sc + '%'; bar.appendChild(i); c.appendChild(bar);
     c.title = 'Business score ' + sc + ' / 100' + (n.sector ? ' · ' + n.sector : '');
@@ -957,15 +976,17 @@
   };
 
   var RANKS = {
-    bet: { f: 'prem_usd', note: 'Ranked by $ in calls: what the calls at the pile were worth at the last saved option prices (open interest × option price × 100). The most money parked at a far strike comes first.' },
-    betadv: { f: 'prem_adv', note: 'Ranked by $ in calls compared with a normal day’s trading in the stock (20-day average). A big bet in a quiet stock ranks high.' },
-    betday: { f: 'per_day_usd', note: 'Ranked by $ per day left: each expiry’s money divided by its own days to expiry, added up. Big money on a short clock comes first.' },
-    biz: { f: 'score', note: 'Ranked by the business score (six numbers: revenue growth on the year and the quarter, EPS growth, free-cash-flow growth and margin, PEG). Funds, and companies outside the large-company list the score covers or without enough reported numbers, have no score and sit at the bottom.' },
-    combo: { f: 'combined', note: 'All three combined: the average of each name’s standing on $ in calls, on $ per day left and on the business score. Names without a business score sit at the bottom.' }
+    bet: { f: 'prem_usd', note: 'Ranked by $ in calls: what the calls at the pile were worth at the last saved option prices. The most money parked at a far strike comes first.' },
+    betadv: { f: 'prem_adv', note: 'Ranked by $ in calls compared with a normal day’s trading in the stock. A big bet in a quiet stock ranks high.' },
+    betday: { f: 'per_day_usd', note: 'Ranked by $ per day left: big money on a short clock comes first.' },
+    biz: { f: 'score', note: 'Ranked by the business score: a 0–100 business-quality score from reported growth, cash flow and valuation. Funds, and companies outside the large-company list the score covers or without enough reported numbers, have no score and sit at the bottom.' },
+    combo: { f: 'combo', asc: true, note: 'All three combined: a blend of each name’s standing on $ in calls, $ per day left and the business score. Names without a business score sit at the bottom.' }
   };
   Object.keys(RANKS).forEach(function (k) {
     var f = RANKS[k].f;
-    SORTS[k] = function (a, b) { return (num(b[f]) ? b[f] : -1) - (num(a[f]) ? a[f] : -1); };
+    SORTS[k] = RANKS[k].asc
+      ? function (a, b) { return (num(a[f]) ? a[f] : 1e15) - (num(b[f]) ? b[f] : 1e15); }
+      : function (a, b) { return (num(b[f]) ? b[f] : -1) - (num(a[f]) ? a[f] : -1); };
   });
   function allRows() {
     var out = P.names.slice();
@@ -989,7 +1010,7 @@
       if (c) b.setAttribute('aria-label', (k === 'all' ? 'All' : 'Tier ' + tierName(k)) + ', ' + (k === 'all' ? P.names.length : c[k]) + ((k === 'all' ? P.names.length : c[k]) === 1 ? ' name' : ' names'));
     });
     $('sort').value = S.sort;
-    Array.prototype.forEach.call(document.querySelectorAll('#rankBar button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sort') === S.sort ? 'true' : 'false'); });
+    Array.prototype.forEach.call(document.querySelectorAll('#rankBar button[data-sort]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sort') === S.sort ? 'true' : 'false'); });
   }
   function renderList() {
     closePop();
@@ -1072,14 +1093,15 @@
   }
   function openLinked(sym) {
     if (P.by[sym]) { setTimeout(function () { goToRow(sym, false); }, 0); return; }
-    if (P.list !== 'all' && P.allSyms[sym]) { setList('all'); setTimeout(function () { goToRow(sym, false); }, 0); }
+    if (P.list !== 'all' && P.allSyms[sym]) { setList('all'); setTimeout(function () { goToRow(sym, false); }, 0); return; }
+    checkTicker(sym);
   }
   function setList(k) {
     if (!isList(k)) k = 'all';
     S.list = k; sset('ps.list', k);
     if (!RAW) { return; }
     closePop(); ghosts = {}; $('updateBar').hidden = true; setStick();
-    P = prep(RAW, k);
+    P = prep(RAW, k, S.side);
     Object.keys(S.open).forEach(function (sym) { if (!P.by[sym]) delete S.open[sym]; });
     renderAll();
   }
@@ -1100,7 +1122,7 @@
     var sym = r.n.sym;
     delete S.open[sym];
     r.art.classList.remove('open'); r.b.setAttribute('aria-expanded', 'false'); r.det.hidden = true; clear(r.det); r.chart = null;
-    if (user && decodeURIComponent(location.hash.slice(1)) === sym) clearHash();
+    if (user && parseHash().o === sym) clearHash();
   }
   function scrollToEl(node) {
     if (!node) return;
@@ -1129,103 +1151,86 @@
   function parseHash() {
     var h = ''; try { h = decodeURIComponent(location.hash.replace(/^#/, '')); } catch (e) { h = location.hash.replace(/^#/, ''); }
     if (!h) return {};
-    if (h.indexOf('=') >= 0) { var o = {}; h.split('&').forEach(function (kv) { var p = kv.split('='); o[p[0]] = p[1]; }); return { t: o.t, s: o.s, l: o.l, o: o.o ? o.o.toUpperCase() : null }; }
+    if (h.indexOf('=') >= 0) { var o = {}; h.split('&').forEach(function (kv) { var p = kv.split('='); o[p[0]] = p[1]; }); return { t: o.t, s: o.s, l: o.l, v: o.v, o: o.o ? o.o.toUpperCase() : null }; }
     return /^[A-Za-z0-9.\-_]{1,12}$/.test(h) ? { o: h.toUpperCase() } : {};
   }
-  function setHash(sym) { try { history.replaceState(null, '', location.pathname + location.search + '#' + encodeURIComponent(sym)); } catch (e) { } }
+  function symHash(sym) {
+    var pre = '';
+    return '#' + pre + encodeURIComponent(sym);
+  }
+  function setHash(sym) { try { history.replaceState(null, '', location.pathname + location.search + symHash(sym)); } catch (e) { } }
   function clearHash() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } }
 
 
   function kick(t) { return para('d-k', t); }
   function plainEnglish(n) {
-    var R = P.R, sym = n.sym, k = '$' + strike(n.node), parts = [];
-    var cp = cpOf(n);
-    if (num(n.call_oi) && num(n.put_oi))
-      parts.push('Traders hold ' + int(n.call_oi) + ' calls at ' + k + ' against ' + int(n.put_oi) + ' puts (' + (cp === Infinity ? 'no puts' : ratioTxt(cp) + ' to 1') + '), counting expiries ' + R.dte_lo + '+ days out.');
-    if (num(n.share)) parts.push('That pile is ' + p0(n.share) + ' of all the upside gamma on ' + sym + (n._persist != null ? ', and it has been the top pile in ' + n._persist + ' of the last ' + n._win + ' sessions' : '') +
+    var w = SW(), sym = n.sym, k = '$' + strike(n.node), parts = [];
+    var cp = cpOf(n), own = ownOi(n), oth = othOi(n);
+    if (num(own) && num(oth))
+      parts.push('Traders hold ' + int(own) + ' ' + w.opts + ' at ' + k + ' against ' + int(oth) + ' ' + w.other + ' (' + (cp === Infinity ? 'no ' + w.other : ratioTxt(cp) + ' to 1') + ').');
+    if (num(n.share)) parts.push('That pile is ' + p0(n.share) + ' of all the ' + w.gam + ' gamma on ' + sym + (n._persist != null ? ', and it has been the top pile in ' + n._persist + ' of the last ' + n._win + ' sessions' : '') +
       (n.first_seen ? ' (first seen ' + dS(n.first_seen) + ').' : '.'));
     var x = n._nc;
     if (x) {
-      if (x.kind === 'strong' || x.kind === 'up') parts.push(int(x.chg) + ' calls were added at ' + k + ' over the last ' + x.w + ' sessions (' + sp0(x.pct) + ').');
-      else if (x.kind === 'flat') parts.push('Hardly any calls were added lately.');
-      else parts.push('Calls at ' + k + ' fell ' + p0(Math.abs(x.pct)) + ' over the last ' + x.w + ' sessions.');
+      if (x.kind === 'strong' || x.kind === 'up') parts.push(int(x.chg) + ' ' + w.opts + ' were added at ' + k + ' over the last ' + x.w + ' sessions (' + sp0(x.pct) + ').');
+      else if (x.kind === 'flat') parts.push('Hardly any ' + w.opts + ' were added lately.');
+      else parts.push(w.Opts + ' at ' + k + ' fell ' + p0(Math.abs(x.pct)) + ' over the last ' + x.w + ' sessions.');
     }
     if (num(n.ret20)) {
-      var T = n._trip, trip = !T ? '' : T.above ? '; it was above the pile 20 days ago' : T.t > 0 ? ', ' + Math.round(Math.min(1, T.t) * 100) + '% of the way there from where it was' : ', moving away from it';
+      var T = n._trip, trip = !T ? '' : T.above ? '; it was ' + w.dir + ' the pile 20 days ago' : T.t > 0 ? ', ' + Math.round(Math.min(1, T.t) * 100) + '% of the way there from where it was' : ', moving away from it';
       parts.push('The price is ' + (n.ret20 >= 0 ? 'up ' : 'down ') + a1(n.ret20) + ' in 20 days' + trip + '.');
     }
     if (num(n.odds)) parts.push('The options give about a ' + p0(n.odds) + ' chance (about ' + oneIn(n.odds) + ') that ' + sym + ' trades at ' + k + ' at least once by ' + wS(n.main_exp) + '.');
     return parts.join(' ');
   }
+
   function whyList(n) {
-    var R = P.R, ul = document.createElement('ul'); ul.className = 'why';
-    var cp = cpOf(n), z = n.z, share = n.share;
-    var bigOk = (num(share) && share >= R.min_share) || (num(n.gex_usd) && n.gex_usd >= R.or_min_gex_usd);
+    var w = SW(), ul = document.createElement('ul'); ul.className = 'why';
+    var cp = cpOf(n), mv = n.mv, share = n.share;
     [
-      [num(n.dist) && n.dist >= R.min_dist, 'Far', a1(n.dist) + ' above', 'needs ' + p0(R.min_dist)],
-      [bigOk, 'Big', p0(share) + ' of upside gamma' + (num(share) && share < R.min_share ? ' (' + usd(n.gex_usd) + ' of gamma)' : ''), 'needs ' + p0(R.min_share) + ', or ' + usd(R.or_min_gex_usd)],
-      [n._persist != null && n._persist >= R.min_persist, 'Stays put', (n._persist != null ? n._persist : '–') + ' of ' + n._win + ' sessions', 'needs ' + R.min_persist],
-      [cp != null && cp >= R.min_call_put, 'Mostly calls', cp === Infinity ? 'no puts' : ratioTxt(cp) + ' to 1', 'needs ' + strike(R.min_call_put)],
-      [num(z) && z <= R.max_z, 'Reachable', (num(z) ? z.toFixed(1) : '–') + ' typical moves', 'needs ' + strike(R.max_z) + ' or less']
-    ].forEach(function (w) {
+      ['Far', a1(n.dist) + ' ' + w.dir],
+      ['Big', p0(share) + ' of ' + w.gam + ' gamma' + (n.big_usd === true ? ' (' + usd(n.gex_usd) + ' of gamma)' : '')],
+      ['Stays put', (n._persist != null ? n._persist : '–') + ' of ' + n._win + ' sessions'],
+      [w.mostly, cp === Infinity ? 'no ' + w.other : ratioTxt(cp) + ' to 1'],
+      ['Reachable', (num(mv) ? mv.toFixed(1) : '–') + ' typical moves']
+    ].forEach(function (x) {
       var li = document.createElement('li');
-      li.appendChild(span(w[0] ? 'ok' : 'no', w[0] ? '✓' : '✗'));
-      li.appendChild(document.createTextNode(w[1] + ': ' + w[2] + ' (' + w[3] + ')'));
+      li.appendChild(span('ok', '✓'));
+      li.appendChild(document.createTextNode(x[0] + ': ' + x[1]));
       ul.appendChild(li);
     });
     return ul;
   }
 
-  function callsWords(n, flatWords) {
-    var R = P.R, x = n._nc; if (!x) return '';
-    var w = ' over ' + x.w + (x.w === '1' ? ' session' : ' sessions');
-    if (x.kind === 'strong') return 'Calls at the pile are up ' + p0(x.pct) + w + '.';
-    if (x.pct >= R.tierB_growth) return 'Calls at the pile are up ' + p0(x.pct) + w + ', but only ' + int(x.chg) + ' contracts (B needs ' + int(R.tierB_min) + '+).';
-    if (x.kind === 'up') return 'Calls at the pile are up ' + (n.borderline === 'B' ? a1(x.pct) : p0(x.pct)) + w + ', ' + (n.borderline === 'B' ? 'just under' : 'under') + ' the ' + p0(R.tierB_growth) + ' bar for B.';
-    if (x.kind === 'flat') return flatWords;
-    return 'Calls at the pile are down ' + p0(Math.abs(x.pct)) + w + '.';
-  }
-  function priceWords(n) {
-    var R = P.R; if (!num(n.ret20)) return '';
-    if (n.ret20 <= 0) return 'The price is down ' + a1(n.ret20) + ' in 20 days.';
-    return 'The price is up ' + a1(n.ret20) + ' in 20 days, ' + (n.borderline === 'A' ? 'just under' : 'under') + ' the ' + p0(R.tierA_ret20) + ' bar for A.';
-  }
   function tierLine(n) {
-    var x = n._nc, p = para('d-tier', null), t;
-    var calls = x ? 'calls at the pile up ' + p0(Math.max(0, x.pct)) + ' (' + x.w + ' sessions)' : 'calls at the pile growing';
-    var flatish = !x || x.kind === 'flat';
-    if (n.tier === 'AB') t = 'Why A+B: up ' + a1(n.ret20) + ' in 20 days and ' + calls + '.';
-    else if (n.tier === 'A') t = 'Why A: up ' + a1(n.ret20) + ' in 20 days. ' + (callsWords(n, 'Calls at the pile aren’t growing.') || 'Calls at the pile aren’t growing.');
-    else if (n.tier === 'B') t = !num(n.ret20) || n.ret20 <= 0 ? 'Why B: ' + calls + ', but the price hasn’t started toward it.' : 'Why B: ' + calls + '. ' + priceWords(n);
-    else if (flatish && (!num(n.ret20) || n.ret20 <= 0.01)) t = 'Why C: an old pile. These calls have barely changed and the price isn’t moving toward it. Often a fund selling calls against shares it owns, not a bet on a jump.';
-    else t = 'Why C: neither A nor B today. ' + priceWords(n) + ' ' + callsWords(n, 'Calls at the pile have barely changed.') + ' Old piles like this are often a fund selling calls against shares it owns, not a bet on a jump.';
-    p.appendChild(document.createTextNode(t.replace(/\s+/g, ' ').trim()));
-    var fd = fuseDays(n);
-    if (fd != null && fd >= 0 && fd <= 21) p.appendChild(span('amber', 'Short fuse: the main expiry, ' + wS(n.main_exp) + ', is ' + fd + ' days away (' + p0(n.main_share) + ' of these calls).'));
+    var p = para('d-tier', null);
+    p.appendChild(document.createTextNode(typeof n.why === 'string' ? n.why : ''));
+    if (num(n.fuse)) p.appendChild(span('amber', 'Short fuse: the main expiry, ' + wS(n.main_exp) + ', is ' + n.fuse + ' days away (' + p0(n.main_share) + ' of these ' + SW().opts + ').'));
     return p;
   }
   function factsGrid(n) {
     var dl = document.createElement('dl'); dl.className = 'facts';
     function row(k, v) { var dt = document.createElement('dt'); dt.textContent = k; var dd = document.createElement('dd'); if (typeof v === 'string') dd.textContent = v; else dd.appendChild(v); dl.appendChild(dt); dl.appendChild(dd); return dd; }
     var cp = cpOf(n);
-    row('$ in calls at the pile', usd(n.prem_usd) + (num(n.prem_adv) ? ' · ' + (n.prem_adv * 100).toFixed(1) + '% of a normal day’s trading (' + usd(n.adv_usd) + ')' : ''));
-    if (num(n.per_day_usd)) row('$ per day left', usd(n.per_day_usd) + ' (each expiry’s $ ÷ its own days)');
+    row('$ in ' + SW().opts + ' at the pile', usd(n.prem_usd) + (num(n.prem_adv) ? ' · ' + (n.prem_adv * 100).toFixed(1) + '% of a normal day’s trading (' + usd(n.adv_usd) + ')' : ''));
+    if (num(n.per_day_usd)) row('$ per day left', usd(n.per_day_usd));
     row('Business score', num(n.score) ? Math.round(n.score) + ' / 100' + (n.sector ? ' · ' + n.sector : '') : 'none (funds and some companies have no score)');
     if (n._comboRank && P.by[n.sym]) row('All three combined', '#' + n._comboRank + ' of ' + n._comboN + ' names with all three');
     row('Pile size (gamma $)', usd(n.gex_usd));
-    row('Share of upside gamma', p0(n.share));
+    row('Share of ' + SW().gam + ' gamma', p0(n.share));
     var held = span('', (n._persist != null ? n._persist : '–') + ' of last ' + n._win + ' sessions ');
     held.appendChild(heldDots(n)); if (held.lastChild.className === 'held-t') held.removeChild(held.lastChild);
     row('Same pile for', held);
     row('First seen', wS(n.first_seen));
-    row('Calls / puts at the pile', int(n.call_oi) + ' / ' + int(n.put_oi) + (cp == null ? '' : cp === Infinity ? ' (no puts)' : ' (' + ratioTxt(cp) + ' to 1)'));
+    var w = SW();
+    row(w.Opts + ' / ' + w.other + ' at the pile', int(ownOi(n)) + ' / ' + int(othOi(n)) + (cp == null ? '' : cp === Infinity ? ' (no ' + w.other + ')' : ' (' + ratioTxt(cp) + ' to 1)'));
     var ch = n.oi_chg || {}, miss = false;
     var nc = ['1', '3', '5'].map(function (w) { var v = ch[w]; if (!Array.isArray(v) || !num(v[0])) { miss = true; return '–'; } return sgnInt(v[0]) + ' (' + sp0(v[1]) + ')'; }).join(' / ');
     var ncv = span('', nc);
-    if (miss && Array.isArray(n.oi_hist) && n.oi_hist[0]) ncv.appendChild(span('mut', 'collecting since ' + dS(n.oi_hist[0][0])));
-    row('New calls · 1 / 3 / 5 sessions', ncv);
-    row('Main expiry', wS(n.main_exp) + (num(n.main_share) ? ' · ' + p0(n.main_share) + ' of these calls' : ''));
-    row('Typical moves away', num(n.z) ? n.z.toFixed(1) : '–');
+    if (miss && typeof n.oi0 === 'string') ncv.appendChild(span('mut', 'collecting since ' + dS(n.oi0)));
+    row('New ' + SW().opts + ' · 1 / 3 / 5 sessions', ncv);
+    row('Main expiry', wS(n.main_exp) + (num(n.main_share) ? ' · ' + p0(n.main_share) + ' of these ' + SW().opts : ''));
+    row('Typical moves away', num(n.mv) ? n.mv.toFixed(1) : '–');
     var r20 = span(num(n.ret20) ? (n.ret20 >= 0 ? 'up' : 'down') : '', sp1(n.ret20)); row('Last 20 trading days', r20);
     row('From 52-week closing high', sp1(n.off_high));
     var old = n.oi_settle && P.newest && n.oi_settle < P.newest;
@@ -1234,19 +1239,19 @@
   }
   var XCOL = ['#3987E5', '#8EC0FA', '#2E6DB8', '#B9D8FB', '#5A9BE8'];
   function expiryBlock(n) {
-    var mix = (Array.isArray(n.exp_mix) ? n.exp_mix : []).filter(function (e) { return Array.isArray(e) && typeof e[0] === 'string' && num(e[1]); }).slice(0, 5);
-    if (!mix.length || !num(n.call_oi) || n.call_oi <= 0) return null;
+    var mix = (Array.isArray(n.xmix) ? n.xmix : []).filter(function (e) { return Array.isArray(e) && typeof e[0] === 'string' && num(e[1]); }).slice(0, 5);
+    if (!mix.length) return null;
     var w = div(''), bar = div('xbar');
     bar.setAttribute('role', 'img');
-    var lab = mix.map(function (e) { return dS(e[0], true) + ' ' + p0(e[1] / n.call_oi); }).join(' · ');
+    var lab = mix.map(function (e) { return dS(e[0], true) + ' ' + p0(e[1]); }).join(' · ');
     bar.setAttribute('aria-label', lab);
-    mix.forEach(function (e, i) { var s = document.createElement('i'); s.style.width = (Math.min(1, e[1] / n.call_oi) * 100).toFixed(2) + '%'; s.style.background = XCOL[i % XCOL.length]; bar.appendChild(s); });
-    w.appendChild(kick('Where the calls at $' + strike(n.node) + ' expire'));
+    mix.forEach(function (e, i) { var s = document.createElement('i'); s.style.width = (Math.min(1, e[1]) * 100).toFixed(2) + '%'; s.style.background = XCOL[i % XCOL.length]; bar.appendChild(s); });
+    w.appendChild(kick('Where the ' + SW().opts + ' at $' + strike(n.node) + ' expire'));
     w.appendChild(bar); w.appendChild(para('xlab', lab));
     return w;
   }
   function copyLink(sym, b) {
-    var url = location.origin + location.pathname + location.search + '#' + encodeURIComponent(sym);
+    var url = location.origin + location.pathname + location.search + symHash(sym);
     function done() { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy link'; }, 1500); }
     function fallback() {
       var ta = document.createElement('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
@@ -1286,10 +1291,8 @@
   function captionFor(n) {
     var by = wS(n.main_exp), od = p0(n.odds);
     var s = 'Shaded fan = where the price usually is by ' + by + ' (about one typical move up or down). ';
-    if (!num(n.z)) return s;
-    if (n.z < 1) return s + 'The pile is inside the fan, so the odds are ' + od + '.';
-    if (n.z <= 1.5) return s + 'The pile is just outside the fan, so the odds are ' + od + '.';
-    return s + 'The pile is outside the fan, so the odds are ' + od + '.';
+    var where = { 'in': 'inside the fan', edge: 'just outside the fan', out: 'outside the fan' }[n.fan_pos];
+    return where ? s + 'The pile is ' + where + ', so the odds are ' + od + '.' : s;
   }
   function runwayRead(ch, dn, v, fan) {
     var ro = ch.ro, n = ch.n; clear(ro);
@@ -1305,11 +1308,15 @@
     var W = Math.max(260, Math.round(h.clientWidth || 300)), H = GEO.mode === 'card' ? 200 : 220;
     var L = 4, Rr = 6, T = 16, B = 20, pw = W - L - Rr, ph = H - T - B, hw = pw * 0.65, fw = pw - hw;
     var c = ser.c, d = ser.d, N = c.length, today = d[N - 1];
-    var exp = n.main_exp ? dayNum(n.main_exp) : null, spanD = exp && exp > today ? exp - today : null, Ty = spanD ? spanD / 365 : null;
-    var sig = num(n.atm_iv) && n.atm_iv > 0 ? n.atm_iv : (num(n.z) && n.z > 0 && num(n.dist) && Ty ? Math.log(1 + n.dist) / n.z / Math.sqrt(Ty) : null);
-    var p0v = num(n.price) ? n.price : c[N - 1], fan = [];
-    if (spanD && sig) for (var k = 0; k <= 24; k++) { var dd = today + spanD * k / 24, mm = sig * Math.sqrt((dd - today) / 365); fan.push({ dn: dd, hi: p0v * Math.exp(mm), lo: p0v * Math.exp(-mm) }); }
-    var lo = Math.min.apply(null, c), hi = Math.max(Math.max.apply(null, c), num(n.node) ? n.node : -Infinity), rng = (hi - lo) || hi * 0.05;
+    var exp = n.main_exp ? dayNum(n.main_exp) : null, spanD = exp && exp > today ? exp - today : null;
+    var p0v = num(n.price) ? n.price : c[N - 1], fan = [], k;
+
+    var fh = Array.isArray(n.fan) && Array.isArray(n.fan[0]) && Array.isArray(n.fan[1]) ? n.fan : null, nf = fh ? Math.min(fh[0].length, fh[1].length) : 0;
+    if (spanD && nf) {
+      fan.push({ dn: today, hi: p0v, lo: p0v });
+      for (k = 1; k <= nf; k++) fan.push({ dn: today + spanD * k / nf, hi: fh[0][k - 1], lo: fh[1][k - 1] });
+    }
+    var lo = Math.min(Math.min.apply(null, c), num(n.node) ? n.node : Infinity), hi = Math.max(Math.max.apply(null, c), num(n.node) ? n.node : -Infinity), rng = (hi - lo) || hi * 0.05;
     if (fan.length) { var fe = fan[fan.length - 1]; lo = Math.min(lo, Math.max(fe.lo, lo - rng * 0.35)); hi = Math.max(hi, Math.min(fe.hi, hi + rng * 0.35)); }
     var pd = (hi - lo) * 0.06; lo -= pd; hi += pd;
     var Y = lin(lo, hi, T + ph, T);
@@ -1420,11 +1427,11 @@
       var go = btn('btn', 'Show it on the whole list'); go.addEventListener('click', function () { hideCheck(); setList('all'); goToRow(sym, true); });
       card.appendChild(go); return;
     }
-    var ix = P.index ? P.index[sym] : null, inCl = P.closing.filter(function (c) { return c.sym === sym; })[0];
+    var ix = P.idx ? P.idx[sym] : null, inCl = P.closing.filter(function (c) { return c.sym === sym; })[0];
     var hit = P.hits.filter(function (h) { return h.sym === sym; })[0];
     var head = div('cc-h'), x = btn('x-btn', '✕'); x.setAttribute('aria-label', 'Close the check'); x.addEventListener('click', hideCheck);
-    var R = P.R;
-    if (P.index && !ix && !inCl && !hit) {
+    var w = SW();
+    if (P.idx && !ix && !inCl && !hit) {
       var onL = ['wl', 'spx', 'ndx'].filter(function (k) { return P.lists[k] && P.lists[k][sym]; })[0];
       head.appendChild(span('', onL
         ? sym + ' is on ' + LISTS[onL].label + ', but we don’t keep an option chain for it' + (onL === 'wl' ? ' (the sweep leaves out leveraged and inverse funds, crypto and the VIX, and some names have no usable chain).' : ' (no usable chain today).')
@@ -1433,24 +1440,26 @@
     }
     head.appendChild(add(document.createElement('b'), sym + ' isn’t on today’s list.')); head.appendChild(x); card.appendChild(head);
     if (ix) {
-      var node = ix[1], dist = ix[2], share = ix[3], fail = ix[4], val = ix[5];
-      if (fail === 'below') card.appendChild(para('', sym + '’s biggest call pile is at or below the price, so there’s nothing to seek upward.'));
+
+      var fail = ix[1], node = ix[2], dist = ix[3], share = ix[4], val = ix[5];
+      if (fail === 'below' || fail === 'above') card.appendChild(para('', sym + '’s biggest ' + w.opt + ' pile is at or ' + w.away + ' the price, so there’s nothing to seek ' + w.seek + '.'));
+      else if (fail === 'nopile') card.appendChild(para('', sym + ' has no strike where ' + w.opts + ' outweigh ' + w.other + ' today, so there’s no ' + w.opt + ' pile to seek.'));
       else if (fail === 'nochain') card.appendChild(para('', sym + ' has no usable option chain or price history today, so it can’t be checked.'));
       else {
         var ul = document.createElement('ul'), fi = CHECK_ORDER.indexOf(fail);
         var PASS = {
-          far: '✓ Far: its biggest call pile (' + strike(node) + ') is ' + a1(dist) + ' above the price.',
-          big: '✓ Big: the pile holds ' + p0(share) + ' of upside gamma.',
-          persist: '✓ Stays put.', calls: '✓ Mostly calls.', reach: '✓ Reachable.'
+          far: '✓ Far: its biggest ' + w.opt + ' pile (' + strike(node) + ') is ' + a1(dist) + ' ' + w.dir + ' the price.',
+          big: '✓ Big: the pile holds ' + p0(share) + ' of ' + w.gam + ' gamma.',
+          persist: '✓ Stays put.', calls: '✓ ' + w.mostly + '.', reach: '✓ Reachable.'
         };
         var FAIL = {
-          far: '✗ Far: its biggest call pile (' + strike(node) + ') is only ' + a1(dist) + ' above the price (needs ' + p0(R.min_dist) + ').',
-          big: '✗ Big: the pile holds ' + p0(share) + ' of upside gamma (needs ' + p0(R.min_share) + ', or ' + usd(R.or_min_gex_usd) + ').',
-          persist: '✗ Stays put: the top strike was the same in only ' + (num(val) ? val : '–') + ' of the last ' + R.persist_window + ' sessions (needs ' + R.min_persist + ').',
-          calls: '✗ Mostly calls: ' + (num(val) ? ratioTxt(val) : '–') + ' calls per put at that strike (needs ' + strike(R.min_call_put) + ').',
-          reach: '✗ Reachable: ' + (num(val) ? val.toFixed(1) : '–') + ' typical moves away (needs ' + strike(R.max_z) + ' or less).'
+          far: '✗ Far: its biggest ' + w.opt + ' pile (' + strike(node) + ') is only ' + a1(dist) + ' ' + w.dir + ' the price: not far enough.',
+          big: '✗ Big: the pile holds ' + p0(share) + ' of ' + w.gam + ' gamma: not big enough.',
+          persist: '✗ Stays put: the top strike was the same in only ' + (num(val) ? val : '–') + ' of the last 10 sessions: hasn’t stayed put.',
+          calls: '✗ ' + w.mostly + ': ' + (num(val) ? ratioTxt(val) : '–') + ' ' + w.opts + ' per ' + w.other.replace(/s$/, '') + ' at that strike: not ' + w.mostly.toLowerCase() + '.',
+          reach: '✗ Reachable: ' + (num(val) ? val.toFixed(1) : '–') + ' typical moves away: out of reach.'
         };
-        var LABEL = { far: 'Far', big: 'Big', persist: 'Stays put', calls: 'Mostly calls', reach: 'Reachable' };
+        var LABEL = { far: 'Far', big: 'Big', persist: 'Stays put', calls: w.mostly, reach: 'Reachable' };
         CHECK_ORDER.forEach(function (k, i) {
           var li = document.createElement('li');
           if (fi < 0 || i < fi) li.textContent = PASS[k];
@@ -1460,7 +1469,7 @@
         });
         card.appendChild(ul);
       }
-    } else if (!P.index) card.appendChild(para('mut', 'The 5-check detail for names off the list comes with the next version of the data file.'));
+    } else if (!P.idx) card.appendChild(para('mut', 'The 5-check detail for names off the list comes with the next version of the data file.'));
     if (inCl || hit) {
       var lk = para('cc-links', null);
       if (inCl) { var b1 = btn('linkbtn', 'It’s in Closing in.'); b1.addEventListener('click', function () { goToClosing(sym); }); lk.appendChild(b1); }
@@ -1504,12 +1513,12 @@
     var t = span('cl-txt', null);
     var sep = function () { return span('sep', ' · '); };
     add(t, span('tk', c.sym), sep(), span('', px(c.price) + ' → ' + strike(c.node)), sep());
-    if (c._touched) add(t, span('', 'TOUCHED today' + (num(c.day_high) ? ' · high ' + px(c.day_high) : '') + '. ' +
+    var ext = sideExt(c);
+    if (c._touched) add(t, span('', 'TOUCHED today' + (num(ext) ? ' · ' + SW().ext + ' ' + px(ext) : '') + '. ' +
       (P.doc.state === 'LIVE' ? 'Counts as a hit once the close confirms it.' : 'It joins Recent hits at the next record update.')));
     else {
       add(t, span('togo', a1(c.dist) + ' to go'), sep(), span('seen', 'first seen ' + dS(c.first_seen) + ' at ' + px(c.spot_first) + ' (' + a1(c.dist_first) + ' away)'));
-      if (num(c.price) && num(c.spot_first) && num(c.node) && c.node > c.spot_first)
-        add(t, sep(), span('', p0((c.price - c.spot_first) / (c.node - c.spot_first)) + ' of the way'));
+      if (num(c.way)) add(t, sep(), span('', p0(c.way) + ' of the way'));
     }
     b.appendChild(t);
     var sp = span('cl-sp', null); sp.appendChild(sparkSvg(c._spk, c.node, 128, 28)); b.appendChild(sp);
@@ -1545,7 +1554,7 @@
       var first = onListFirst(h);
       add(sum, span('h-stk tk', h.sym), span('h-pile', strike(h.node)),
         add(span('h-seen', null), span('hk', 'first seen '), dS(h.first_seen) + ' · ' + px(h.spot) + ' (' + a1(h.dist) + ' away)'),
-        add(span('h-reach', null), span('hk', 'reached '), dS(h.reached) + (num(h.high) ? ' · high ' + px(h.high) : '') + (num(h.sessions) ? ' · ' + h.sessions + ' sessions' : '')),
+        add(span('h-reach', null), span('hk', 'reached '), dS(h.reached) + (num(h[SW().ext]) ? ' · ' + SW().ext + ' ' + px(h[SW().ext]) : '') + (num(h.sessions) ? ' · ' + h.sessions + ' sessions' : '')),
         add(span('h-first' + (/^Yes/.test(first) ? ' yes' : ''), null), span('hk', 'On the list first? '), first));
       var ch = span('c-chev', canOpen ? '›' : ''); ch.setAttribute('aria-hidden', 'true'); sum.appendChild(ch);
       w.appendChild(sum);
@@ -1556,7 +1565,7 @@
         var draw = function () {
           w.classList.add('open'); sum.setAttribute('aria-expanded', 'true'); det.hidden = false;
           var hd = h.reached ? dayNum(h.reached) : null;
-          miniChart(det, h._path, { H: 90, node: h.node, seen: h.first_seen ? dayNum(h.first_seen) : null, seenV: h.spot, hit: { dn: hd, v: h.high }, label: h.sym + ': from first seen to the touch of ' + strike(h.node) });
+          miniChart(det, h._path, { H: 90, node: h.node, seen: h.first_seen ? dayNum(h.first_seen) : null, seenV: h.spot, hit: { dn: hd, v: h[SW().ext] }, label: h.sym + ': from first seen to the touch of ' + strike(h.node) });
         };
         sum.addEventListener('click', function () {
           if (S.hitOpen[key]) { delete S.hitOpen[key]; w.classList.remove('open'); sum.setAttribute('aria-expanded', 'false'); det.hidden = true; clear(det); }
@@ -1567,22 +1576,21 @@
       host.appendChild(w);
     });
 
-    var ms = P.misses || [], n = P.missed != null ? P.missed : ms.length;
+    var ms = P.missList || [], n = P.missed != null ? P.missed : ms.length;
     $('missesH').textContent = 'Ran out of time (' + n + ')';
     var mh = $('missRows'); clear(mh);
     if (!ms.length) mh.appendChild(para('src', 'None yet. That isn’t good news: the first main expiries are ' + firstExpWords() + ', and most piles expire in December or January.'));
     ms.forEach(function (m) {
       mh.appendChild(para('miss', m.sym + ' · pile ' + strike(m.node) + ' · first seen ' + dS(m.first_seen) + ' · odds then ' + (num(m.q_odds) ? p0(m.q_odds) : '–') +
-        ' · main expiry ' + dS(m.main_exp) + ' passed · got within ' + a1(m.closest)));
+        ' · main expiry ' + dS(m.main_exp) + ' passed · got ' + (num(m.closest) ? p0(m.closest) + ' of the way' : 'no closer than at first')));
     });
   }
   function firstExpWords() { var e = P.byExp && P.byExp[0]; return e ? dS(e.exp) : 'Oct 16'; }
 
 
-  var BUCKETS = [[0.13, 0.25, '13–25%'], [0.25, 0.40, '25–40%'], [0.40, 0.60, '40–60%'], [0.60, 1.01, '60%+']];
   function renderScore() {
     $('score').hidden = false;
-    var rec = P.rec, sc = P.scored || {}, R = P.R;
+    var rec = P.rec, bd = P.board || {};
     var hitsQ = P.hits.filter(function (h) { return 'q_day' in h; }), k = hitsQ.length === P.hits.length && P.hits.length ? P.hits.filter(function (h) { return !!h.q_day; }).length : null;
     var T = $('scoreTiles'); clear(T);
     function tile(kk, v, small, note) {
@@ -1609,75 +1617,56 @@
       row.appendChild(span('cal-n', String(r.n))); cal.appendChild(row);
     });
 
-    var N = P.names.length, cut = null, nLate = 0;
-    if (N && P.doc.prices_day) {
-      var c60 = dayNum(P.doc.prices_day) + 60;
-      P.byExp.forEach(function (e) { if (cut == null && dayNum(e.exp) >= c60) cut = e.exp; });
-      if (cut) P.byExp.forEach(function (e) { if (e.exp >= cut) nLate += e.n; });
-    }
+    var N = P.names.length, lt = P.late;
     $('earlyBias').textContent = 'Too early to grade. Hits can come any day, but a miss only counts when the expiry passes' +
-      (cut ? ', and ' + nLate + ' of the ' + N + ' piles on today’s list expire ' + dS(cut) + ' or later' : '') + '. So for months the record will look better than it really is.';
-    var ts = R.test_start ? dayNum(R.test_start) : null;
-    $('testBox').textContent = 'The test, written down ' + TEST_WRITTEN + ': from ' + (ts ? wmd(ts) : 'Mon Oct 5') + ' on, every pile that passes all 5 checks counts from its first day on the list, with the odds it had that day. ' +
-      'A pile is reached if the price trades at or above it before its main expiry, and missed if that expiry passes first. Once ' + R.min_closed +
-      ' piles have resolved, we compare the reached count with what the odds said, overall and by tier. Piles from before ' + (ts ? monD(ts) : 'Oct 5') + ' are shown above but not scored.';
-    var closed = num(sc.closed) ? sc.closed : 0;
-    $('progT').textContent = 'Scored so far: ' + closed + ' of the ' + R.min_closed + ' we need';
-    var pg = $('prog'); pg.setAttribute('aria-valuemax', String(R.min_closed)); pg.setAttribute('aria-valuenow', String(closed));
-    pg.setAttribute('aria-label', 'Scored so far: ' + closed + ' of ' + R.min_closed);
-    pg.firstChild.style.width = Math.min(100, closed / R.min_closed * 100).toFixed(1) + '%';
+      (lt ? ', and ' + lt.n + ' of the ' + N + ' piles on today’s list expire ' + dS(lt.cut) + ' or later' : '') + '. So for months the record will look better than it really is.';
+    var ts = typeof bd.start === 'string' ? dayNum(bd.start) : null;
+    $('testBox').textContent = 'The test, written down Sat Oct 3, 2026: from ' + (ts ? wmd(ts) : 'Mon Oct 5') + ' on, every pile that joins the list is scored against the odds it had that day. ' +
+      'Once enough piles have resolved, we compare how many were reached with what the odds said, overall and by tier. Piles from before ' + (ts ? monD(ts) : 'Oct 5') + ' are shown above but not scored.';
+    var closed = num(bd.closed) ? bd.closed : 0, need = num(bd.need) && bd.need > 0 ? bd.need : null;
+    $('progT').textContent = 'Scored so far: ' + closed + ' of the ' + (need != null ? need : '–') + ' we need';
+    var pg = $('prog'); pg.setAttribute('aria-valuemax', need != null ? String(need) : ''); pg.setAttribute('aria-valuenow', String(closed));
+    pg.setAttribute('aria-label', 'Scored so far: ' + closed + ' of ' + (need != null ? need : '–'));
+    pg.firstChild.style.width = (need ? Math.min(100, closed / need * 100) : 0).toFixed(1) + '%';
     renderScoreTable();
   }
   function renderScoreTable() {
-    var sc = P.scored || {}, R = P.R, early = !num(sc.closed) || sc.closed < R.min_closed;
+    var bd = P.board || {}, early = bd.early !== false;
     Array.prototype.forEach.call(document.querySelectorAll('#scoreSeg button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sv') === S.scoreBy ? 'true' : 'false'); });
     var tb = $('scoreTable'); clear(tb); tb.classList.toggle('greyed', early);
-    var cap = tb.createCaption(); cap.textContent = early ? 'Greyed until ' + R.min_closed + ' piles have resolved. Raw counts only.' : 'Odds said = how many the odds expected to be reached.';
+    var cap = tb.createCaption(); cap.textContent = early ? 'Greyed until enough piles have resolved. Raw counts only.' : 'Odds said = how many the odds expected to be reached.';
     var hr = tb.createTHead().insertRow();
     [S.scoreBy === 'odds' ? 'Odds when listed' : 'Tier', 'Resolved', 'Reached', 'Odds said', 'Verdict'].forEach(function (h, i) { var th = document.createElement('th'); th.textContent = h; if (i === 4) th.className = 'vd'; hr.appendChild(th); });
-    var body = tb.createTBody(), rows;
-    if (S.scoreBy === 'odds') {
-      var bb = Array.isArray(sc.by_bucket) ? sc.by_bucket : [];
-      rows = BUCKETS.map(function (b) { var m = bb.filter(function (x) { return x && Math.abs((x.lo || 0) - b[0]) < 0.005; })[0] || {}; return [b[2], m]; });
-    } else {
-      var bt = Array.isArray(sc.by_tier) ? sc.by_tier : [];
-      rows = TIERS.map(function (t) { var m = bt.filter(function (x) { return x && x.tier === t; })[0] || {}; return [tierName(t), m]; });
-    }
-    rows.forEach(function (r) {
-      var m = r[1], cl = num(m.closed) ? m.closed : 0, hit = num(m.hit) ? m.hit : 0, ex = num(m.expected) ? m.expected : null;
+    var body = tb.createTBody();
+
+    (Array.isArray(bd[S.scoreBy === 'odds' ? 'odds' : 'tier']) ? bd[S.scoreBy === 'odds' ? 'odds' : 'tier'] : []).forEach(function (r) {
+      if (!Array.isArray(r)) return;
       var tr = body.insertRow();
-      [r[0], String(cl), String(hit), cl && ex != null ? ex.toFixed(1) : '–', early ? 'Too early' : verdict(hit, ex, cl)].forEach(function (v, i) {
+      [String(r[0]), String(num(r[1]) ? r[1] : 0), String(num(r[2]) ? r[2] : 0), num(r[3]) ? r[3].toFixed(1) : '–', typeof r[4] === 'string' ? r[4] : '–'].forEach(function (v, i) {
         var td = tr.insertCell(); td.textContent = v; if (i === 4) td.className = 'vd';
       });
     });
   }
-  function verdict(hit, ex, closed) {
-    if (!closed || ex == null) return '–';
-    var p = ex / closed, se = Math.sqrt(closed * p * (1 - p));
-    if (Math.abs(hit - ex) <= 2 * se) return 'about what the odds said';
-    return hit > ex ? 'more than the odds said' : 'fewer than the odds said';
-  }
 
 
   function renderRules() {
-    var R = P.R, b = $('rulesBody'); clear(b);
+    var b = $('rulesBody'); clear(b);
     function h3(t) { var h = document.createElement('h3'); h.textContent = t; b.appendChild(h); }
     function ul(items) { var u = document.createElement('ul'); items.forEach(function (t) { var li = document.createElement('li'); li.textContent = t; u.appendChild(li); }); b.appendChild(u); }
     h3('The 5 checks (a pile must pass all five)');
-    ul(['Far: at least ' + p0(R.min_dist) + ' above the price.',
-      'Big: at least ' + p0(R.min_share) + ' of the stock’s upside gamma, or ' + usd(R.or_min_gex_usd) + '+ of gamma.',
-      'Stays put: the top pile in ' + R.min_persist + ' of the last ' + R.persist_window + ' sessions.',
-      'Mostly calls: at least ' + strike(R.min_call_put) + ' calls for every put at that strike.',
-      'Reachable: no more than ' + strike(R.max_z) + ' typical moves away by its main expiry.']);
+    var w = SW();
+    ul(['Far: well ' + w.dir + ' the price.',
+      'Big: one of the biggest piles on the stock.',
+      'Stays put: the top pile in most recent sessions.',
+      w.mostly + ': far more ' + w.opts + ' than ' + w.other + ' at that strike.',
+      'Reachable: within the range the options expect by its main expiry.']);
     h3('The 4 tiers (set by the engine, explained here)');
-    var bl = R.borderline || {};
     ul(['A+B: both A and B.',
-      'A: the price is up more than ' + p0(R.tierA_ret20) + ' in 20 trading days.',
-      'B: calls at the pile up ' + p0(R.tierB_growth) + '+ and ' + int(R.tierB_min) + '+ contracts over the last few sessions.',
+      'A: price moving toward the pile over the last 20 days.',
+      'B: ' + w.opts + ' at the pile growing fast, in size.',
       'C: passes the 5 checks but is neither A nor B: an old pile.',
-      'Borderline: within ' + (num(bl.ret20) ? Math.round(bl.ret20 * 100) : 1) + ' point of the A bar or ' + (num(bl.growth) ? Math.round(bl.growth * 100) : 2) + ' points of the B bar.',
-      'Short fuse: the main expiry is 21 days away or less.']);
-    b.appendChild(para('', 'Expiries ' + R.dte_lo + ' to ' + R.dte_hi + ' days out only. Odds = 2 × (1 − N(z)), z = ln(pile / price) ÷ (at-the-money IV of the main expiry × √years left): the chance a price swinging the way its options expect, with no drift, trades at the pile at least once before that expiry. Ignores skew.'));
+      'Borderline: close to the bar for A or B.',
+      'Short fuse: the main expiry is only a few weeks away.']);
   }
   var NUM_COLS = [
     ['Stock', function (n) { return n.sym; }, 0],
@@ -1687,23 +1676,24 @@
     ['To go %', function (n) { return num(n.dist) ? n.dist * 100 : null; }, 0, function (v) { return num(v) ? v.toFixed(1) : '–'; }],
     ['Odds %', function (n) { return num(n.odds) ? n.odds * 100 : null; }, 0, function (v) { return num(v) ? Math.round(v) + '' : '–'; }],
     ['By', function (n) { return n.main_exp || ''; }, 0, function (v) { return dS(v); }],
-    ['Typical moves', function (n) { return n.z; }, 1, function (v) { return num(v) ? v.toFixed(2) : '–'; }],
+    ['Typical moves', function (n) { return n.mv; }, 1, function (v) { return num(v) ? v.toFixed(2) : '–'; }],
     ['Pile $M', function (n) { return num(n.gex_usd) ? n.gex_usd / 1e6 : null; }, 1, function (v) { return num(v) ? v.toFixed(1) : '–'; }],
     ['Share %', function (n) { return num(n.share) ? n.share * 100 : null; }, 1, function (v) { return num(v) ? Math.round(v) + '' : '–'; }],
     ['Held', function (n) { return n._persist; }, 1, function (v, n) { return v == null ? '–' : v + ' of ' + n._win; }],
     ['First seen', function (n) { return n.first_seen || ''; }, 1, function (v) { return dS(v); }],
     ['Calls', function (n) { return n.call_oi; }, 1, int],
     ['Puts', function (n) { return n.put_oi; }, 1, int],
-    ['New calls % (window)', function (n) { return n._nc ? n._nc.pct * 100 : null; }, 1, function (v, n) { return n._nc ? sp0(n._nc.pct) + ' (' + n._nc.w + 's)' : '–'; }],
+    [function () { return 'New ' + SW().opts + ' % (window)'; }, function (n) { return n._nc ? n._nc.pct * 100 : null; }, 1, function (v, n) { return n._nc ? sp0(n._nc.pct) + ' (' + n._nc.w + 's)' : '–'; }],
     ['20d %', function (n) { return num(n.ret20) ? n.ret20 * 100 : null; }, 1, function (v) { return num(v) ? (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) : '–'; }],
     ['From 52w high %', function (n) { return num(n.off_high) ? n.off_high * 100 : null; }, 1, function (v) { return num(v) ? (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) : '–'; }],
     ['Settle', function (n) { return n.oi_settle || ''; }, 1, function (v) { return dS(v); }],
-    ['$ in calls $M', function (n) { return num(n.prem_usd) ? n.prem_usd / 1e6 : null; }, 0, function (v) { return num(v) ? v.toFixed(1) : '–'; }],
+    [function () { return '$ in ' + SW().opts + ' $M'; }, function (n) { return num(n.prem_usd) ? n.prem_usd / 1e6 : null; }, 0, function (v) { return num(v) ? v.toFixed(1) : '–'; }],
     ['vs day %', function (n) { return num(n.prem_adv) ? n.prem_adv * 100 : null; }, 1, function (v) { return num(v) ? v.toFixed(1) : '–'; }],
     ['$/day left $M', function (n) { return num(n.per_day_usd) ? n.per_day_usd / 1e6 : null; }, 1, function (v) { return num(v) ? v.toFixed(2) : '–'; }],
     ['Business', function (n) { return n.score; }, 0, function (v) { return num(v) ? Math.round(v) + '' : '–'; }],
     ['All three #', function (n) { return n._comboRank || null; }, 1, function (v) { return v ? '#' + v : '–'; }, 'asc']
   ];
+  function colName(c) { return typeof c[0] === 'function' ? c[0]() : c[0]; }
   var numSort = { col: -1, dir: 1 };
   function renderNumTable() {
     var tb = $('numTable'); clear(tb);
@@ -1712,7 +1702,7 @@
     NUM_COLS.forEach(function (c, i) {
       var th = document.createElement('th'); th.scope = 'col'; if (c[2]) th.className = 'wide-only';
       if (numSort.col === i) th.setAttribute('aria-sort', numSort.dir > 0 ? 'ascending' : 'descending');
-      var b = btn('', c[0]); b.addEventListener('click', function () { numSort = { col: i, dir: numSort.col === i ? -numSort.dir : (i < 2 || i === 6 || i === 11 || NUM_COLS[i][4] === 'asc' ? 1 : -1) }; renderNumTable(); });
+      var b = btn('', colName(c)); b.addEventListener('click', function () { numSort = { col: i, dir: numSort.col === i ? -numSort.dir : (i < 2 || i === 6 || i === 11 || NUM_COLS[i][4] === 'asc' ? 1 : -1) }; renderNumTable(); });
       th.appendChild(b); hr.appendChild(th);
     });
     var rows = P.names.slice();
@@ -1738,7 +1728,7 @@
   function csvCell(v) { var s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
   function downloadCsv() {
     if (!P) return;
-    var lines = [NUM_COLS.map(function (c) { return csvCell(c[0]); }).join(',')];
+    var lines = [NUM_COLS.map(function (c) { return csvCell(colName(c)); }).join(',')];
     P.names.forEach(function (n) {
       lines.push(NUM_COLS.map(function (c, i) {
         var v = c[1](n);
@@ -1770,14 +1760,14 @@
     for (var i = 0; i < 60; i++) { v += Math.sin(i / 5) * 0.55 - 0.05; c.push(Math.round(v * 100) / 100); }
     c[59] = 61.78;
     var n = { sym: 'DRAM', tier: 'AB', price: 61.78, prev_close: 62.03, node: 70, dist: 0.1331, odds: 0.2327, main_exp: '2026-10-16', ret20: 0.0991, prem_usd: 43567074,
-      oi_chg: { '3': [46181, 0.298] }, persist: 10, persist_window: 10, spark: { start: '2026-07-09', c: c } };
-    n._win = 10; n._persist = 10; n._spk = normSeries(n.spark); n._trip = tripOf(n); n._nc = ncOf(n, P ? P.R : RULE_DEF);
-    return n;
+      oi_chg: { '3': [46181, 0.298] }, nc: ['3', 'strong'], persist: 10, persist_window: 10, held: 'ffffffffff', spark: { start: '2026-07-09', c: c },
+      trip: P && P.side === 'puts' ? 'above' : 0.40393 };
+    return viewName(n, null);
   }
   function buildHelp() {
     var demo = $('helpDemo'); clear(demo); demo.className = 'demo';
     var savedP = P;
-    if (!P) P = { R: RULE_DEF, doc: {}, newest: null };
+    if (!P) P = { doc: {}, newest: null };
     var r = buildRow(demoName(), true);
     P = savedP;
     [['tier', 1], ['price', 2], ['trip', 3], ['spark', 4], ['odds', 5], ['nc', 6], ['bet', 7], ['biz', 8]].forEach(function (o) { var b = span('cn', String(o[1])); b.setAttribute('aria-hidden', 'true'); r.c[o[0]].insertBefore(b, r.c[o[0]].firstChild); });
@@ -1835,15 +1825,16 @@
   function whyLeft(sym, np) {
     var c = np.closing.filter(function (x) { return x.sym === sym; })[0];
     if (c) return 'Now ' + a1(c.dist) + ' away: moved to Closing in.';
-    var ix = np.index ? np.index[sym] : null;
+    var ix = np.idx ? np.idx[sym] : null, w = SW();
     if (ix) {
-      var R = np.R, f = ix[4], v = ix[5];
-      if (f === 'below') return sym + '’s biggest call pile is at or below the price, so there’s nothing to seek upward.';
-      if (f === 'far') return 'Its biggest call pile (' + strike(ix[1]) + ') is only ' + a1(ix[2]) + ' above the price (needs ' + p0(R.min_dist) + ').';
-      if (f === 'big') return 'The pile holds ' + p0(ix[3]) + ' of upside gamma (needs ' + p0(R.min_share) + ', or ' + usd(R.or_min_gex_usd) + ').';
-      if (f === 'persist') return 'The top strike was the same in only ' + (num(v) ? v : '–') + ' of the last ' + R.persist_window + ' sessions (needs ' + R.min_persist + ').';
-      if (f === 'calls') return (num(v) ? ratioTxt(v) : '–') + ' calls per put at that strike (needs ' + strike(R.min_call_put) + ').';
-      if (f === 'reach') return (num(v) ? v.toFixed(1) : '–') + ' typical moves away (needs ' + strike(R.max_z) + ' or less).';
+      var f = ix[1], v = ix[5];
+      if (f === 'nopile') return 'It has no strike where ' + w.opts + ' outweigh ' + w.other + ' today.';
+      if (f === 'below' || f === 'above') return sym + '’s biggest ' + w.opt + ' pile is at or ' + w.away + ' the price, so there’s nothing to seek ' + w.seek + '.';
+      if (f === 'far') return 'Its biggest ' + w.opt + ' pile (' + strike(ix[2]) + ') is only ' + a1(ix[3]) + ' ' + w.dir + ' the price: not far enough.';
+      if (f === 'big') return 'The pile holds ' + p0(ix[4]) + ' of ' + w.gam + ' gamma: not big enough.';
+      if (f === 'persist') return 'The top strike was the same in only ' + (num(v) ? v : '–') + ' of the last 10 sessions: hasn’t stayed put.';
+      if (f === 'calls') return (num(v) ? ratioTxt(v) : '–') + ' ' + w.opts + ' per ' + w.other.replace(/s$/, '') + ' at that strike: not ' + w.mostly.toLowerCase() + '.';
+      if (f === 'reach') return (num(v) ? v.toFixed(1) : '–') + ' typical moves away: out of reach.';
     }
     return 'It no longer passes all 5 checks.';
   }
@@ -1894,6 +1885,7 @@
 
   function renderAll() {
     $('content').hidden = false;
+    sideCopy();
     renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
     if ($('numbers').open) renderNumTable();
     if (helpBuilt && !helpBuilt.real) helpBuilt = false;
@@ -1917,11 +1909,11 @@
     return fetch(url, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined })
       .then(function (r) {
         clearTimeout(timer);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json().catch(function () { throw new Error('the file is not valid JSON'); });
+        if (!r.ok) throw fmtErr('HTTP ' + r.status);
+        return r.json().catch(function () { throw fmtErr('the file is not valid JSON'); });
       }, function (e) {
         clearTimeout(timer);
-        throw new Error(e && e.name === 'AbortError' ? 'timed out after 15 s' : 'network error');
+        throw fmtErr(e && e.name === 'AbortError' ? 'timed out after 15 s' : 'network error');
       });
   }
   function load(initial, viaVisible) {
@@ -1931,13 +1923,13 @@
     getJSON().then(function (d) {
       check(d);
       RAW = d;
-      var np = prep(d, S.list);
+      var np = prep(d, S.list, S.side);
       lastErr = null;
       if (!P) { fatal = null; bannerSig = ''; P = np; renderAll(); }
       else if (np.doc.generated === P.doc.generated) renderStatus();
       else applyUpdate(np, viaVisible);
     }).catch(function (e) {
-      var msg = (e && e.message) || String(e);
+      var msg = e && e.shown ? e.message : 'the data looked broken';
       if (!P) showFatal(e && e.version !== undefined ? { version: e.version } : { msg: msg });
       else { lastErr = { at: now(), msg: msg }; renderStatus(); }
     }).then(function () { loading = false; schedule(); });
@@ -1967,7 +1959,7 @@
   renderBanners();
   Array.prototype.forEach.call(document.querySelectorAll('#tierSeg button'), function (b) { b.addEventListener('click', function () { setTier(b.getAttribute('data-tier')); }); });
   $('sort').addEventListener('change', function () { setSort(this.value); });
-  Array.prototype.forEach.call(document.querySelectorAll('#rankBar button'), function (b) { b.addEventListener('click', function () { setSort(b.getAttribute('data-sort')); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#rankBar button[data-sort]'), function (b) { b.addEventListener('click', function () { setSort(b.getAttribute('data-sort')); }); });
   Array.prototype.forEach.call(document.querySelectorAll('#listBar button'), function (b) { b.addEventListener('click', function () { setList(b.getAttribute('data-list')); }); });
   $('backBestBtn').addEventListener('click', function () { setSort('best'); });
   var q = $('q');
@@ -2003,7 +1995,10 @@
   Array.prototype.forEach.call(document.querySelectorAll('#scoreSeg button'), function (b) { b.addEventListener('click', function () { S.scoreBy = b.getAttribute('data-sv'); if (P) renderScoreTable(); }); });
   $('numbers').addEventListener('toggle', function () { if (this.open) renderNumTable(); });
   $('csvBtn').addEventListener('click', downloadCsv);
-  window.addEventListener('hashchange', function () { var h = parseHash(); if (h.o && P) openLinked(h.o); });
+  window.addEventListener('hashchange', function () {
+    var h = parseHash(); if (!P) return;
+    if (h.o) openLinked(h.o);
+  });
   var rsT = null;
   window.addEventListener('resize', function () { clearTimeout(rsT); rsT = setTimeout(onResize, 140); });
   function onResize() {
@@ -2025,14 +2020,5 @@
   });
   setInterval(function () { if (P) renderStatus(); else renderBanners(); }, TICK_MS);
 
-  try {
-    Object.defineProperty(window, '__seeker', { configurable: true, get: function () {
-      if (!P) return { loaded: false, fatal: fatal, dataUrl: dataUrl };
-      return { loaded: true, dataUrl: dataUrl, version: P.doc.version, generated: P.doc.generated, chip: $('chip').textContent, counts: P.counts,
-        names: P.names.length, rowsBuilt: Object.keys(rowRefs), open: Object.keys(S.open), tier: S.tier, sort: S.sort, cOpen: S.cOpen, ghosts: Object.keys(ghosts),
-        geo: GEO.mode, poll: pollDelay() };
-    } });
-    window.__seekerPoll = function () { load(false, false); };
-  } catch (e) { }
   load(true);
 })();

@@ -44,7 +44,7 @@
       <h1>Price Seeker</h1>
       <span class="chip chip-watch">WATCH LIST · UNTESTED</span>
     </div>
-    <p class="sub">Big piles of call options parked far above the price, and whether the price is heading to them.</p>
+    <p class="sub" id="pageSub">Big piles of call options parked far above the price, and whether the price is heading to them.</p>
   </div>
 
   <div id="content">
@@ -70,13 +70,13 @@
 
     <div class="eli5 caveat" id="caveat">
       <div class="cv-row">
-        <span class="cv-line">Watch list, not a buy signal. Nothing here is tested yet.</span>
+        <span class="cv-line" id="cvLine">Watch list, not a buy signal. Nothing here is tested yet.</span>
         <button type="button" class="tog" id="cvTog" aria-expanded="true" aria-controls="cvList">Hide</button>
       </div>
       <ol class="cv-list" id="cvList">
-        <li>This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</li>
-        <li>We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</li>
-        <li>Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</li>
+        <li id="cv1">This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</li>
+        <li id="cv2">We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</li>
+        <li id="cv3">Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</li>
         <li>Nothing on this page has been tested yet. The scoreboard below will tell us once enough piles have resolved.</li>
       </ol>
     </div>
@@ -118,12 +118,12 @@
             <option value="near">Nearest pile</option>
             <option value="far">Farthest pile</option>
             <option value="size">Biggest pile ($)</option>
-            <option value="new">Most new calls</option>
+            <option value="new" id="optNew">Most new calls</option>
             <option value="r20">Strongest 20 days</option>
             <option value="newest">Newest pile</option>
             <option value="az">A–Z</option>
             <optgroup label="Rankings (all tiers)">
-              <option value="bet">Biggest bet ($ in calls)</option>
+              <option value="bet" id="optBet">Biggest bet ($ in calls)</option>
               <option value="betadv">Bet vs daily trading</option>
               <option value="betday">Bet per day left</option>
               <option value="biz">Business score</option>
@@ -138,7 +138,7 @@
       <span class="rb-k">Rank by</span>
       <span class="rb-btns">
         <button type="button" data-sort="best" aria-pressed="true">Best match</button>
-        <button type="button" data-sort="bet" aria-pressed="false">$ in calls</button>
+        <button type="button" data-sort="bet" aria-pressed="false" id="rbBet">$ in calls</button>
         <button type="button" data-sort="betadv" aria-pressed="false">vs daily trading</button>
         <button type="button" data-sort="betday" aria-pressed="false">$ per day left</button>
         <button type="button" data-sort="biz" aria-pressed="false">Business score</button>
@@ -161,8 +161,8 @@
         <span class="c-trip">Trip · 20 days <button type="button" class="ib" data-pop="3" aria-expanded="false" aria-label="About the trip bar">i</button></span>
         <span class="c-spark">Last 60 days <button type="button" class="ib" data-pop="4" aria-expanded="false" aria-label="About the last 60 days">i</button></span>
         <span class="c-odds">Odds <button type="button" class="ib" data-pop="5" aria-expanded="false" aria-label="About the odds">i</button></span>
-        <span class="c-new" title="Calls added at this strike over the last 1, 3 or 5 sessions (counting expiries 2+ days out). Changes once a day.">New calls <button type="button" class="ib" data-pop="6" aria-expanded="false" aria-label="About new calls and held">i</button></span>
-        <span class="c-bet"><span class="hl-long">$ in calls</span><span class="hl-short">$ calls · Biz</span> <button type="button" class="ib" data-pop="7" aria-expanded="false" aria-label="About $ in calls">i</button></span>
+        <span class="c-new" title="Calls added at this strike over the last 1, 3 or 5 sessions. Changes once a day."><span id="hdNew">New calls</span> <button type="button" class="ib" data-pop="6" aria-expanded="false" aria-label="About new calls and held">i</button></span>
+        <span class="c-bet"><span class="hl-long" id="hdBet">$ in calls</span><span class="hl-short" id="hdBetS">$ calls · Biz</span> <button type="button" class="ib" data-pop="7" aria-expanded="false" aria-label="About $ in calls">i</button></span>
         <span class="c-biz"><span class="hl-long">Business</span><span class="hl-short">Biz</span> <button type="button" class="ib" data-pop="8" aria-expanded="false" aria-label="About the business score">i</button></span>
         <span class="c-r20">20 days</span>
         <span class="c-held">Held</span>
@@ -177,7 +177,7 @@
 
     <section class="card" id="closing" aria-labelledby="closingH" hidden>
       <h2 id="closingH">Closing in</h2>
-      <p class="sub">Far piles we tracked (10%+ away and big when first seen) that the price is now within 10% of. They left the main list because they got close.</p>
+      <p class="sub">Far piles we tracked that the price has now come close to. They left the main list because they got close.</p>
       <div id="closingRows" class="cl-list"></div>
       <p class="more"><button type="button" class="linkbtn" id="closingMore" aria-expanded="false" hidden></button></p>
     </section>
@@ -224,15 +224,15 @@
   </div>
 
   <div class="box" id="caveatBox">
-    <div class="box-row"><b>Not a buy signal</b><span>This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</span></div>
-    <div class="box-row"><b>Who’s on the other side? We guess.</b><span>We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</span></div>
-    <div class="box-row"><b>Yesterday’s piles, today’s prices</b><span>Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</span></div>
+    <div class="box-row"><b id="bxNot">Not a buy signal</b><span id="bx1">This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</span></div>
+    <div class="box-row"><b>Who’s on the other side? We guess.</b><span id="bx2">We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</span></div>
+    <div class="box-row"><b>Yesterday’s piles, today’s prices</b><span id="bx3">Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</span></div>
     <div class="box-row"><b>Not tested yet</b><span>Nothing on this page has been tested yet. The scoreboard above will tell us once enough piles have resolved.</span></div>
   </div>
 
   <footer class="foot">
-    <p>Pile (the king node) = the strike with the biggest positive net gamma exposure across expiries 2 to 400 days out, counting calls as plus and puts as minus.</p>
-    <p>Odds = 2 × (1 − N(z)), z = ln(pile / price) ÷ (at-the-money IV of the main expiry × √years left): the chance a price swinging the way its options expect, with no drift, trades at the pile at least once before that expiry. Ignores skew.</p>
+    <p id="footPile">Pile (the king node) = the strike where the biggest call bet in the stock’s option map sits, estimated from public open interest.</p>
+    <p>Odds = the options market’s own estimate of the chance the price trades at the pile at least once before its main expiry. Priced by the market, not our forecast.</p>
     <p id="footRec">Pile records start Sep 8; open-interest history starts Sep 28.</p>
     <p id="footData">Derived from delayed public options data (previous-session open interest) and ~15-minute delayed prices. Only computed values are shown, not quotes.</p>
     <p><b>Informational only. Not investment advice.</b> Nothing here says when to buy or sell.</p>
