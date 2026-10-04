@@ -46,6 +46,14 @@
       cv2: 'We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
       king: '', noteC: 'Often covered-call writing', sig: 'buy',
       foot: 'Pile (the king node) = the strike where the biggest call bet in the stock’s option map sits, estimated from public open interest.' },
+    puts: { key: 'puts', opt: 'put', opts: 'puts', Opts: 'Puts', dir: 'below', rise: 'fall', mv: 'down', gam: 'downside', sign: -1, ext: 'low',
+      reach: 'trades at or below', seek: 'downward', other: 'calls', mostly: 'Mostly puts', bet: 'put bet', away: 'above',
+      oldPile: 'Often a fund hedging shares it owns, or someone selling puts for income, not a bet on a drop.', noise: 'often hedges or put selling; likely noise',
+      sub: 'Big piles of put options parked far below the price, and whether the price is heading down to them.',
+      cv1: 'This is a watch list, not a sell signal. A big put pile far below the price is usually insurance (a fund hedging shares it owns) or someone selling puts for income. A bet on a drop is the minority.',
+      cv2: 'We assume dealers sold these puts (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
+      king: ' on the put side', noteC: 'Often hedges or put selling', sig: 'sell',
+      foot: 'Pile (the put king node) = the strike where the biggest put bet in the stock’s option map sits, estimated from public open interest.' },
   };
   function SW() {
     var k = (typeof P !== 'undefined' && P && P.side) || (typeof S !== 'undefined' && S && S.side) || 'calls';
@@ -56,7 +64,7 @@
     var w = SW();
     CALLOUTS = [
       ['Tier', 'A+B = price moving toward the pile AND ' + w.opts + ' being added. A = price moving toward the pile over the last 20 days. B = ' + w.opts + ' being added at the pile, in size. C = old pile; ' + w.noise + '.'],
-      ['Price → pile and To go', 'The pile is the strike where options traders’ biggest ' + w.bet + ' sits (the king node' + w.king + '). To go = how far the price has to ' + w.rise + ' to reach it.'],
+      ['Price → pile and To go', 'The pile is the strike where options traders’ biggest ' + w.bet + ' sits (the king node' + w.king + '). To go = how far the price has to ' + w.rise + ' to reach it. The little bar under it: calls (green) against puts (red) across all of the stock’s options, written calls : puts. The line above the list says which: traded on the latest day, or, when you sort by them, traded over the past week or held. Volume counts contracts traded, bought or sold, so it shows activity, not direction.'],
       ['Trip', 'Start line = the price 20 days ago, flag = the pile. Green = how much of the trip is done. Red = the price went the other way.'],
       ['Last 60 days', 'The last 60 daily closes. The dashed amber line is the pile, so the gap you see is the distance left.'],
       ['Odds', 'The options’ own chance that the price trades at the pile at least once by the date shown. Priced by the market, not our forecast, and not tested. Different dates are not like-for-like.'],
@@ -81,7 +89,6 @@
     set('tierNote', 'Tier C = old piles. ' + w.noteC + '; likely noise. Shown so you can check them.');
     set('cvLine', 'Watch list, not a ' + w.sig + ' signal. Nothing here is tested yet.');
     set('cv3', 'Open interest is the previous session’s settle, so ' + w.opt + ' counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.');
-    set('optNew', 'Most new ' + w.opts);
     set('optBet', 'Biggest bet ($ in ' + w.opts + ')');
     set('bxNot', 'Not a ' + w.sig + ' signal'); set('bx1', w.cv1); set('bx2', w.cv2);
     set('bx3', 'Open interest is the previous session’s settle, so ' + w.opt + ' counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.');
@@ -224,6 +231,52 @@
   function ownOi(n) { return n[SW().opt + '_oi']; }
   function othOi(n) { return n[SW().other.slice(0, -1) + '_oi']; }
   function sideExt(o) { return o['day_' + SW().ext]; }
+  function cpRatioTxt(c, p) {
+    if (!c && !p) return '–';
+    if (!p) return 'all calls';
+    if (!c) return 'all puts';
+    return c >= p ? ratioTxt(c / p) + ' : 1' : '1 : ' + ratioTxt(p / c);
+  }
+  function volDayTxt(n) {
+    var a = n.vol_asof || '';
+    if (!a) return null;
+    var t = a.slice(11, 16), full = t >= (HALF[dayNum(a.slice(0, 10))] ? '12:55' : '15:55');
+    return dS(a.slice(0, 10)) + (full ? '' : ' so far (' + t + ' ET)');
+  }
+  function hasVol(n) { return num(n.vol_c) && num(n.vol_p) && n.vol_c + n.vol_p > 0; }
+  function hasWeek(n) { return num(n.wk_c) && num(n.wk_p) && n.wk_c + n.wk_p > 0 && num(n.wk_n) && n.wk_n > 0; }
+  function weekTxt(n) { return 'past ' + n.wk_n + (n.wk_n === 1 ? ' session' : ' sessions') + (n.wk_from ? ' (' + dS(n.wk_from) + (n.wk_to && n.wk_to !== n.wk_from ? '–' + dS(n.wk_to) : '') + ')' : ''); }
+  function cpWin() { var rk = typeof S !== 'undefined' && RANKS[S.sort]; return rk && rk.cp || 'day'; }
+  function cpBar(n, wide) {
+    var win = cpWin();
+    if (win === 'all') return num(n.chain_call_oi) && num(n.chain_put_oi) ?
+      cpBarOf(n.chain_call_oi, n.chain_put_oi, wide, int(n.chain_call_oi) + ' calls and ' + int(n.chain_put_oi) + ' puts held across all of ' + n.sym + '’s options') : null;
+    if (win === 'wk') return hasWeek(n) ?
+      cpBarOf(n.wk_c, n.wk_p, wide, int(n.wk_c) + ' calls and ' + int(n.wk_p) + ' puts traded, ' + weekTxt(n) + ', all of ' + n.sym + '’s options') : null;
+    if (!hasVol(n)) return null;
+    var b = cpBarOf(n.vol_c, n.vol_p, wide, '');
+    if (b) b.title = int(n.vol_c) + ' calls and ' + int(n.vol_p) + ' puts traded on ' + volDayTxt(n) + ' across all of ' + n.sym + '’s options (calls : puts ' + cpRatioTxt(n.vol_c, n.vol_p) + ')' +
+      (hasWeek(n) ? '. ' + weekTxt(n).replace(/^p/, 'P') + ': ' + cpRatioTxt(n.wk_c, n.wk_p) : '');
+    if (b) b.setAttribute('aria-label', b.title);
+    return b;
+  }
+  function pileBar(n, wide) {
+    if (!num(n.call_oi) || !num(n.put_oi)) return null;
+    return cpBarOf(n.call_oi, n.put_oi, wide, int(n.call_oi) + ' calls and ' + int(n.put_oi) + ' puts held at the ' + strike(n.node) + ' pile');
+  }
+  function cpBarOf(c, p, wide, what) {
+    var t = c + p;
+    if (!t) return null;
+    var w = span('cpb' + (wide ? ' cpb-wide' : ''), null), bar = span('cpb-bar', null);
+    var ic = document.createElement('i'); ic.className = 'cpb-c'; ic.style.width = (c / t * 100).toFixed(1) + '%';
+    var ip = document.createElement('i'); ip.className = 'cpb-p'; ip.style.width = (p / t * 100).toFixed(1) + '%';
+    bar.appendChild(ic); bar.appendChild(ip); w.appendChild(bar);
+    if (wide) { w.appendChild(span('cpb-k cpb-kc', 'calls')); w.appendChild(span('cpb-k cpb-kp', 'puts')); }
+    else w.appendChild(span('cpb-t', cpRatioTxt(c, p)));
+    w.title = what + ' (calls : puts ' + cpRatioTxt(c, p) + ')';
+    w.setAttribute('role', 'img'); w.setAttribute('aria-label', w.title);
+    return w;
+  }
   function cpOf(n) {
     var own = ownOi(n), oth = othOi(n);
     return num(own) && num(oth) ? (oth > 0 ? own / oth : Infinity) : null;
@@ -271,6 +324,8 @@
   var GEO = { mode: geoNow(), spk: 0 };
   GEO.spk = spkW();
   var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all', side: 'calls' };
+  S.failBy = 'all'; S.failSort = 'size'; S.failAll = false; S.failOpen = {};
+  S.netOpen = false; S.netDir = null; S.netAll = false;
 
   var LISTS = {
     all: { label: 'Whole list', title: 'Every name we keep option chains for: the S&P 500, the Nasdaq-100 and the optionable names on Watchlist 1' },
@@ -326,8 +381,16 @@
     n._nc = x && Array.isArray(ch) && num(ch[0]) && num(ch[1]) ? { w: String(x[0]), kind: x[1], chg: ch[0], pct: ch[1] } : null;
     return n;
   }
+  var CP_MIN = { all: 5000, wk: 3000, day: 1000 };
+  function skewOf(c, p, min) { return num(c) && num(p) && c + p >= min ? c / Math.max(p, 1) : null; }
   function prep(d, listKey, side) {
     var sideKey = 'calls', full = d;
+    if (side === 'puts' && d.puts && Array.isArray(d.puts.names)) {
+      sideKey = 'puts';
+      var dp = Object.create(d);
+      ['names', 'closing', 'record', 'idx', 'failed', 'oi_since'].forEach(function (k) { dp[k] = d.puts[k]; });
+      dp.meta_case = null; d = dp;
+    }
     var lists = {};
     if (d.lists && typeof d.lists === 'object') Object.keys(LISTS).forEach(function (k) {
       if (k !== 'all' && Array.isArray(d.lists[k])) { lists[k] = {}; d.lists[k].forEach(function (x) { if (typeof x === 'string') lists[k][x] = 1; }); }
@@ -345,6 +408,9 @@
     var by = {}, settles = [];
     names.forEach(function (n, i) {
       n._i = i;
+      n._cpAll = skewOf(n.chain_call_oi, n.chain_put_oi, CP_MIN.all);
+      n._cpWk = skewOf(n.wk_c, n.wk_p, CP_MIN.wk);
+      n._cpDay = skewOf(n.vol_c, n.vol_p, CP_MIN.day);
       if (TIERS.indexOf(n.tier) < 0) n.tier = 'C';
       viewName(n, d.prices_day);
       by[n.sym] = n;
@@ -385,6 +451,20 @@
       oiStart: typeof d.oi_since === 'string' ? d.oi_since : null, gen: Date.parse(d.generated), comboN: cmb.length,
       universeAll: num(d.universe) ? d.universe : null,
       universe: lk === 'all' ? (num(d.universe) ? d.universe : null) : (idx ? Object.keys(idx).filter(inL).length : null),
+      failed: (function () {
+        var f = d.failed && typeof d.failed === 'object' ? d.failed : null;
+        if (!f || !Array.isArray(f.names)) return null;
+        return { names: f.names.filter(function (x) { return x && typeof x.sym === 'string' && inL(x.sym); }).map(function (x, i) { x._i = i; x._path = normSeries(x.path); return x; }),
+          counts: (f.counts && (f.counts[lk] || f.counts.all)) || null, since: f.since || null };
+      })(),
+      net: (function () {
+        var nb = d.net && Array.isArray(d.net.rows) ? d.net.rows : null;
+        if (!nb) return null;
+        return nb.filter(function (r) { return Array.isArray(r) && typeof r[0] === 'string' && num(r[2]) && inL(r[0]); })
+          .map(function (r) { return { sym: r[0], price: r[1], net: r[2], ck: r[3], cd: r[4], pk: r[5], pd: r[6], score: r[7], onC: !!r[8], onP: !!r[9] }; });
+      })(),
+      hasPuts: !!(full.puts && Array.isArray(full.puts.names)), putsSince: full.puts ? full.puts.history_since : null,
+      cpHave: { day: names.some(hasVol), wk: names.some(hasWeek), all: names.some(function (n) { return num(n.chain_call_oi) && num(n.chain_put_oi); }) },
       list: lk, lists: lists, listCounts: listCounts, allSyms: allSyms, side: sideKey
     };
   }
@@ -831,6 +911,8 @@
     if (BORDERS[n.border] === 1) pill('Borderline', 'p-bord', borderTitle(n));
     if (num(n.fuse)) pill('Short fuse', 'p-fuse', 'The main expiry is ' + n.fuse + ' days away' + (num(n.main_share) ? ' (' + p0(n.main_share) + ' of these ' + SW().opts + ').' : '.'));
     if (n.touched === true) pill('TOUCHED today', 'p-touch', 'The price traded at or ' + SW().dir + ' the pile today (' + SW().ext + ' ' + px(sideExt(n)) + ').');
+    if (n.puts_below) pill('Puts below too', 'p-other', 'A big put pile also sits ' + a1(n.puts_below.dist) + ' below the price, at ' + strike(n.puts_below.node) + ' (' + usd(n.puts_below.prem_usd) + ' in puts).');
+    if (n.calls_above) pill('Calls above too', 'p-other', 'A big call pile also sits ' + a1(n.calls_above.dist) + ' above the price, at ' + strike(n.calls_above.node) + ' (' + usd(n.calls_above.prem_usd) + ' in calls).');
     if (r.leftAt) pill('Left the list ' + r.leftAt, 'p-left', r.leftWhy || '');
     P0.hidden = !P0.firstChild;
   }
@@ -839,6 +921,7 @@
     var p = span('px', px(n.price));
     if (num(n.prev_close) && num(n.price) && n.price !== n.prev_close) { p.className += n.price > n.prev_close ? ' dup' : ' ddn'; p.title = 'Today ' + sp1(n.price / n.prev_close - 1); }
     add(c, p, ' ', add(span('nd-w', null), span('ar', '→ '), span('nd', strike(n.node))));
+    var cb = cpBar(n); if (cb) c.appendChild(cb);
   }
   function fillTogo(r) { r.c.togo.textContent = num(r.n.dist) ? sp1(r.n.dist * SW().sign) : '–'; }
   function tripSvg(t, W) {
@@ -980,6 +1063,9 @@
     betadv: { f: 'prem_adv', note: 'Ranked by $ in calls compared with a normal day’s trading in the stock. A big bet in a quiet stock ranks high.' },
     betday: { f: 'per_day_usd', note: 'Ranked by $ per day left: big money on a short clock comes first.' },
     biz: { f: 'score', note: 'Ranked by the business score: a 0–100 business-quality score from reported growth, cash flow and valuation. Funds, and companies outside the large-company list the score covers or without enough reported numbers, have no score and sit at the bottom.' },
+    cpall: { f: '_cpAll', cp: 'all', note: 'Ranked by calls against puts held across all of the stock’s options (open contracts, every expiry). The most call-heavy name comes first. Names with very few open contracts sit at the bottom without a number.' },
+    cpwk: { f: '_cpWk', cp: 'wk', note: 'Ranked by calls against puts traded over the past week (up to five sessions), all of the stock’s options. The most call-heavy trading comes first. Volume counts contracts traded, bought or sold, so it shows where the activity is, not which way it leans. Names with very little trading sit at the bottom without a number.' },
+    cpday: { f: '_cpDay', cp: 'day', note: 'Ranked by calls against puts traded on the latest day, all of the stock’s options. The most call-heavy trading comes first. Volume counts contracts traded, bought or sold, so it shows where the activity is, not which way it leans. Names with very little trading sit at the bottom without a number.' },
     combo: { f: 'combo', asc: true, note: 'All three combined: a blend of each name’s standing on $ in calls, $ per day left and the business score. Names without a business score sit at the bottom.' }
   };
   Object.keys(RANKS).forEach(function (k) {
@@ -1010,10 +1096,33 @@
       if (c) b.setAttribute('aria-label', (k === 'all' ? 'All' : 'Tier ' + tierName(k)) + ', ' + (k === 'all' ? P.names.length : c[k]) + ((k === 'all' ? P.names.length : c[k]) === 1 ? ' name' : ' names'));
     });
     $('sort').value = S.sort;
+    if (S.sort === 'new' && P && P.side === 'puts') $('sort').value = 'newputs';
     Array.prototype.forEach.call(document.querySelectorAll('#rankBar button[data-sort]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sort') === S.sort ? 'true' : 'false'); });
   }
+  var CP_LEGEND = {
+    day: ['traded on the latest day across all of the stock’s options (2.6 : 1 = 2.6 calls traded for every put). Volume shows activity, not direction. Tap a row for the past week and the open interest.'],
+    wk: ['traded over the past week across all of the stock’s options (2.6 : 1 = 2.6 calls traded for every put). Volume shows activity, not direction. Tap a row for the latest day and the open interest.'],
+    all: ['held across all of the stock’s options (1.2 : 1 = 1.2 open calls for every open put). Tap a row for what traded on the latest day and over the past week.']
+  };
+  function renderCpOpts() {
+    var have = (P && P.cpHave) || {}, any = false;
+    [['optCpAll', 'all'], ['optCpWk', 'wk'], ['optCpDay', 'day']].forEach(function (x) {
+      var o = document.getElementById(x[0]); if (o) { o.hidden = !have[x[1]]; o.disabled = !have[x[1]]; } any = any || !!have[x[1]];
+    });
+    var g = document.getElementById('optgCp'); if (g) g.hidden = !any;
+    var rk = RANKS[S.sort]; if (rk && rk.cp && !have[rk.cp]) S.sort = 'best';
+  }
+  function renderLegend() {
+    $('cpLegend').hidden = !(P && P.cpHave && P.cpHave[cpWin()]);
+    var t = document.querySelector('#cpLegend .cpl-t'); if (!t) return;
+    clear(t); t.appendChild(document.createTextNode('Bar under each pile: '));
+    var c = document.createElement('b'); c.className = 'cpl-c'; c.textContent = 'calls'; t.appendChild(c);
+    t.appendChild(document.createTextNode(' against '));
+    var p = document.createElement('b'); p.className = 'cpl-p'; p.textContent = 'puts'; t.appendChild(p);
+    t.appendChild(document.createTextNode(' ' + CP_LEGEND[cpWin()][0]));
+  }
   function renderList() {
-    closePop();
+    closePop(); renderLegend();
     var host = $('rows'); clear(host); rowRefs = {};
     if (!P) return;
     $('tierNote').hidden = S.tier !== 'C';
@@ -1078,6 +1187,29 @@
       h.appendChild(b);
     }
     return h;
+  }
+  function renderSideBar() {
+    var bar = $('sideBar'), have = P && P.hasPuts;
+    bar.hidden = !have;
+    var onp = document.getElementById('optNewPuts'); if (onp) { onp.hidden = !have; onp.disabled = !have; }
+    if (!have) return;
+    Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-side') === P.side ? 'true' : 'false'); });
+    var note = $('sideNote');
+    note.hidden = P.side !== 'puts';
+    if (P.side === 'puts') note.textContent = 'Put piles are usually insurance or put selling, not bets on a fall. Public data can’t tell which. We have each stock’s top put strike from ' +
+      (P.putsSince ? dS(P.putsSince) : 'Sep 8') + ', but its size (share of downside gamma) only from ' + (P.rec && P.rec.since ? dS(P.rec.since) : 'Sep 28') + ', so the put record and “Didn’t work out” start there.';
+  }
+  function setSide(k, fromHash) {
+    k = k === 'puts' ? 'puts' : 'calls';
+    S.side = k; sset('ps.side', k);
+    if (!fromHash) clearHash();
+    if (!RAW) return;
+    closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
+    S.open = {}; S.clOpen = {}; S.hitOpen = {}; S.failOpen = {};
+    P = prep(RAW, S.list, k);
+    sideCopy();
+    if (helpBuilt) helpBuilt = false;
+    renderAll();
   }
   function renderListBar() {
     var bar = $('listBar'), have = P && Object.keys(P.lists || {}).length;
@@ -1156,6 +1288,7 @@
   }
   function symHash(sym) {
     var pre = '';
+    if (P && P.side === 'puts') pre = 'v=puts&o=';
     return '#' + pre + encodeURIComponent(sym);
   }
   function setHash(sym) { try { history.replaceState(null, '', location.pathname + location.search + symHash(sym)); } catch (e) { } }
@@ -1223,7 +1356,22 @@
     row('Same pile for', held);
     row('First seen', wS(n.first_seen));
     var w = SW();
-    row(w.Opts + ' / ' + w.other + ' at the pile', int(ownOi(n)) + ' / ' + int(othOi(n)) + (cp == null ? '' : cp === Infinity ? ' (no ' + w.other + ')' : ' (' + ratioTxt(cp) + ' to 1)'));
+    if (hasVol(n)) {
+      var vd = row('Traded on ' + volDayTxt(n), int(n.vol_c) + ' calls / ' + int(n.vol_p) + ' puts (' + cpRatioTxt(n.vol_c, n.vol_p) + ' calls : puts)');
+      var vb = cpBarOf(n.vol_c, n.vol_p, true, int(n.vol_c) + ' calls and ' + int(n.vol_p) + ' puts traded on ' + volDayTxt(n)); if (vb && vd) vd.appendChild(vb);
+      if (hasWeek(n)) {
+        var wd = row('Traded, ' + weekTxt(n), int(n.wk_c) + ' calls / ' + int(n.wk_p) + ' puts (' + cpRatioTxt(n.wk_c, n.wk_p) + ' calls : puts)');
+        var wb = cpBarOf(n.wk_c, n.wk_p, true, int(n.wk_c) + ' calls and ' + int(n.wk_p) + ' puts traded, ' + weekTxt(n)); if (wb && wd) wd.appendChild(wb);
+      }
+    }
+    var cpd = row(w.Opts + ' / ' + w.other + ' held at the pile', int(ownOi(n)) + ' / ' + int(othOi(n)) + (cp == null ? '' : cp === Infinity ? ' (no ' + w.other + ')' : ' (' + ratioTxt(cp) + ' to 1)'));
+    var cbw = pileBar(n, true); if (cbw && cpd) cpd.appendChild(cbw);
+    if (num(n.chain_call_oi) && num(n.chain_put_oi) && (n.chain_call_oi + n.chain_put_oi) > 0) {
+      var cc = n.chain_call_oi, cq = n.chain_put_oi;
+      var chd = row('Held across all of ' + n.sym + '’s options', int(cc) + ' calls / ' + int(cq) + ' puts (' + cpRatioTxt(cc, cq) + ' calls : puts)');
+      var chb = cpBarOf(cc, cq, true, int(cc) + ' calls and ' + int(cq) + ' puts across all of ' + n.sym + '’s options');
+      if (chb && chd) chd.appendChild(chb);
+    }
     var ch = n.oi_chg || {}, miss = false;
     var nc = ['1', '3', '5'].map(function (w) { var v = ch[w]; if (!Array.isArray(v) || !num(v[0])) { miss = true; return '–'; } return sgnInt(v[0]) + ' (' + sp0(v[1]) + ')'; }).join(' / ');
     var ncv = span('', nc);
@@ -1235,6 +1383,9 @@
     row('From 52-week closing high', sp1(n.off_high));
     var old = n.oi_settle && P.newest && n.oi_settle < P.newest;
     row('Option settle', old ? span('amber', dS(n.oi_settle) + ' (older chain)') : dS(n.oi_settle));
+    Array.prototype.forEach.call(dl.querySelectorAll('.cpb-wide'), function (b, i) {
+      if (i) Array.prototype.forEach.call(b.querySelectorAll('.cpb-k'), function (k) { b.removeChild(k); });
+    });
     return dl;
   }
   var XCOL = ['#3987E5', '#8EC0FA', '#2E6DB8', '#B9D8FB', '#5A9BE8'];
@@ -1534,6 +1685,121 @@
       else { S.clOpen[c.sym] = 1; w._draw(); }
     });
     return w;
+  }
+
+
+  function netDir() { return S.netDir || (P && P.side === 'puts' ? 'neg' : 'pos'); }
+  function openNetName(x) {
+    if (P.by[x.sym]) { goToRow(x.sym, true); return; }
+    var other = P.side === 'puts' ? 'calls' : 'puts';
+    if (typeof setSide === 'function' && ((other === 'puts' && x.onP) || (other === 'calls' && x.onC))) { setSide(other); setTimeout(function () { goToRow(x.sym, true); }, 0); return; }
+    checkTicker(x.sym); scrollToEl($('filters'));
+  }
+  function renderNet() {
+    var sec = $('netTop'), rows = P.net;
+    sec.hidden = !rows; $('netJump').hidden = !rows;
+    if (!rows) return;
+    var open = S.netOpen, tog = $('netTog');
+    tog.textContent = open ? 'Hide' : 'Show'; tog.setAttribute('aria-expanded', open ? 'true' : 'false');
+    $('netBody').hidden = !open;
+    if (!open) return;
+    var dir = netDir();
+    Array.prototype.forEach.call(document.querySelectorAll('#netSeg button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-nd') === dir ? 'true' : 'false'); });
+    var list = rows.filter(function (x) { return dir === 'pos' ? x.net > 0 : x.net < 0; })
+      .sort(function (a, b) { return dir === 'pos' ? b.net - a.net : a.net - b.net; });
+    var host = $('netRows'); clear(host);
+    if (!list.length) { host.appendChild(para('src', 'No name on this list has ' + (dir === 'pos' ? 'positive' : 'negative') + ' net GEX today.')); }
+    var top = list.length ? Math.abs(list[0].net) : 1, cap = S.netAll ? list.length : 25;
+    list.slice(0, cap).forEach(function (x, i) {
+      var w = div('nt'), b = btn('nt-sum', null);
+      b.setAttribute('aria-label', x.sym + ', net GEX ' + (x.net < 0 ? 'minus ' : '') + usd(Math.abs(x.net)));
+      var l1 = span('nt-1', null);
+      add(l1, span('rk', String(i + 1)), span('tk', x.sym), span('nt-v ' + (x.net < 0 ? 'neg' : 'pos'), (x.net < 0 ? '−' : '+') + usd(Math.abs(x.net))));
+      if (x.onC) l1.appendChild(span('pill p-a', 'Calls list'));
+      if (x.onP) l1.appendChild(span('pill p-down', 'Puts list'));
+      var bar = span('nt-bar ' + (x.net < 0 ? 'neg' : 'pos'), null), bi = document.createElement('i'); bi.style.width = Math.max(2, Math.round(Math.abs(x.net) / top * 100)) + '%'; bar.appendChild(bi);
+      var l2 = span('nt-2', px(x.price) +
+        (num(x.ck) ? ' · biggest call pile ' + strike(x.ck) + (num(x.cd) ? ' (' + sp1(x.cd) + ')' : '') : '') +
+        (num(x.pk) ? ' · biggest put pile ' + strike(x.pk) + (num(x.pd) ? ' (' + sp1(-x.pd) + ')' : '') : '') +
+        (num(x.score) ? ' · biz ' + Math.round(x.score) : ''));
+      b.appendChild(l1); b.appendChild(bar); b.appendChild(l2);
+      var ch = span('c-chev', '›'); ch.setAttribute('aria-hidden', 'true'); b.appendChild(ch);
+      b.addEventListener('click', function () { openNetName(x); });
+      w.appendChild(b); host.appendChild(w);
+    });
+    var more = $('netMore');
+    more.hidden = list.length <= 25;
+    more.textContent = S.netAll ? 'Show fewer' : 'Show all ' + list.length;
+    more.setAttribute('aria-expanded', S.netAll ? 'true' : 'false');
+  }
+
+
+  var FAIL_SORTS = {
+    size: function (a, b) { return (b.gex0 || 0) - (a.gex0 || 0); },
+    biz: function (a, b) { return (num(b.score) ? b.score : -1) - (num(a.score) ? a.score : -1); },
+    closest: function (a, b) { return (num(b.closest) ? b.closest : -1) - (num(a.closest) ? a.closest : -1); },
+    newest: function (a, b) { return (b.first_seen || '').localeCompare(a.first_seen || ''); }
+  };
+  function outcomeText(f) {
+    if (f.outcome === 'expired') return 'Ran out of time' + (f.main_exp ? ' · expired ' + dS(f.main_exp) : '');
+    if (f.outcome === 'left') return 'Pile gone ' + (f.left_day ? dS(f.left_day) : 'today') + (num(f.left_to) ? ' · the top strike moved to ' + strike(f.left_to) : '') +
+      (f.exp_known === false ? ' · expiry not on record' : '');
+    return 'Wrong way · now ' + a1(f.now_dist) + ' away (was ' + a1(f.dist0) + ')';
+  }
+  function failedRow(f) {
+    var key = f.sym + '@' + f.node, w = div('cl fl'), id = 'fl-' + safeId(f.sym + '-' + f.node);
+    var b = btn('cl-sum', null); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', id);
+    var t = span('cl-txt', null), sep = function () { return span('sep', ' · '); };
+    add(t, span('tk', f.sym), sep(), span('', strike(f.node) + ' pile'), sep(), span('fo fo-' + f.outcome, outcomeText(f)));
+    var t2 = span('fl-meta', 'tracked from ' + dS(f.first_seen) + ' at ' + px(f.spot0) + ', ' + a1(f.dist0) + ' away');
+    if (num(f.closest)) add(t2, span('sep', ' · '), span('', 'closest: ' + p0(f.closest) + ' of the way'));
+    if (num(f.gex0)) add(t2, span('sep', ' · '), span('', usd(f.gex0) + ' of gamma'));
+    if (num(f.score)) add(t2, span('sep', ' · '), span('', 'biz ' + Math.round(f.score)));
+    t.appendChild(document.createElement('br')); t.appendChild(t2);
+    var pills = span('pills', null);
+    if (f.made_list) { var p1 = span('pill p-bord', 'Best match'); p1.title = 'Was a best match when we tracked it.'; pills.appendChild(p1); }
+    if (f.big_bet) { var p2 = span('pill p-new', 'Big bet'); p2.title = usd(f.gex0) + ' of gamma when first seen.'; pills.appendChild(p2); }
+    if (pills.firstChild) { t.appendChild(document.createTextNode(' ')); t.appendChild(pills); }
+    b.appendChild(t);
+    var ch = span('c-chev', '›'); ch.setAttribute('aria-hidden', 'true'); b.appendChild(ch);
+    w.appendChild(b);
+    var det = div('cl-det'); det.id = id; det.hidden = true; w.appendChild(det);
+    var draw = w._draw = function () {
+      w.classList.add('open'); b.setAttribute('aria-expanded', 'true'); det.hidden = false;
+      miniChart(det, f._path, { H: 110, node: f.node, seen: f.first_seen ? dayNum(f.first_seen) : null, seenV: f.spot0, today: true,
+        label: f.sym + ': closes from first seen, and the pile at ' + strike(f.node) });
+    };
+    b.addEventListener('click', function () {
+      if (S.failOpen[key]) { delete S.failOpen[key]; w.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); det.hidden = true; clear(det); }
+      else { S.failOpen[key] = 1; draw(); }
+    });
+    if (S.failOpen[key]) setTimeout(draw, 0);
+    return w;
+  }
+  function renderFailed() {
+    var sec = $('failed'), F = P.failed;
+    sec.hidden = !F;
+    if (!F) return;
+    var cc = F.counts || {}, c = (cc.all && typeof cc.all === 'object') ? (cc[S.failBy] || cc.all) : cc;
+    $('failedSub').textContent = 'Best matches and big bets (the largest piles) since ' + dS(F.since || P.rec.since) +
+      ' that the price hasn’t reached: the pile went away first, its main expiry passed first, or the price is now further from it than when we first saw it. Most piles haven’t resolved yet, so “wrong way” can still turn around. A pile that went away or ran out of time leaves this list 20 sessions later; the counts above keep every one. There is no “all three combined” filter here: that needs option prices, which we have only kept since Sep 28.';
+    var tl = $('failedTally'); clear(tl);
+    [['worked', 'Worked', 'reached the pile'], ['left', 'Pile gone', 'the pile went away first'], ['expired', 'Ran out of time', 'main expiry passed first'],
+      ['wrong_way', 'Wrong way', 'further away now'], ['working', 'Still working', 'closer than at first']].forEach(function (x) {
+      var t = div('ft ft-' + x[0]); t.appendChild(span('ft-v', num(c[x[0]]) ? String(c[x[0]]) : '–')); t.appendChild(span('ft-k', x[1])); t.title = x[2]; tl.appendChild(t);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#failSeg button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-fb') === S.failBy ? 'true' : 'false'); });
+    $('failSort').value = S.failSort;
+    var list = F.names.filter(function (f) { return S.failBy === 'all' || (S.failBy === 'list' ? !!f.made_list : !!f.big_bet); })
+      .sort(function (a, b) { return FAIL_SORTS[S.failSort](a, b) || a._i - b._i; });
+    var host = $('failedRows'); clear(host);
+    if (!list.length) host.appendChild(para('src', 'Nothing here for this view.'));
+    var cap = S.failAll ? list.length : 25;
+    list.slice(0, cap).forEach(function (f) { host.appendChild(failedRow(f)); });
+    var more = $('failedMore');
+    more.hidden = list.length <= 25;
+    more.textContent = S.failAll ? 'Show fewer' : 'Show all ' + list.length;
+    more.setAttribute('aria-expanded', S.failAll ? 'true' : 'false');
   }
 
 
@@ -1852,6 +2118,12 @@
   function applyUpdate(np, viaVisible) {
     var old = P;
     P = np;
+    if (old && old.side !== np.side) {
+      closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
+      S.open = {}; S.clOpen = {}; S.hitOpen = {}; S.failOpen = {}; clearHash();
+      if (helpBuilt) helpBuilt = false;
+      renderAll(); return;
+    }
     if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }
     var t = hm12(np.gen, NY), nNew = 0;
     np.names.forEach(function (n) { if (!old.by[n.sym]) nNew++; });
@@ -1864,6 +2136,9 @@
         if (S.open[sym]) buildDetail(r);
       }
     });
+    renderSideBar();
+    renderNet();
+    renderFailed();
     renderListBar(); renderTiles(); renderCounts(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot(); renderStatus();
     if ($('numbers').open) renderNumTable();
     var nLeft = Object.keys(ghosts).filter(function (k) { return !np.by[k]; }).length;
@@ -1886,7 +2161,10 @@
   function renderAll() {
     $('content').hidden = false;
     sideCopy();
-    renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
+    renderSideBar();
+    renderNet();
+    renderFailed();
+    renderCpOpts(); renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
     if ($('numbers').open) renderNumTable();
     if (helpBuilt && !helpBuilt.real) helpBuilt = false;
     if (pendingOpen) { var o = pendingOpen; pendingOpen = null; openLinked(o); }
@@ -1943,7 +2221,10 @@
 
   (function initState() {
     var t = sget('ps.tier'), s = sget('ps.sort'), c = sget('ps.cOpen'), li = sget('ps.list');
+    var sd = sget('ps.side');
+    if (sd === 'puts' || sd === 'calls') S.side = sd;
     if (isList(li)) S.list = li;
+    S.netOpen = sget('ps.net') === '1';
     if (t && (t === 'all' || TIERS.indexOf(t) >= 0)) S.tier = t;
     if (s && (s === 'best' || SORTS[s])) S.sort = s;
     S.cOpen = c === '1';
@@ -1951,6 +2232,8 @@
     if (h.t && (h.t === 'all' || TIERS.indexOf(h.t) >= 0)) S.tier = h.t;
     if (h.s && (h.s === 'best' || SORTS[h.s])) S.sort = h.s;
     if (isList(h.l)) S.list = h.l;
+    if (h.v === 'puts' || h.v === 'calls') S.side = h.v;
+    if (h.o && !h.v) S.side = 'calls';
     if (h.o) pendingOpen = h.o;
     if (S.tier === 'C') S.cOpen = true;
   })();
@@ -1958,9 +2241,26 @@
   renderCounts();
   renderBanners();
   Array.prototype.forEach.call(document.querySelectorAll('#tierSeg button'), function (b) { b.addEventListener('click', function () { setTier(b.getAttribute('data-tier')); }); });
-  $('sort').addEventListener('change', function () { setSort(this.value); });
+  $('sort').addEventListener('change', function () {
+    var v = this.value;
+    if (v === 'newputs' || (v === 'new' && P && P.side === 'puts')) {
+      var sd = v === 'newputs' ? 'puts' : 'calls';
+      if (!P || P.side !== sd) setSide(sd);
+      setSort('new');
+      return;
+    }
+    setSort(v);
+  });
   Array.prototype.forEach.call(document.querySelectorAll('#rankBar button[data-sort]'), function (b) { b.addEventListener('click', function () { setSort(b.getAttribute('data-sort')); }); });
   Array.prototype.forEach.call(document.querySelectorAll('#listBar button'), function (b) { b.addEventListener('click', function () { setList(b.getAttribute('data-list')); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#sideBar button'), function (b) { b.addEventListener('click', function () { setSide(b.getAttribute('data-side')); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#failSeg button'), function (b) { b.addEventListener('click', function () { S.failBy = b.getAttribute('data-fb'); if (P) renderFailed(); }); });
+  $('failSort').addEventListener('change', function () { S.failSort = FAIL_SORTS[this.value] ? this.value : 'size'; if (P) renderFailed(); });
+  $('failedMore').addEventListener('click', function () { S.failAll = !S.failAll; if (P) renderFailed(); });
+  $('netTog').addEventListener('click', function () { S.netOpen = !S.netOpen; sset('ps.net', S.netOpen ? '1' : '0'); if (P) renderNet(); });
+  $('netJump').addEventListener('click', function () { S.netOpen = true; sset('ps.net', '1'); if (P) renderNet(); scrollToEl($('netTop')); });
+  Array.prototype.forEach.call(document.querySelectorAll('#netSeg button'), function (b) { b.addEventListener('click', function () { S.netDir = b.getAttribute('data-nd'); if (P) renderNet(); }); });
+  $('netMore').addEventListener('click', function () { S.netAll = !S.netAll; if (P) renderNet(); if (!S.netAll) scrollToEl($('netTop')); });
   $('backBestBtn').addEventListener('click', function () { setSort('best'); });
   var q = $('q');
   q.addEventListener('input', function () { S.q = q.value; hideCheck(); renderList(); });
@@ -1997,6 +2297,8 @@
   $('csvBtn').addEventListener('click', downloadCsv);
   window.addEventListener('hashchange', function () {
     var h = parseHash(); if (!P) return;
+    var want = h.v === 'puts' || h.v === 'calls' ? h.v : (h.o ? 'calls' : null);
+    if (want && want !== P.side) setSide(want, true);
     if (h.o) openLinked(h.o);
   });
   var rsT = null;
@@ -2011,6 +2313,7 @@
     if (P) {
       Array.prototype.forEach.call(document.querySelectorAll('#closingRows .cl.open'), function (w) { if (w._draw) w._draw(); });
       Array.prototype.forEach.call(document.querySelectorAll('#hitRows .hl.open .hl-sum'), function (b) { b.click(); b.click(); });
+      Array.prototype.forEach.call(document.querySelectorAll('#failedRows .cl.open'), function (w) { if (w._draw) w._draw(); });
     }
     setStick();
   }

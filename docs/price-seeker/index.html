@@ -10,7 +10,7 @@
 <meta name="description" content="Big call-option piles parked far above the price, today's look-alikes of the META pattern, and an honest record of hits and misses.">
 <title>Price Seeker · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="seeker.css">
+<link rel="stylesheet" href="seeker.css?v=20261005a">
 </head>
 <body>
 <a class="skip" href="#list">Skip to the list</a>
@@ -48,6 +48,15 @@
   </div>
 
   <div id="content">
+
+    <div class="rankbar sidebar" id="sideBar" role="group" aria-label="Which side" hidden>
+      <span class="rb-k">Side</span>
+      <span class="rb-btns">
+        <button type="button" data-side="calls" aria-pressed="true">Calls above ↑</button>
+        <button type="button" data-side="puts" aria-pressed="false">Puts below ↓</button>
+      </span>
+    </div>
+    <p class="banner banner-info side-note" id="sideNote" hidden></p>
 
     <div class="rankbar listbar" id="listBar" role="group" aria-label="Which list" hidden>
       <span class="rb-k">List</span>
@@ -119,6 +128,7 @@
             <option value="far">Farthest pile</option>
             <option value="size">Biggest pile ($)</option>
             <option value="new" id="optNew">Most new calls</option>
+            <option value="newputs" id="optNewPuts">Most new puts</option>
             <option value="r20">Strongest 20 days</option>
             <option value="newest">Newest pile</option>
             <option value="az">A–Z</option>
@@ -128,6 +138,11 @@
               <option value="betday">Bet per day left</option>
               <option value="biz">Business score</option>
               <option value="combo">All three combined</option>
+            </optgroup>
+            <optgroup label="Calls : puts (all tiers)" id="optgCp">
+              <option value="cpall" id="optCpAll">Highest Call / Puts Skew Total</option>
+              <option value="cpwk" id="optCpWk">Highest Call / Puts Skew Weekly</option>
+              <option value="cpday" id="optCpDay">Highest Call / Puts Skew Today</option>
             </optgroup>
           </select>
         </label>
@@ -143,6 +158,7 @@
         <button type="button" data-sort="betday" aria-pressed="false">$ per day left</button>
         <button type="button" data-sort="biz" aria-pressed="false">Business score</button>
         <button type="button" data-sort="combo" aria-pressed="false">All three</button>
+        <button type="button" class="rb-jump" id="netJump" hidden>Top net GEX ↓</button>
       </span>
     </div>
     <p class="back-best" id="backBest" hidden><button type="button" class="linkbtn" id="backBestBtn">Back to best match</button></p>
@@ -168,9 +184,29 @@
         <span class="c-held">Held</span>
         <span class="c-chev"></span>
       </div>
+      <p class="cp-legend" id="cpLegend"><span class="cpb-bar cpb-demo" aria-hidden="true"><i class="cpb-c" style="width:70%"></i><i class="cpb-p" style="width:30%"></i></span> <span class="cpl-t">Bar under each pile: <b class="cpl-c">calls</b> against <b class="cpl-p">puts</b> traded on the latest day across all of the stock’s options (2.6 : 1 = 2.6 calls traded for every put). Volume shows activity, not direction. Tap a row for the past week and the open interest.</span></p>
       <div id="rows">
         <div class="ph"><i></i></div><div class="ph"><i></i></div><div class="ph"><i></i></div>
         <div class="ph"><i></i></div><div class="ph"><i></i></div><div class="ph"><i></i></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="netTop" aria-labelledby="netH" hidden>
+      <div class="nt-top">
+        <h2 id="netH">Top net GEX</h2>
+        <button type="button" class="tog" id="netTog" aria-expanded="false" aria-controls="netBody">Show</button>
+      </div>
+      <p class="sub">Every name we track (stocks and funds), ranked by the net gamma of its whole option map at today’s price. Positive = call gamma outweighs put gamma; negative = the reverse. The plus and minus are a convention, not a reading of who holds which side: public data can’t show that.</p>
+      <div id="netBody" hidden>
+        <div class="fl-bar">
+          <div class="seg seg-sm" role="group" aria-label="Which end" id="netSeg">
+            <button type="button" data-nd="pos" aria-pressed="true">Most positive</button>
+            <button type="button" data-nd="neg" aria-pressed="false">Most negative</button>
+          </div>
+        </div>
+        <div id="netRows" class="cl-list"></div>
+        <p class="more"><button type="button" class="linkbtn" id="netMore" aria-expanded="false" hidden></button></p>
       </div>
     </section>
 
@@ -193,6 +229,30 @@
         <summary id="missesH">Ran out of time</summary>
         <div id="missRows"></div>
       </details>
+    </section>
+
+
+    <section class="card" id="failed" aria-labelledby="failedH" hidden>
+      <h2 id="failedH">Didn’t work out (so far)</h2>
+      <p class="sub" id="failedSub"></p>
+      <div class="ftally" id="failedTally"></div>
+      <div class="fl-bar">
+        <div class="seg seg-sm" role="group" aria-label="Which piles" id="failSeg">
+          <button type="button" data-fb="all" aria-pressed="true">All</button>
+          <button type="button" data-fb="list" aria-pressed="false">Best matches</button>
+          <button type="button" data-fb="big" aria-pressed="false">Big bets</button>
+        </div>
+        <label class="sort"><span class="sort-k">Sort</span>
+          <select id="failSort">
+            <option value="size">Biggest pile</option>
+            <option value="biz">Business score</option>
+            <option value="closest">Closest it got</option>
+            <option value="newest">Newest</option>
+          </select>
+        </label>
+      </div>
+      <div id="failedRows" class="cl-list"></div>
+      <p class="more"><button type="button" class="linkbtn" id="failedMore" aria-expanded="false" hidden></button></p>
     </section>
 
 
@@ -253,6 +313,6 @@
 </div>
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the list.</p></noscript>
-<script src="seeker.js" defer></script>
+<script src="seeker.js?v=20261005a" defer></script>
 </body>
 </html>
