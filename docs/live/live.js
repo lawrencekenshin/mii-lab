@@ -161,124 +161,82 @@
   var hover = { c1: null, c2: null };
 
 
+
+  function arr(a, n) { return Array.isArray(a) && (n == null || a.length === n); }
   function validate(d) {
-    if (!d || typeof d !== 'object') return 'not JSON';
-    if (d.schema !== 1) return 'unknown schema ' + d.schema;
-    if (!d.daily || !Array.isArray(d.daily.d) || d.daily.d.length < 300) return 'daily series missing';
-    var n = d.daily.d.length;
-    if (d.daily.v.length !== n || d.daily.spy.length !== n || d.daily.n.length !== n) return 'daily arrays differ in length';
-    for (var i = 1; i < 4; i++) {
-      var t = d.tf && d.tf[TFS[i]];
-      if (!t || !t.s || t.s.length < 10 || t.e.length !== t.s.length || t.v.length !== t.s.length) return TFS[i] + ' series missing';
+    if (!d || typeof d !== 'object' || d.schema !== 1) return false;
+    if (d.state !== 'LIVE' && d.state !== 'CLOSED') return false;
+    if (!d.daily || !arr(d.daily.d) || d.daily.d.length < 300) return false;
+    var n = d.daily.d.length, V = d.view, i, k;
+    if (!arr(d.daily.v, n) || !arr(d.daily.spy, n) || !arr(d.daily.n, n)) return false;
+    if (!V || V.v !== 1 || !V.tf || !arr(V.hot) || !arr(V.hp, 2) || typeof V.foot !== 'string') return false;
+    for (i = 0; i < 4; i++) {
+      k = TFS[i];
+      var t = i ? d.tf && d.tf[k] : null, m = i ? (t && arr(t.s) ? t.s.length : -1) : n, w = V.tf[k];
+      if (i && (m < 10 || !arr(t.e, m) || !arr(t.v, m))) return false;
+      if (!d.stats || !d.stats[k] || typeof d.stats[k].latest !== 'number') return false;
+      if (!w || !arr(w.r13, m) || !arr(w.r21, m) || !arr(w.K, m) || !arr(w.D, m) || !arr(w.J, m) || !arr(w.lv, 3) ||
+        !arr(w.pk) || !arr(w.xu) || !arr(w.xd) || typeof w.rp !== 'number' || w.rp < 0 || w.rp >= m) return false;
     }
-    for (i = 0; i < 4; i++) if (!d.stats || !d.stats[TFS[i]] || typeof d.stats[TFS[i]].latest !== 'number') return 'stats missing';
-    if (!d.live || !d.live.asof_utc || isNaN(Date.parse(d.live.asof_utc))) return 'as-of time missing';
-    if (!d.windows || !d.windows['5y'] || !d.windows['10y']) return 'windows missing';
-    if (d.state !== 'LIVE' && d.state !== 'CLOSED') return 'unknown state ' + d.state;
-    return null;
+    if (!d.live || !d.live.asof_utc || isNaN(Date.parse(d.live.asof_utc)) || !/^\d{4}-\d\d-\d\d$/.test(d.live.session_date)) return false;
+    return true;
   }
   function prepare(d) {
-    var P = { d: d.daily.d.map(dayNum), v: d.daily.v.map(function (x) { return x / 10; }), n: d.daily.n, spy: d.daily.spy, tf: {} };
+    var P = { d: d.daily.d.map(dayNum), v: d.daily.v.map(function (x) { return x / 10; }), n: d.daily.n, spy: d.daily.spy, tf: {}, hot: {} };
     P.tf['1D'] = { s: P.d, e: P.d, v: P.v, n: P.n };
     ['1W', '2W', '1M'].forEach(function (k) {
       var t = d.tf[k];
-      P.tf[k] = { s: t.s.map(dayNum), e: t.e.map(dayNum), v: t.v.map(function (x) { return x / 10; }), n: t.n };
+      P.tf[k] = { s: t.s.map(dayNum), e: t.e.map(dayNum), v: t.v.map(function (x) { return x / 10; }) };
     });
     P.last = P.d[P.d.length - 1];
 
-    TFS.forEach(function (k) { P.tf[k].thr = peakThreshold(k, d.stats[k].alarm); P.tf[k].peaks = clusterPeaks(P.tf[k].v, PEAK_RADIUS[k], P.tf[k].thr); });
-    P.kdj = prepareKdj(P);
-    P.pct = pctPrepare(P, d);
+
+
+    TFS.forEach(function (k) {
+      var w = d.view.tf[k], T = P.tf[k];
+      T.r13 = w.r13; T.r21 = w.r21; T.lv = w.lv; T.mg = !!w.mg; T.peaks = w.pk; T.rp = w.rp;
+    });
+    d.view.hot.forEach(function (i) { P.hot[i] = 1; });
+    P.hp = d.view.hp;
+    P.kdj = prepareKdj(P, d);
     return P;
   }
 
 
-
-
-
-
-
-
-
-  var PCT_BASES = { s13: { from: '2013-01-01', word: 'since 2013', short: '2013+' }, s21: { from: '2021-01-01', word: 'since 2021', short: '2021+' } };
+  var PCT_BASES = { s13: { word: 'since 2013', short: '2013+' }, s21: { word: 'since 2021', short: '2021+' } };
   var PCT_LEVELS = [90, 95, 99];
-
-
-  var PCT_PEAK = { '1D': { days: 30 }, '1W': { n: 6 }, '2W': { n: 4 }, '1M': { n: 3 } };
-  var PCT_PEAK_WORDS = 'Recent peak = the highest reading in the last 30 calendar days (daily), the last 6 weekly, 4 two-week or 3 monthly candles, the latest one included.';
-  function tenths(x) { return Math.round(x * 10); }
-  function upperBound(a, x) { var lo = 0, hi = a.length; while (lo < hi) { var m = (lo + hi) >> 1; if (a[m] <= x) lo = m + 1; else hi = m; } return lo; }
+  var PEAK_TIP = 'Recent peak = the highest reading of the last few weeks (or candles), the latest one included.';
   function ordinal(n) { var t = n % 100, u = n % 10; return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th'); }
-  function quantile7(s, q) {
-    if (!s.length) return null;
-    var h = (s.length - 1) * q, lo = Math.floor(h), hi = Math.min(s.length - 1, lo + 1);
-    return s[lo] + (h - lo) * (s[hi] - s[lo]);
-  }
-  function pctPrepare(P, d) {
-    var out = {};
-    TFS.forEach(function (k) {
-      var T = P.tf[k], n = T.v.length, open = !!d.stats[k].open, closed = open ? n - 1 : n, o = { n: n, closed: closed, open: open, base: {}, levels: {} };
-      Object.keys(PCT_BASES).forEach(function (b) {
-        var first = lowerBound(T.e, dayNum(PCT_BASES[b].from)), vals = [];
-        for (var j = first; j < closed; j++) vals.push(tenths(T.v[j]));
-        vals.sort(function (p, q) { return p - q; });
-        o.base[b] = { first: first, sorted: vals };
-      });
-      PCT_LEVELS.forEach(function (q) { var t = quantile7(o.base.s13.sorted, q / 100); o.levels[q] = t == null ? null : t / 10; });
-      out[k] = o;
-    });
-    return out;
-  }
 
-  function pctOf(k, j, x, b) {
-    var o = D.pct[k], B = o.base[b], cnt = upperBound(B.sorted, tenths(x)), n = B.sorted.length;
-    if (j != null && j >= B.first && j < o.closed) {
-      n--; if (tenths(D.tf[k].v[j]) <= tenths(x)) cnt--;
-    }
-    if (n <= 0) return null;
-    var p = 100 * cnt / n, r = Math.round(p), rec = cnt === n;
-    if (r >= 100 && !rec) r = 99;
-    return { p: p, r: r, cnt: cnt, n: n, record: rec, open: j != null && j >= o.closed, ord: ordinal(r), top: rec ? 0 : Math.max(1, 100 - r) };
+  function rankWords(r, open) {
+    if (r == null) return null;
+    var rec = r === 100;
+    return { r: r, record: rec, open: !!open, ord: ordinal(r), top: rec ? 0 : Math.max(1, 100 - r) };
   }
+  function isOpen(k, j) { return j === D.tf[k].v.length - 1 && !!doc.stats[k].open; }
   function candleVal(k, j) { return j === D.tf[k].v.length - 1 ? doc.stats[k].latest : D.tf[k].v[j]; }
-  function pctCandle(k, j) { var x = candleVal(k, j); return { k: k, j: j, x: x, open: j >= D.pct[k].closed, s13: pctOf(k, j, x, 's13'), s21: pctOf(k, j, x, 's21') }; }
-  function recentPeak(k) {
-    var T = D.tf[k], last = T.v.length - 1, i0 = k === '1D' ? lowerBound(T.e, T.e[last] - (PCT_PEAK[k].days - 1)) : Math.max(0, last + 1 - PCT_PEAK[k].n), best = -1, bx = -1;
-    for (var j = i0; j <= last; j++) { var x = candleVal(k, j); if (best < 0 || x > bx) { best = j; bx = x; } }
-    return pctCandle(k, best);
+  function pctCandle(k, j) {
+    var T = D.tf[k], open = isOpen(k, j);
+    return { k: k, j: j, x: candleVal(k, j), open: open, s13: rankWords(T.r13[j], open), s21: rankWords(T.r21[j], open) };
   }
+  function recentPeak(k) { return pctCandle(k, D.tf[k].rp); }
   function pctWord(r) { return r ? r.ord : '–'; }
   function topWord(r, base) { return !r ? '' : r.record ? 'highest ' + PCT_BASES[base || 's13'].word : 'top ' + r.top + '%'; }
-  function alarmMerged(k) { var p = D.pct[k].levels[90]; return p != null && Math.abs(doc.stats[k].alarm - p) <= 3; }
+  function alarmMerged(k) { return D.tf[k].mg; }
 
   var PK_TXT = '#E8C547';
-  var PEAK_SPAN = { '1D': '30 days', '1W': '6 weeks', '2W': '4 candles', '1M': '3 months' };
   function peakWords(k) {
     var Pk = recentPeak(k), T = D.tf[k];
-    if (Pk.j === T.v.length - 1) return 'now = recent peak (' + ('last ' + PEAK_SPAN[k]).replace(/ /g, '\u00a0') + ')';
+    if (Pk.j === T.v.length - 1) return 'now = recent peak';
     var when = k === '1D' ? fmtDay(T.e[Pk.j], false) : k === '1M' ? fmtMonYear(T.s[Pk.j]).slice(0, 3) : 'to ' + fmtDay(T.e[Pk.j], false);
-    return 'recent peak ' + pct1(Pk.x) + ' (' + when.replace(/ /g, '\u00a0') + ')\u00a0=\u00a0' + pctWord(Pk.s13);
+    return 'recent peak ' + pct1(Pk.x) + ' (' + when.replace(/ /g, ' ') + ') = ' + pctWord(Pk.s13);
   }
   function alarmWords(k, lead) { return (lead || 'alarm ') + Math.round(doc.stats[k].alarm) + '%' + (alarmMerged(k) ? ' ≈ 90th' : ''); }
 
 
-  var PEAK_RADIUS = { '1D': 15, '1W': 3, '2W': 2, '1M': 2 };
-  var PEAK_RATIO = 1.75;
-  function peakThreshold(k, alarm) { return k === '1D' ? 40 : PEAK_RATIO * alarm; }
-  function clusterPeaks(v, R, thr) {
-    var out = [], last = v.length - 1, i, j, ok;
-    for (i = 0; i < last; i++) {
-      if (!(v[i] >= thr)) continue;
-      for (ok = true, j = Math.max(0, i - R); j <= Math.min(last, i + R) && ok; j++) if (j !== i && (j < i ? v[j] >= v[i] : v[j] > v[i])) ok = false;
-      if (ok) out.push(i);
-    }
-    return out;
-  }
-
-
   function status() {
     var t = now(), asof = Date.parse(doc.live.asof_utc), age = t - asof, live = doc.live;
-    var sess = dayNum(live.session_date || doc.as_of.session), s = { age: age, asof: asof };
+    var sess = dayNum(live.session_date), s = { age: age, asof: asof };
     var calNote = sess >= dayNum(CAL_END) ? ' (The page calendar ends ' + CAL_END + '; extend it.)' : '';
     var refEt = live.refresh_et || '17:45', refTpe = live.refresh_tpe || '05:45';
     var refresh = live.refresh_utc ? Date.parse(live.refresh_utc) : etEpoch(sess, 17, 45);
@@ -334,7 +292,7 @@
     if (!doc) return;
     var s = status();
     var chip = $('chip'); chip.className = 'chip chip-' + s.cls; chip.textContent = s.chip;
-    var sessDn = dayNum(doc.live.session_date || doc.as_of.session), L0 = doc.live, head;
+    var sessDn = dayNum(doc.live.session_date), L0 = doc.live, head;
     if (doc.state === 'LIVE' && !L0.session_closed) {
       var pr = L0.prices_asof_utc ? Date.parse(L0.prices_asof_utc) : s.asof - 15 * 6e4;
       head = 'Today so far · prices ~' + hm(pr) + ' ET (15-min delayed) · built ' + hm(s.asof) + ' ET · ' + fmtTz(s.asof, 'Asia/Taipei', 'Taipei', false);
@@ -389,7 +347,7 @@
 
 
   function renderText() {
-    var st = doc.stats, live = doc.state === 'LIVE', latest = st['1D'].latest, sessDn = dayNum(doc.live.session_date || doc.as_of.session);
+    var st = doc.stats, live = doc.state === 'LIVE', latest = st['1D'].latest, sessDn = dayNum(doc.live.session_date);
     var cn = closedNow();
     $('heroK').textContent = cn ? 'today’s close (prelim.)' : live ? 'today so far' : 'last close';
     $('heroV').textContent = lat0(st['1D']);
@@ -400,19 +358,19 @@
     zl.appendChild(span('zw', word.charAt(0).toUpperCase() + word.slice(1)));
     zl.appendChild(span('', ' — ' + lat0(st['1D']) + ' of S&P 500 stocks are scared' +
       (cn ? ' at today’s close (preliminary).' : live ? ' (today so far).' : ' at the close.')));
-    $('zoneKey').textContent = 'Under 10% calm · 10–23 normal · 23–40 worried · 40–60 fear · 60+ panic. Alarm line ' +
-      Math.round(st['1D'].alarm) + '% = only 1 day in 10 was higher in 2013–2020.';
+    $('zoneKey').textContent = 'From fewest to most stocks scared: calm · normal · worried · fear · panic. Alarm line ' +
+      Math.round(st['1D'].alarm) + '% = a high reading by the meter’s own history.';
     $('howTo').textContent = doc.text.how_to_read;
     $('rightNow').textContent = doc.text.right_now;
     $('whatChanges').textContent = doc.text.what_changes;
 
-    $('tfClaim').textContent = 'Against its own history since 2013 (closed candles at or below): ' + TFS.map(function (k) {
+    $('tfClaim').textContent = 'Against its own history since 2013: ' + TFS.map(function (k) {
       var R = pctCandle(k, D.tf[k].v.length - 1);
       return { '1D': 'daily', '1W': 'weekly', '2W': '2-week', '1M': 'monthly' }[k] + ' ' + pctWord(R.s13) + soFar(k, R) + ' (' + topWord(R.s13) + ')';
-    }).join(', ') + '. Open candles are ranked against closed ones.';
+    }).join(', ') + '. Unfinished candles are ranked “so far”.';
     $('tfSub').textContent = 'Same rule — % of S&P 500 stocks scared — on daily, weekly, 2-week and monthly candles. ' +
       (cn ? 'Today’s closing candle counted (preliminary).' : live ? 'Today’s candle counted as if it closed now.' : 'Last candle counted as of the close of ' + fmtDay(sessDn, false, false) + '.');
-    if (doc.text.footer) $('footRule').textContent = doc.text.footer;
+    $('footRule').textContent = doc.view.foot;
     $('footData').textContent = 'Derived values only (shares of stocks, SPY close); no member prices are published. Prices about 15 minutes delayed during the session. Built ' +
       etAndTpe(doc.generated_epoch * 1000) + '. No cookies, no tracking.';
     renderLegends();
@@ -432,23 +390,25 @@
   }
   function renderHeroPct() {
     var k = '1D', last = D.tf[k].v.length - 1, R = pctCandle(k, last), Pk = recentPeak(k);
-    heroNow = R; heroPk = Pk;
+
+    var pNow = R.s13 ? D.hp[0] : null, pPk = Pk.s13 ? D.hp[1] : null;
+    heroNow = { p: pNow }; heroPk = { p: pPk };
     var hp = $('heroPct'); clear(hp);
     hp.appendChild(span('hp-b', pctWord(R.s13) + ' percentile')); hp.appendChild(document.createTextNode(' since 2013'));
     hp.appendChild(span('hp-sep', ' · ')); hp.appendChild(span('hp-2', pctWord(R.s21) + ' since 2021'));
     var pk = $('heroPeak'); clear(pk);
     var same = Pk.j === last, pdn = D.tf[k].e[Pk.j];
     var pkt = span('hp-rule', same ? 'today is the recent peak' : 'recent peak ' + pct1(Pk.x) + ' (' + fmtDay(pdn, false) + ') = ' + pctWord(Pk.s13) + (Pk.open ? ' so far' : ''));
-    pkt.title = PCT_PEAK_WORDS; pk.appendChild(pkt);
-    pk.title = PCT_PEAK_WORDS;
+    pkt.title = PEAK_TIP; pk.appendChild(pkt);
+    pk.title = PEAK_TIP;
 
     var g = $('gauge1'); clear(g);
     g.setAttribute('aria-label', 'Percentile gauge since 2013: now ' + pctWord(R.s13) + (same ? '' : ', recent peak ' + pctWord(Pk.s13)));
     var labs = document.createElement('div'); labs.className = 'g-labs'; g.appendChild(labs);
     var bar = document.createElement('div'); bar.className = 'g-bar'; bandsInto(bar); g.appendChild(bar);
     var mk = function (cls, p) { var m = document.createElement('i'); m.className = 'g-m ' + cls; m.style.left = Math.max(0, Math.min(100, p)).toFixed(2) + '%'; bar.appendChild(m); return m; };
-    if (!same && Pk.s13) mk('g-m-pk' + (R.s13 && Math.abs(Pk.s13.p - R.s13.p) < 1.5 ? ' g-m-near' : ''), Pk.s13.p);
-    if (R.s13) mk('g-m-now', R.s13.p);
+    if (!same && pPk != null) mk('g-m-pk' + (pNow != null && Math.abs(pPk - pNow) < 1.5 ? ' g-m-near' : ''), pPk);
+    if (pNow != null) mk('g-m-now', pNow);
     if (!same && Pk.s13) labs.appendChild(span('g-lab g-lab-pk', fmtDay(pdn, false) + ' peak ' + pctWord(Pk.s13)));
     labs.appendChild(span('g-lab g-lab-now', same ? 'now = recent peak · ' + pctWord(R.s13) : 'now ' + pctWord(R.s13)));
     var tk = document.createElement('div'); tk.className = 'g-ticks'; g.appendChild(tk);
@@ -464,8 +424,8 @@
     gaugeKey = key;
     var labs = g.querySelector('.g-labs'), L = [];
     Array.prototype.forEach.call(labs.children, function (s) {
-      var pk = s.classList.contains('g-lab-pk'), r = pk ? heroPk.s13 : heroNow.s13;
-      L.push({ s: s, w: s.offsetWidth, c: (r ? r.p : 0) / 100 * W, row: 0 });
+      var p = s.classList.contains('g-lab-pk') ? heroPk.p : heroNow.p;
+      L.push({ s: s, w: s.offsetWidth, c: (p != null ? p : 0) / 100 * W, row: 0 });
     });
     L.forEach(function (o) { o.x = Math.max(0, Math.min(W - o.w, o.c - o.w / 2)); });
     if (L.length === 2) {
@@ -498,13 +458,12 @@
 
   function renderLegends() {
     function item(cls, text) { var s = span('lg-i', ''); s.appendChild(span(cls, '')); s.appendChild(document.createTextNode(text)); return s; }
-    var thr = function (k) { return Math.round(D.tf[k].thr) + '%+'; };
     var l1 = $('lg1'); clear(l1);
-    l1.appendChild(item('lg-pk', 'fear peak (' + thr('1D') + ' daily, same day on SPY)'));
+    l1.appendChild(item('lg-pk', 'fear peak (a big daily spike, same day on SPY)'));
     l1.appendChild(item('lg-now', 'now'));
     l1.appendChild(item('lg-pl', '90th · 95th · 99th percentile of daily candles since 2013'));
     var l2 = $('lg2'); clear(l2);
-    l2.appendChild(item('lg-pk', 'fear peak: 1D ' + thr('1D') + ' · 1W ' + thr('1W') + ' · 2W ' + thr('2W') + ' · 1M ' + thr('1M')));
+    l2.appendChild(item('lg-pk', 'fear peak (the biggest spikes of each candle size)'));
     l2.appendChild(item('lg-now', 'now'));
     l2.appendChild(item('lg-pl', '90th · 95th · 99th percentile of each candle size since 2013'));
   }
@@ -540,7 +499,7 @@
     '2Y': 'last 2 years', '5Y': 'last 5 years', '10Y': 'last 10 years' };
   var MIN_SPAN = 14;
   var ZOOM_STEP = 1.6;
-  var view = { chip: '5Y', x0: 0, x1: 0, custom: false }, renders = 0;
+  var view = { chip: '5Y', x0: 0, x1: 0, custom: false };
 
   function normRange(s) {
     if (!s) return null;
@@ -696,7 +655,7 @@
     }
     cand.sort(function (a, b) { return v[b] - v[a]; });
     cand.forEach(function (c) { if (out.every(function (o) { return Math.abs(d[o] - d[c]) >= gap; })) out.push(c); });
-    return out.map(function (k) { return { dn: d[k], v: v[k] }; });
+    return out.map(function (k) { return { dn: d[k], v: v[k], i: k }; });
   }
 
 
@@ -813,15 +772,15 @@
 
 
   var PL = { 90: { c: '#A99CC8', op: 0.7, w: 1 }, 95: { c: '#B98AF2', op: 0.85, w: 1.15 }, 99: { c: '#D17BFF', op: 1, w: 1.4 } };
-  var PL_DASH = '6 4', PLDBG = {};
+  var PL_DASH = '6 4';
 
 
 
 
   function pctLines(g, k, Y, L, pw, top, bot, lineTop) {
-    var o = D.pct[k], merged = alarmMerged(k), out = { k: k, g: g, L: L, pw: pw, lines: [], above: [], merged: merged, ys: [Y(doc.stats[k].alarm)] };
-    PCT_LEVELS.forEach(function (q) {
-      var v = o.levels[q]; if (v == null || (q === 90 && merged)) return;
+    var lv = D.tf[k].lv, merged = alarmMerged(k), out = { k: k, g: g, L: L, pw: pw, lines: [], above: [], merged: merged, ys: [Y(doc.stats[k].alarm)] };
+    PCT_LEVELS.forEach(function (q, qi) {
+      var v = lv[qi]; if (v == null || (q === 90 && merged)) return;
       var y = Y(v), s = ordinal(q) + ' · ' + Math.round(v) + '%';
       if (y < (lineTop != null ? lineTop : top + 3)) { out.above.push({ q: q, v: v, s: s }); return; }
       if (y > bot - 1) return;
@@ -858,7 +817,7 @@
 
 
   function pctLabels(g, P, L, pw, top, bot, obstacles, hit, tag) {
-    var fs = 11, H = 14, placed = [], dbg = { lines: [], above: [] };
+    var fs = 11, H = 14, placed = [];
     function box(s, x, yMid) { return { x: x, y: yMid - H / 2, w: textW(s, fs, 600) + 8, h: H }; }
     function clear0(b) {
       if (b.x < L + 1 || b.x + b.w > L + pw - 1 || b.y < top + 1 || b.y + b.h > bot - 1) return false;
@@ -928,8 +887,6 @@
     res.forEach(function (r) {
       var b = r.b, ln = r.ln;
       if (b && placed.indexOf(b) < 0) draw(b, r.s, r.q || ln.q, r.qs);
-      dbg.lines.push({ q: ln.q, v: +ln.v.toFixed(2), y: +ln.y.toFixed(1), s: ln.s, shared: r.qs ? r.s : undefined,
-        box: b ? { x: +b.x.toFixed(1), y: +b.y.toFixed(1), w: +b.w.toFixed(1), h: b.h } : null });
     });
     if (P.above.length) {
       var yE = top + 2 + H / 2, yE2 = yE + H + 1, yE3 = yE2 + H + 1, got = [];
@@ -942,12 +899,8 @@
       } else got.forEach(function (o) { placed.splice(placed.indexOf(o.b), 1); });
       got.forEach(function (o) {
         var s = o.s || '↑ ' + o.ln.s; draw(o.b, s, o.ln.q);
-        dbg.above.push({ q: o.ln.q, s: s, box: { x: +o.b.x.toFixed(1), y: +o.b.y.toFixed(1), w: +o.b.w.toFixed(1), h: o.b.h } });
       });
-      if (!got.length) P.above.forEach(function (ln) { dbg.above.push({ q: ln.q, s: '↑ ' + ln.s, box: null }); });
     }
-    dbg.merged = P.merged; dbg.top = top; dbg.bot = bot; dbg.L = L; dbg.pw = pw;
-    if (tag) PLDBG[tag] = dbg;
     return placed;
   }
   var HALO = { 'paint-order': 'stroke', stroke: C.panel, 'stroke-width': 3, 'stroke-linejoin': 'round' };
@@ -979,7 +932,6 @@
   }
   var lastDaily = [];
   var dotDays = {};
-  var dotDebug = {};
   function overlaps(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
   function crossLayer(svg) { return el('g', { 'pointer-events': 'none' }, svg); }
   var GEO = { c1: null, c2: null };
@@ -1004,7 +956,7 @@
 
     var T1 = D.tf['1D'], fpk = findPeaks(D.d, D.v, x0, x1), keep = {};
     T1.peaks.forEach(function (i) { keep[i] = 1; });
-    fpk.forEach(function (p) { if (p.v >= T1.thr) keep[bsearchLE(D.d, p.dn)] = 1; });
+    fpk.forEach(function (p) { if (D.hot[p.i]) keep[p.i] = 1; });
     var spyY = spyPanel(svg, X, x0, x1, L, 0, pw, spyH, 12.5, ticks, keep);
     var g = el('g', {}, svg), st = doc.stats['1D'], todayIn = D.last >= x0 && D.last <= x1;
     panelRect(g, L, mTop, pw, mH);
@@ -1057,7 +1009,7 @@
       if (placed >= maxLabels) return;
       var dn = p.dn, px = X(dn), py = Y(p.v), dd = dnDate(dn);
       if (px < L || px > L + pw) return;
-      var big = Math.round(p.v) + '%', dotted = p.v >= T1.thr, up = dotted ? rPk - 1.5 : 0, y0 = dotted ? rPk + 1 : 3;
+      var big = Math.round(p.v) + '%', dotted = !!D.hot[p.i], up = dotted ? rPk - 1.5 : 0, y0 = dotted ? rPk + 1 : 3;
       if (phone) {
         var small = long ? MON[dd.getUTCMonth()] + ' ’' + String(dd.getUTCFullYear()).slice(2) : fmtDay(dn, false);
         var s1 = 12.5, s2 = 11, w = Math.max(textW(big, s1, 700), textW(small, s2, 400)) + 4, bh = s1 + s2 + 4;
@@ -1096,7 +1048,7 @@
     });
 
     labelled.forEach(function (p) {
-      if (p.v < T1.thr || dots.some(function (d) { return d.dn === p.dn; })) return;
+      if (!D.hot[p.i] || dots.some(function (d) { return d.dn === p.dn; })) return;
       var c = { dn: p.dn, v: p.v, x: X(p.dn), y: Y(p.v), lab: true };
       if (c.x < Math.max(L, rPk + 0.5) || c.x > L + pw) return;
       dots = dots.filter(function (d) { return d.lab || (Math.hypot(d.x - c.x, d.y - c.y) >= 2 * rPk + 0.5 && Math.abs(d.x - c.x) >= minDx); });
@@ -1114,8 +1066,6 @@
     if (todayIn) nowDot(nowG, tx0, ty, rNow);
     lastDaily = dots.map(function (d) { return d.dn; });
     var spyShown = spyDots(spyY, X, lastDaily, spyR(W), narrow ? 3.5 : 4, todayIn, L, pw);
-    dotDebug.c1 = { meter: lastDaily.map(isoOf), labelled: labelled.map(function (p) { return isoOf(p.dn); }), spy: spyShown.map(isoOf), spyUnderNow: spyShown.under.map(isoOf),
-      now: todayIn ? isoOf(D.last) : null, x: dots.map(function (d) { return +d.x.toFixed(1); }) };
     timeAxis(svg, X, ticks, H - 4, 0, W);
     var cross = crossLayer(svg);
     function set(dn) {
@@ -1178,7 +1128,6 @@
     var spyShown = spyDots(spyY, X, lastDaily, spyR(W), wide ? 4 : 3.5, todayIn, L, pw);
     spyShown.forEach(function (dn) { snap.push({ x: X(dn), y: spyY(D.spy[bsearchLE(D.d, dn)]), dn: dn }); });
     if (todayIn && D.spy[D.d.length - 1] != null) snap.push({ x: X(D.last), y: spyY(D.spy[D.d.length - 1]), dn: D.last });
-    dotDebug.c2 = { spy: spyShown.map(isoOf), spyUnderNow: spyShown.under.map(isoOf) };
     var y = spyH, panels = [];
     TFS.forEach(function (k) {
       var st = doc.stats[k], T = D.tf[k], steps = k === '1M';
@@ -1224,7 +1173,6 @@
       pctDraw(plk, TXREC); TXREC = null;
       kept.forEach(function (d) { peakDot(g, d.x, d.y, rPk); snap.push({ x: d.x, y: d.y, dn: D.d[Math.max(0, bsearchLE(D.d, steps ? X.inv(d.x) : T.e[d.j]))] }); });
       kept.sort(function (p, q) { return p.j - q.j; });
-      dotDebug.c2[k] = kept.map(function (d) { return isoOf(T.s[d.j]) + (T.s[d.j] !== T.e[d.j] ? '..' + isoOf(T.e[d.j]) : '') + ' ' + f1(d.v); });
       if (todayIn) { nowDot(g, nx, ny, rNow); snap.push({ x: nx, y: ny, dn: D.last }); }
       if (wide) {
         var cx = L + pw + RA + 14, cw = RC - 18, full = panH >= 150;
@@ -1352,11 +1300,12 @@
       if (pre) sEl.appendChild(span('sp', pre[1]));
       sEl.appendChild(document.createTextNode(pre ? lab.slice(pre[1].length) : lab));
       c.appendChild(sEl);
-      c.appendChild(miniBar(R.s13 ? R.s13.p : null));
+      c.appendChild(miniBar(R.s13 ? R.s13.r : null));
       grid.appendChild(c);
     });
     ro.appendChild(grid);
   }
+
 
 
   function setAttr(n, k, v) { if (n.getAttribute(k) !== v) n.setAttribute(k, v); }
@@ -1588,68 +1537,24 @@
   var K_MIN = 12;
 
 
-
-
-
-  function kdjStep(win, x, kp, dp) {
-    var lo = x, hi = x;
-    for (var i = 0; i < win.length; i++) { if (win[i] < lo) lo = win[i]; if (win[i] > hi) hi = win[i]; }
-    var rsv = hi === lo ? 50 : (x - lo) / (hi - lo) * 100, k = (rsv + 2 * kp) / 3;
-    return { k: k, d: (k + 2 * dp) / 3 };
-  }
-  function kdjSeries(v) {
-    var n = v.length, K = new Array(n), Dd = new Array(n), J = new Array(n), k = 50, d = 50;
-    for (var i = 0; i < n; i++) {
-      var r = kdjStep(v.slice(Math.max(0, i - 8), i), v[i], k, d);
-      k = r.k; d = r.d; K[i] = k; Dd[i] = d; J[i] = 3 * k - 2 * d;
-    }
-    return { K: K, D: Dd, J: J };
-  }
-
-
-
-
-  function flipLevel(v, Q, open) {
-    var n = v.length, b = open ? n - 1 : n;
-    if (b < 1) return null;
-    var win = v.slice(Math.max(0, b - 8), b), kp = Q.K[b - 1], dp = Q.D[b - 1], rising = Q.K[n - 1] > Q.D[n - 1], lvl = null, flips = false;
-    for (var i = 0; i <= 1000; i++) {
-      var x = i / 10, r = kdjStep(win, x, kp, dp), up = r.k > r.d;
-      if (up !== rising) flips = true;
-      if (rising && up && lvl === null) lvl = x;
-      if (!rising && !up) lvl = x;
-    }
-    return flips ? lvl : null;
-  }
-  function kdjCrosses(Q) {
-    var c = {};
-    for (var i = 1; i < Q.K.length; i++) {
-      if (Q.K[i] > Q.D[i] && Q.K[i - 1] <= Q.D[i - 1]) c[i] = 'up';
-      else if (Q.K[i] < Q.D[i] && Q.K[i - 1] >= Q.D[i - 1]) c[i] = 'down';
-    }
-    return c;
-  }
-  function kOpen(k) {
-    var st = doc.stats[k];
-    if (!st || !st.open) return false;
-    return k !== '1D' || (!!doc.live.is_live && !doc.live.session_closed);
-  }
-  function prepareKdj(P) {
+  function prepareKdj(P, d) {
     var out = {};
     TFS.forEach(function (k) {
-      var T = P.tf[k], n = T.v.length, Q = kdjSeries(T.v), idx = new Array(n), spy = new Array(n);
+      var T = P.tf[k], w = d.view.tf[k], n = T.v.length, idx = new Array(n), spy = new Array(n), t10 = function (x) { return x / 10; };
       for (var i = 0; i < n; i++) { idx[i] = i; var di = bsearchLE(P.d, T.e[i]); spy[i] = di >= 0 ? P.spy[di] : null; }
-      Q.n = n; Q.idx = idx; Q.spy = spy; Q.open = kOpen(k); Q.cross = kdjCrosses(Q);
-      Q.peak = {}; T.peaks.forEach(function (j) { Q.peak[j] = 1; });
-      Q.rising = Q.K[n - 1] > Q.D[n - 1];
-      Q.flip = flipLevel(T.v, Q, Q.open);
+      var Q = { K: w.K.map(t10), D: w.D.map(t10), J: w.J.map(t10), n: n, idx: idx, spy: spy, open: !!w.op, cross: {}, peak: {} };
+      w.xu.forEach(function (j) { Q.cross[j] = 'up'; });
+      w.xd.forEach(function (j) { Q.cross[j] = 'down'; });
+      T.peaks.forEach(function (j) { Q.peak[j] = 1; });
+      Q.rising = !!w.up;
+      Q.flip = w.fl == null ? null : w.fl;
       out[k] = Q;
     });
     return out;
   }
 
 
-  var KV = {}, KN = {}, KB = {}, kDebug = {}, kPending = {}, kRaf = false;
+  var KV = {}, KN = {}, KB = {}, kPending = {}, kRaf = false;
   function kPad(span) { return Math.max(0.9, span * 0.02); }
   function kHi(k, span) { return KN[k] - 1 + kPad(span); }
   function kLatestSpan(k, x0) { var b = KN[k] - 1 - x0; return 0.9 >= 0.02 * (b + 0.9) ? b + 0.9 : b / 0.98; }
@@ -1826,7 +1731,7 @@
     return note;
   }
   function renderKdjText() {
-    var cn = closedNow(), live = doc.state === 'LIVE', sessDn = dayNum(doc.live.session_date || doc.as_of.session);
+    var cn = closedNow(), live = doc.state === 'LIVE', sessDn = dayNum(doc.live.session_date);
     $('kdjSub2').textContent = (cn ? 'Close of ' + fmtDay(sessDn, false, true) + ' (preliminary)' : live ? 'Today so far' : 'Close of ' + fmtDay(sessDn, false, true)) +
       ' · open candles drawn as if they closed today (dotted lines, hollow dots, shaded column)';
     TFS.forEach(function (k) {
@@ -1843,7 +1748,7 @@
     var lg = $('lg3'); clear(lg);
     function item(cls, text) { var s = span('lg-i', ''); s.appendChild(span(cls, '')); s.appendChild(document.createTextNode(text)); return s; }
     lg.appendChild(item('lg-bar', 'fear %'));
-    lg.appendChild(item('lg-pk', 'fear peak (1D ' + Math.round(D.tf['1D'].thr) + '%+ · 1W ' + Math.round(D.tf['1W'].thr) + '%+ · 2W ' + Math.round(D.tf['2W'].thr) + '%+ · 1M ' + Math.round(D.tf['1M'].thr) + '%+, same candle on SPY)'));
+    lg.appendChild(item('lg-pk', 'fear peak (same candle on SPY)'));
     lg.appendChild(item('lg-ln lg-k', 'K'));
     lg.appendChild(item('lg-ln lg-d', 'D'));
     lg.appendChild(item('lg-ln lg-j', 'J'));
@@ -1988,7 +1893,6 @@
       if (x1 > x0) el('rect', { x: x0.toFixed(1), y: top, width: Math.max(1, x1 - x0).toFixed(1), height: h, fill: C.fear, 'fill-opacity': 0.2 }, g);
     }
     function grid(g, top, h) { ticks.forEach(function (t) { el('line', { x1: t.x, x2: t.x, y1: top, y2: top + h, stroke: C.line, 'stroke-width': 1, opacity: 0.7 }, g); }); }
-    var dbg = { k: k, n: n, open: open, x0: v.x0, x1: v.x1, ppc: ppc, L: L, pw: pw, spyH: spyH, fH: fH, kH: kH };
 
 
     var rPk = narrow ? 3.2 : 3.8, pkIn = T.peaks.filter(function (j) { return j >= a && j <= b && j < last; }), keepPk = {};
@@ -2043,7 +1947,7 @@
       });
       if (best) {
         tx(gS, right, best.base, pl, withHalo({ fill: C.white, 'font-size': pfs, 'font-weight': 700, 'text-anchor': 'end' }));
-        dbg.priceBox = best.box; dbg.spyDot = { x: sx, y: sy, r: rS }; obsS.push(best.box);
+        obsS.push(best.box);
       }
     }
     var dotObsS = obsS.slice();
@@ -2104,7 +2008,6 @@
     if (overlaps(abox, titleF) || abox.y < fTop + 2 || (plCross(abox) && ay + 16 <= fTop + fH - 1 && !plCross({ x: abox.x, y: ay + 2, w: aw, h: 14 }))) abox.y = ay + 2;
     var aShow = abox.y + abox.h <= fTop + fH - 1, gAl = el('g', {}, gF);
     if (aShow) obsF.push(abox);
-    dbg.flipText = flipTxt;
 
 
 
@@ -2154,19 +2057,12 @@
       el('rect', { x: tagB.x.toFixed(1), y: tagB.y.toFixed(1), width: tw.toFixed(1), height: 15, rx: 2, fill: KC.yel }, gTag);
       tx(gTag, tagB.x + tw / 2, tagY + 3.8, tagT, { fill: C.bg, 'font-size': 11, 'font-weight': 700, 'text-anchor': 'middle' });
       tagB.full = true; obsF.push(tagB);
-      dbg.flipY = tagY; dbg.flipTag = tagT; dbg.flipSide = tagB === tagLft ? 'L' : 'R';
     }
     if (!aShow) obsF = obsF.filter(function (o) { return o !== abox; });
     if (aShow) {
       el('rect', { x: abox.x, y: abox.y, width: abox.w, height: abox.h, fill: C.panel, 'fill-opacity': 0.85 }, gAl);
       tx(gAl, abox.x + 3, abox.y + 11, alab, { fill: C.text, 'font-size': 11 });
     }
-    dbg.alarmBox = aShow ? { x: abox.x, y: abox.y, w: abox.w, h: abox.h } : null;
-    var jl = function (j) { return isoOf(T.s[j]) + (T.s[j] !== T.e[j] ? '..' + isoOf(T.e[j]) : '') + ' ' + f1(T.v[j]); };
-    var byJ = function (p, q) { return p - q; };
-    dbg.peaks = { rule: pkIn.slice().sort(byJ).map(jl), fear: keptF.map(function (d) { return d.j; }).sort(byJ).map(jl), spy: spyPk.sort(byJ).map(jl),
-      spyUnderNow: spyUnder.sort(byJ).map(jl), spyHidden: spyHidden.sort(byJ).map(jl), edgeCut: edgeCut.map(jl), r: rPk,
-      fearXY: keptF.map(function (d) { return { j: d.j, x: +d.x.toFixed(1), y: +d.y.toFixed(1) }; }), spyXY: spyKept.map(function (d) { return { j: d.j, x: +d.x.toFixed(1), y: +d.y.toFixed(1) }; }) };
 
 
     var rX = open && lastIn && col.w <= 16 && col.x - 1 < L + pw - 2 ? col.x - 1 : null;
@@ -2175,7 +2071,7 @@
 
     var plObsF = obsF.concat(labF.map(function (o) { return { x: o.x, y: o.y, w: o.w, h: o.h }; }));
     if (open && lastIn) plObsF.push({ x: col.x - 1, y: fTop, w: col.w + 2, h: fH });
-    dbg.pct = pctLabels(el('g', {}, gF), plF, L, pw, fTop, fTop + fH, plObsF, barHit, 'k' + k).length;
+    var plPlaced = pctLabels(el('g', {}, gF), plF, L, pw, fTop, fTop + fH, plObsF, barHit, 'k' + k);
     pctDraw(plF, TXREC); TXREC = null;
 
 
@@ -2200,8 +2096,8 @@
         el('circle', { cx: gxx.toFixed(1), cy: yy.toFixed(1), r: gr, fill: C.bg, stroke: s[1], 'stroke-width': 1.7 }, gG);
         ghostY[s[0]] = yy; snap.push({ x: gxx, y: yy, dn: last }); obsK.push(dotBox(gxx, yy, gr + 1));
       });
-      dbg.ghostDots = 3;
     }
+
 
 
 
@@ -2222,8 +2118,15 @@
         if (!free(y)) {
           var cand = [];
           gys.forEach(function (g) { cand.push(clampY(g - need - 1), clampY(g + need + 1)); });
-          cand = cand.filter(free).sort(function (p, q) { return Math.abs(p - y) - Math.abs(q - y); });
-          if (cand.length) y = cand[0]; else dx = -(gr + tri + 2);
+
+
+
+          cand = cand.filter(free);
+          if (cand.length) {
+            var dMin = Math.min.apply(null, cand.map(function (p) { return Math.abs(p - y); }));
+            cand = cand.filter(function (p) { return Math.abs(p - y) <= dMin + 1; }).sort(function (p, q) { return up ? q - p : p - q; });
+            y = cand[0];
+          } else dx = -(gr + tri + 2);
         }
       }
       if (overlaps(titleK, { x: x - tri, y: y - tri, w: 2 * tri, h: 2 * tri }) && !hollow) y = clampY(Math.max(y, titleK.y + titleK.h + tri + 1));
@@ -2235,8 +2138,6 @@
     obsK.push(titleK);
     var labK = kInsideLabels(gK, [100, 50, 0].map(function (t) { return { y: Yk(t), s: String(t) }; }), L, pw, obsK,
       anyHit([kLineHit(X, Yk, Q.K, a, b, 1.5), kLineHit(X, Yk, Q.D, a, b, 1.5)]), kTop, kTop + kH, true, rX);
-    dbg.yLabels = { spy: labS.map(function (o) { return o.s + o.side; }), fear: labF.map(function (o) { return o.s + o.side; }), kdj: labK.map(function (o) { return o.s + o.side; }) };
-    dbg.crosses = crossShown.length; dbg.crossList = crossShown; dbg.crossOnLast = Q.cross[last] || null;
 
 
     ticks.forEach(function (t) {
@@ -2270,8 +2171,6 @@
       bt.disabled = z === 'reset' ? !v.custom : z === 'in' ? s <= lim.min + 0.5 : s >= lim.max - 1e-6;
     });
     var ww = kWinWords(k); if (B.win.textContent !== ww) B.win.textContent = ww;
-    dbg.ticks = ticks.map(function (t) { return t.label; }); dbg.H = H; dbg.W = W;
-    kDebug[k] = dbg;
   }
   function kReadout(k, j, picked) {
     var B = KB[k], Q = D.kdj[k], T = D.tf[k], ro = B.ro, isLast = j === Q.n - 1;
@@ -2303,7 +2202,7 @@
     if (!doc || !D || !D.kdj) return;
     var todo = Object.keys(kPending); kPending = {};
     try { todo.forEach(drawKdj); $('kdjErr').hidden = true; renderKChips(); }
-    catch (e) { var er = $('kdjErr'); er.hidden = false; er.textContent = 'The KDJ section could not be drawn (' + e.message + ').'; }
+    catch (e) { var er = $('kdjErr'); er.hidden = false; errWords(e); er.textContent = 'The KDJ section could not be drawn.'; }
   }
   function initKdjBlocks() {
     TFS.forEach(function (k) {
@@ -2346,7 +2245,7 @@
   function fsSize() { if (FS.key) { var m = fsMinH(FS.key) + 'px'; if (fsSlot('chart').style.flexBasis !== m) fsSlot('chart').style.flexBasis = m; } }
   function fsDraw(now) {
     if (!FS.key || !D) return;
-    if (FS.key.charAt(0) === 'c') { if (now) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); } } else requestRender(); }
+    if (FS.key.charAt(0) === 'c') { if (now) { try { drawCharts(); } catch (e) { errWords(e); showFatal('The charts could not be drawn.'); } } else requestRender(); }
     else { requestKdj(FS.key.slice(1)); if (now) drawKdjPending(); }
   }
   function fsHint() {
@@ -2407,7 +2306,7 @@
     setInert(false);
 
     if (doc && D) {
-      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); }
+      try { drawCharts(); } catch (e) { errWords(e); showFatal('The charts could not be drawn.'); }
       TFS.forEach(function (k) { kPending[k] = 1; }); drawKdjPending();
     }
     renderKChips();
@@ -2486,23 +2385,23 @@
   var rafPending = false;
   function drawCharts() {
     var c1 = $('chart1'), c2 = $('chart2'), w1 = c1.clientWidth, w2 = c2.clientWidth, h1 = fsHeight(c1), h2 = fsHeight(c2);
-    ['c1', 'c2'].forEach(function (k) { if (hover[k] != null && (hover[k] < view.x0 || hover[k] > view.x1)) hover[k] = null; });
+    var keys = ['c1', 'c2'], skip2 = FS.key === 'c1';
+    keys.forEach(function (k) { if (hover[k] != null && (hover[k] < view.x0 || hover[k] > view.x1)) hover[k] = null; });
 
     var tu = FS.key === 'c1' ? tickUnit(geo1(w1).pw) : FS.key === 'c2' ? tickUnit(geo2(w2).pw) : Math.max(tickUnit(geo1(w1).pw), tickUnit(geo2(w2).pw));
 
     drawChart1(w1, tu, FS.key === 'c1' ? null : geo2(w2).pw, h1);
-    if (FS.key !== 'c1') drawChart2(w2, tu, h2);
+    if (!skip2) drawChart2(w2, tu, h2);
     layoutGauge();
     renderViewUi();
-    renders++;
   }
   function renderAll() {
     if (!doc) return;
     $('content').hidden = false;
     renderStatus(); renderText();
     try { drawCharts(); }
-    catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); return; }
-    try { renderKdjText(); } catch (e) { var er = $('kdjErr'); er.hidden = false; er.textContent = 'The KDJ section could not be drawn (' + e.message + ').'; }
+    catch (e) { errWords(e); showFatal('The charts could not be drawn.'); return; }
+    try { renderKdjText(); } catch (e) { var er = $('kdjErr'); er.hidden = false; errWords(e); er.textContent = 'The KDJ section could not be drawn.'; }
     requestKdj('all'); drawKdjPending();
   }
   function requestRender() {
@@ -2511,7 +2410,7 @@
     requestAnimationFrame(function () {
       rafPending = false;
       if (!doc) return;
-      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); }
+      try { drawCharts(); } catch (e) { errWords(e); showFatal('The charts could not be drawn.'); }
     });
   }
 
@@ -2528,26 +2427,29 @@
   }
 
 
-  function getJSON(name) {
+
+
+  function pubErr(msg) { var e = new Error(msg); e.pub = true; return e; }
+  function errWords(e) { try { console.warn('fear meter:', e); } catch (x) {  } return e && e.pub ? e.message : 'the data looked broken'; }
+  function getJSON(name, url) {
     var ctl = ('AbortController' in window) ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, FETCH_TIMEOUT_MS);
     var bust = Math.floor(Date.now() / 60000);
-    return fetch(base + name + '?m=' + bust, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined })
+    return fetch((url || base + name) + '?m=' + bust, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined })
       .then(function (r) {
         clearTimeout(timer);
-        if (!r.ok) throw new Error(name + ': HTTP ' + r.status);
-        return r.json().catch(function () { throw new Error(name + ' is not valid JSON'); });
+        if (!r.ok) throw pubErr(name + ': HTTP ' + r.status);
+        return r.json().catch(function () { throw pubErr(name + ' is not valid JSON'); });
       }, function (e) {
         clearTimeout(timer);
-        throw new Error(e && e.name === 'AbortError' ? name + ' timed out' : 'network error fetching ' + name);
+        throw pubErr(e && e.name === 'AbortError' ? name + ' timed out' : 'network error fetching ' + name);
       });
   }
   var loading = false;
   function load(initial) {
     if (loading) return; loading = true;
     getJSON('fear.json').then(function (d) {
-      var bad = validate(d);
-      if (bad) throw new Error('the data looked broken: ' + bad);
+      if (!validate(d)) throw pubErr('the data looked broken');
       var changed = !doc || d.generated_epoch !== doc.generated_epoch;
       var hadView = !!D, wasLatest = hadView ? atLatest(view) : true, prevN = {}, prevS = {};
       TFS.forEach(function (k) { prevN[k] = KN[k]; prevS[k] = D && D.tf[k] ? D.tf[k].s : null; });
@@ -2559,17 +2461,19 @@
       else view = wasLatest ? toLatest(view, view.x0) : clampView(view);
       if (changed) renderAll(); else renderStatus();
     }).catch(function (e) {
-      if (!doc) showFatal('Could not load the data (' + e.message + ').');
-      else { lastErr = { at: now(), msg: e.message }; renderStatus(); }
+      var w = errWords(e);
+      if (!doc) showFatal('Could not load the data (' + w + ').');
+      else { lastErr = { at: now(), msg: w }; renderStatus(); }
     }).then(function () { loading = false; });
   }
   function poll() {
     if (document.hidden) return;
     if (!doc) { load(); return; }
     getJSON('manifest.json').then(function (m) {
-      if (!m || m.generated_at !== doc.generated_epoch) load();
+      var changed = !m || m.generated_at !== doc.generated_epoch;
+      if (changed) load();
       else { lastErr = null; renderStatus(); }
-    }).catch(function (e) { lastErr = { at: now(), msg: e.message }; renderStatus(); });
+    }).catch(function (e) { lastErr = { at: now(), msg: errWords(e) }; renderStatus(); });
   }
 
 
@@ -2602,61 +2506,6 @@
   attachGestures($('chart1'), 'c1');
   attachGestures($('chart2'), 'c2');
   initKdjBlocks();
-
-  try {
-    Object.defineProperty(window, '__fearView', { configurable: true, get: function () {
-      if (!D) return null;
-      return { chip: view.chip, custom: view.custom, x0: view.x0, x1: view.x1, from: isoOf(Math.floor(view.x0)), to: isoOf(Math.floor(view.x1)),
-        span: view.x1 - view.x0, atLatest: atLatest(view), latest: isoOf(D.last), first: isoOf(D.d[0]), limits: spanLimits(), renders: renders,
-        title: spanWords() };
-    } });
-    Object.defineProperty(window, '__fearFs', { configurable: true, get: function () {
-      return { key: FS.key, y: FS.y, pushed: FS.pushed, pendingBack: FS.pendingBack, kchip: kChip };
-    } });
-    Object.defineProperty(window, '__fearDots', { configurable: true, get: function () { return D ? JSON.parse(JSON.stringify(dotDebug)) : null; } });
-
-    Object.defineProperty(window, '__fearKdj', { configurable: true, get: function () {
-      if (!D || !D.kdj) return null;
-      var o = {};
-      TFS.forEach(function (k) {
-        var Q = D.kdj[k], n = Q.n, v = KV[k], B = KB[k];
-        o[k] = { n: n, fear: D.tf[k].v[n - 1], K: Q.K[n - 1], D: Q.D[n - 1], J: Q.J[n - 1], open: Q.open, rising: Q.rising, flip: Q.flip,
-          flipDir: Q.flip == null ? null : (Q.rising ? 'easing' : 'rising'), crossLast: Q.cross[n - 1] || null,
-          window: v ? { x0: v.x0, x1: v.x1, custom: v.custom, atLatest: kAtLatest(k, v), words: B.win.textContent, chip: kChip,
-            cnt: Math.min(n - 1, Math.floor(v.x1)) - Math.max(0, Math.ceil(v.x0)) + 1, want: kChipCount(k, kChip), shown: kChipShown(k) } : null,
-          shown: { header: B.val.textContent, note: B.note.textContent, readout: B.ro.textContent }, draw: kDebug[k] || null,
-          recent: { K: Q.K.slice(-12), D: Q.D.slice(-12), J: Q.J.slice(-12) } };
-      });
-      return JSON.parse(JSON.stringify(o));
-    } });
-
-
-    Object.defineProperty(window, '__fearPct', { configurable: true, get: function () {
-      if (!D || !D.pct) return null;
-      var o = { bases: PCT_BASES, levels: PCT_LEVELS, peakRule: PCT_PEAK_WORDS, sizes: {}, drawn: PLDBG, shown: {} };
-      var R6 = function (r) { return r ? { p: Math.round(r.p * 1e6) / 1e6, r: r.r, cnt: r.cnt, n: r.n, ord: r.ord, top: r.top, record: r.record } : null; };
-      TFS.forEach(function (k) {
-        var P = D.pct[k], T = D.tf[k], n = T.v.length, all = { s13: [], s21: [] };
-        for (var j = 0; j < n; j++) { var c = pctCandle(k, j); all.s13.push(c.s13 ? Math.round(c.s13.p * 1e6) / 1e6 : null); all.s21.push(c.s21 ? Math.round(c.s21.p * 1e6) / 1e6 : null); }
-        var L0 = pctCandle(k, n - 1), Pk = recentPeak(k);
-        o.sizes[k] = { n: n, closed: P.closed, open: P.open, first: { s13: P.base.s13.first, s21: P.base.s21.first }, hist: { s13: P.base.s13.sorted.length, s21: P.base.s21.sorted.length },
-          levels: P.levels, alarm: doc.stats[k].alarm, alarmMerged: alarmMerged(k),
-          latest: { j: n - 1, x: L0.x, open: L0.open, s13: R6(L0.s13), s21: R6(L0.s21) },
-          peak: { j: Pk.j, x: Pk.x, open: Pk.open, start: isoOf(T.s[Pk.j]), end: isoOf(T.e[Pk.j]), s13: R6(Pk.s13), s21: R6(Pk.s21) }, all: all };
-      });
-      var txt = function (n) { return n ? n.textContent.replace(/\s+/g, ' ').trim() : null; };
-      o.shown.heroPct = txt($('heroPct')); o.shown.heroPeak = txt($('heroPeak'));
-      o.shown.gauge = Array.prototype.map.call(document.querySelectorAll('#gauge1 .g-lab'), txt);
-      o.shown.gaugeMarks = Array.prototype.map.call(document.querySelectorAll('#gauge1 .g-m'), function (m) { return { cls: m.className, left: m.style.left }; });
-      o.shown.c2 = {};
-      Array.prototype.forEach.call(document.querySelectorAll('#chart2 svg text[data-th]'), function (t) { (o.shown.c2[t.getAttribute('data-th')] = o.shown.c2[t.getAttribute('data-th')] || []).push(t.textContent); });
-      o.shown.tiles = Array.prototype.map.call(document.querySelectorAll('#ro2 .rg > div'), function (d) { return { text: txt(d), marker: d.querySelector('.mb-m') ? d.querySelector('.mb-m').style.left : null }; });
-      o.shown.ro1 = txt($('ro1')); o.shown.ro2date = txt(document.querySelector('#ro2 .rg-date'));
-      o.shown.kdj = {};
-      TFS.forEach(function (k) { o.shown.kdj[k] = { header: txt(KB[k].val), readout: txt(KB[k].ro) }; });
-      return JSON.parse(JSON.stringify(o));
-    } });
-  } catch (e) { }
   if ('ResizeObserver' in window) {
     var lastW = 0;
     new ResizeObserver(function (ents) {
