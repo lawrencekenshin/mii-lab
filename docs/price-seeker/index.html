@@ -10,7 +10,7 @@
 <meta name="description" content="Big call-option piles parked far above the price, today's look-alikes of the META pattern, and an honest record of hits and misses.">
 <title>Price Seeker · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="seeker.css?v=20261005a">
+<link rel="stylesheet" href="seeker.css?v=20261005i">
 </head>
 <body>
 <a class="skip" href="#list">Skip to the list</a>
@@ -65,6 +65,7 @@
         <button type="button" data-list="spx" aria-pressed="false">SPY list <span class="lc" data-lcount="spx"></span></button>
         <button type="button" data-list="ndx" aria-pressed="false">QQQ list <span class="lc" data-lcount="ndx"></span></button>
         <button type="button" data-list="wl" aria-pressed="false">Watchlist 1 <span class="lc" data-lcount="wl"></span></button>
+        <button type="button" data-list="ai" aria-pressed="false">AI companies <span class="lc" data-lcount="ai"></span></button>
       </span>
     </div>
 
@@ -110,6 +111,27 @@
     </section>
 
 
+    <section class="story" id="chase" aria-labelledby="chaseK" hidden>
+      <div class="story-top">
+        <p class="kicker" id="chaseK">THE TSM PATTERN</p>
+        <p class="story-fold" id="chaseFold" hidden></p>
+        <button type="button" class="tog" id="chaseTog" aria-expanded="true" aria-controls="chaseBody">Hide the story</button>
+      </div>
+      <div id="chaseBody">
+        <h2 id="chaseH"></h2>
+        <div class="seg seg-sm chase-seg" role="group" aria-label="Which name" id="chaseSeg"></div>
+        <div class="readout story-ro" id="chaseRo" aria-live="polite">Tap a step, or touch the chart, to read a day.</div>
+        <div class="story-grid">
+          <div class="chart story-chart" id="chaseChart" tabindex="0" role="group" aria-label="TSM chart: the top call pile and the price. Left and right arrows move through days."></div>
+          <ol class="steps" id="chaseSteps"></ol>
+        </div>
+        <div class="checks checks-4" id="chaseChecks"></div>
+        <p class="story-note" id="chaseNote"></p>
+        <p class="chase-hunt"><button type="button" class="btn" id="chaseHunt">Hunt this pattern →</button></p>
+      </div>
+    </section>
+
+
     <div class="filters" id="filters">
       <div class="seg seg-tier" role="group" aria-label="Tier" id="tierSeg">
         <button type="button" data-tier="all" aria-pressed="true"><span class="sl">All</span><span class="sc" data-count="all">–</span></button>
@@ -123,6 +145,7 @@
         <label class="sort"><span class="sort-k">Sort</span>
           <select id="sort">
             <option value="best">Best match</option>
+            <option value="chase" id="optChase">Hunt: TSM pattern</option>
             <option value="odds">Best odds</option>
             <option value="near">Nearest pile</option>
             <option value="far">Farthest pile</option>
@@ -313,6 +336,6 @@
 </div>
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the list.</p></noscript>
-<script src="seeker.js?v=20261005a" defer></script>
+<script src="seeker.js?v=20261005i" defer></script>
 </body>
 </html>

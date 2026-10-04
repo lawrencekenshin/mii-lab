@@ -325,12 +325,14 @@
   GEO.spk = spkW();
   var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all', side: 'calls' };
   S.failBy = 'all'; S.failSort = 'size'; S.failAll = false; S.failOpen = {};
+  S.chaseSym = 'TSM'; S.chaseParked = false;
   S.netOpen = false; S.netDir = null; S.netAll = false;
 
   var LISTS = {
     all: { label: 'Whole list', title: 'Every name we keep option chains for: the S&P 500, the Nasdaq-100 and the optionable names on Watchlist 1' },
     spx: { label: 'SPY list', title: 'S&P 500 members' },
     ndx: { label: 'QQQ list', title: 'Nasdaq-100 members' },
+    ai: { label: 'AI companies', title: 'AI companies: chips, data-center power and build, AI compute and neoclouds, AI software, robotics. The same AI basket as the AI × KDJ alerts' },
     wl: { label: 'Watchlist 1', title: 'The OBV watchlist: hand-picked stocks and ETFs' }
   };
   function isList(k) { return typeof k === 'string' && Object.prototype.hasOwnProperty.call(LISTS, k); }
@@ -464,6 +466,15 @@
           .map(function (r) { return { sym: r[0], price: r[1], net: r[2], ck: r[3], cd: r[4], pk: r[5], pd: r[6], score: r[7], onC: !!r[8], onP: !!r[9] }; });
       })(),
       hasPuts: !!(full.puts && Array.isArray(full.puts.names)), putsSince: full.puts ? full.puts.history_since : null,
+      chase: (function () {
+        var hn = full.chase;
+        if (sideKey !== 'calls' || !hn || !Array.isArray(hn.names)) return null;
+        var rows = hn.names.filter(function (r) { return r && typeof r.sym === 'string' && num(r.node) && num(r.price) && r.hunt && num(r.hunt.closed) && inL(r.sym); });
+        rows.forEach(function (r, i) { r._i = i; if (TIERS.indexOf(r.tier) < 0) r.tier = 'C'; viewName(r, full.prices_day); });
+        return { names: rows, checked: num(hn.checked) ? hn.checked : null };
+      })(),
+      tsm: sideKey === 'calls' && full.tsm_case && Array.isArray(full.tsm_case.cases) ?
+        full.tsm_case.cases.filter(function (c) { return c && typeof c.sym === 'string' && num(c.node) && c.start && c.start.day && num(c.start.dist) && c.now && num(c.now.close); }) : null,
       cpHave: { day: names.some(hasVol), wk: names.some(hasWeek), all: names.some(function (n) { return num(n.chain_call_oi) && num(n.chain_put_oi); }) },
       list: lk, lists: lists, listCounts: listCounts, allSyms: allSyms, side: sideKey
     };
@@ -844,6 +855,312 @@
   }
 
 
+  var CHASE = null;
+  var MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function chaseIsOpen() { return $('chaseTog').getAttribute('aria-expanded') === 'true'; }
+  function setChaseFold(open) {
+    var b = $('chaseTog'); b.setAttribute('aria-expanded', open ? 'true' : 'false'); b.textContent = open ? 'Hide the story' : 'Show the story';
+    $('chaseBody').hidden = !open; $('chaseFold').hidden = open;
+    $('chase').classList.toggle('folded', !open);
+  }
+  function initChaseFold() {
+    var st = sget('ps.chase');
+    setChaseFold(st !== 'closed');
+    if (st == null) sset('ps.chase', 'closed');
+    $('chaseTog').addEventListener('click', function () { var o = this.getAttribute('aria-expanded') !== 'true'; setChaseFold(o); sset('ps.chase', o ? 'open' : 'closed'); if (o && P) drawChase(); });
+    $('chaseHunt').addEventListener('click', function () {
+      setSort('chase');
+      var f = $('filters'); if (f && f.scrollIntoView) f.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+    });
+  }
+  function inHunt(sym) { return !!(P && P.side === 'calls' && P.chase && P.chase.names.some(function (n) { return n.sym === sym; })); }
+  function goToHuntRow(sym) {
+    if (S.sort !== 'chase') { S.sort = 'chase'; S.chaseParked = false; sset('ps.sort', 'chase'); }
+    if (S.q && sym.indexOf(S.q.trim().toUpperCase()) !== 0) { S.q = ''; $('q').value = ''; }
+    renderCounts(); renderList();
+    var r = rowRefs[sym]; if (!r) return false;
+    if (!S.open[sym]) openRow(r, true); else setHash(sym);
+    scrollToEl(r.art); flashRow(r);
+    return true;
+  }
+  function huntUpdate(np, old) {
+    var hb = {}, ob = {};
+    (np.chase ? np.chase.names : []).forEach(function (n) { hb[n.sym] = n; });
+    (old && old.chase ? old.chase.names : []).forEach(function (n) { ob[n.sym] = 1; });
+    var nNew = Object.keys(hb).filter(function (k) { return !ob[k]; }).length, nLeft = 0;
+    Object.keys(rowRefs).forEach(function (sym) { if (hb[sym]) updateRow(rowRefs[sym], hb[sym]); else nLeft++; });
+    renderChaseOpt(); renderChase(); renderListBar(); renderTiles(); renderCounts(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot(); renderStatus();
+    if (typeof renderNet === 'function') renderNet();
+    if (typeof renderFailed === 'function') renderFailed();
+    if (nNew || nLeft) {
+      var b = $('updateBar'); clear(b); b.hidden = false;
+      b.appendChild(span('', 'Updated ' + hm12(np.gen, NY) + ' ET · ' + nNew + ' new · ' + nLeft + ' left the hunt'));
+      var x = btn('btn', 'Re-sort'); x.addEventListener('click', function () { b.hidden = true; setStick(); renderList(); }); b.appendChild(x);
+      setStick();
+    }
+  }
+  function leaveHunt() { if (S.sort === 'chase') { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); return true; } return false; }
+  function closeOn(ser, dn) {
+    if (!ser || dn == null) return null;
+    var v = null; for (var i = 0; i < ser.d.length && ser.d[i] <= dn; i++) v = ser.c[i];
+    return v;
+  }
+  function pileOn(c, dn) {
+    var prev = null, next = null;
+    (c.piles || []).forEach(function (p) { var d = dayNum(p[0]); if (d <= dn) prev = p; else if (!next) next = p; });
+    if (!prev) return null;
+    return dayNum(prev[0]) === dn || !next || next[1] === prev[1] ? prev[1] : null;
+  }
+  function chgTxt(ch) { return Math.round(Math.abs(ch) * 100) === 0 ? '0%' : (ch >= 0 ? '+' : '−') + p0(Math.abs(ch)); }
+  function expMonth(s) { return typeof s === 'string' && s.length >= 10 ? MONTH_FULL[+s.slice(5, 7) - 1] : null; }
+  function startText(c) {
+    var st = c.start, k = strike(c.node), t;
+    if (c.since_records) t = 'Already ' + c.sym + '’s top call pile when our records start';
+    else if (c.unrecorded > 0) t = 'Between ' + dS(c.prev_day) + ' and ' + dS(st.day) + ' (no record in between) ' + k + ' becomes the top call pile';
+    else t = k + ' becomes the top call pile';
+    t += ', ' + p0(st.dist) + ' above the price' + (c.unrecorded > 0 ? ' on ' + dS(st.day) : '') + '.';
+    if (c.opex) t += ' It is the week the ' + dS(c.opex) + ' options expire: near-term piles drop out of the map, so ' + k +
+      (expMonth(c.main_exp) ? ', mostly ' + expMonth(c.main_exp) + ' calls,' : '') + ' was most likely there already rather than a new bet.';
+    return t;
+  }
+  function pairText(c, o) {
+    var who = c.sym === 'TSM' && o.sym === 'EWT' ? 'EWT, the Taiwan fund whose biggest holding is TSMC,' : c.sym === 'EWT' && o.sym === 'TSM' ? 'TSM (TSMC is the fund’s biggest holding)' : o.sym;
+    var od = dayNum(o.start.day), cd = dayNum(c.start.day), exact = !(c.unrecorded > 0) && !(o.unrecorded > 0);
+    var when = !exact ? (od >= cd ? ' shows the same pattern' : ' showed the same pattern') + ' by ' + dS(o.start.day) :
+      od === cd ? ' does the same the same day' : od > cd ? ' does the same ' + sessionsAfter(cd, od) + (sessionsAfter(cd, od) === 1 ? ' session' : ' sessions') + ' later' :
+      ' did the same ' + sessionsAfter(od, cd) + (sessionsAfter(od, cd) === 1 ? ' session' : ' sessions') + ' earlier';
+    return who + when + ': ' + strike(o.node) + ' became its top call pile, ' + p0(o.start.dist) + ' above the price. Tap ' + o.sym + ' above to see it.';
+  }
+  function renderChaseOpt() {
+    var o = document.getElementById('optChase'), have = !!(P && P.side === 'calls' && P.chase);
+    if (o) { o.hidden = !have; o.disabled = !have; }
+    if (!have && S.sort === 'chase') { S.sort = 'best'; S.chaseParked = true; }
+    else if (have && S.chaseParked) { S.chaseParked = false; if (S.sort === 'best') S.sort = 'chase'; }
+  }
+  function renderChase() {
+    var sec = $('chase'), cs = P && P.tsm ? P.tsm : [];
+    if (!cs.length) { sec.hidden = true; CHASE = null; return; }
+    sec.hidden = false;
+    var c = cs.filter(function (x) { return x.sym === S.chaseSym; })[0] || cs[0], lead = c === cs[0];
+    S.chaseSym = c.sym;
+    var seg = $('chaseSeg');
+    if (seg.getAttribute('data-syms') !== cs.map(function (x) { return x.sym; }).join(',')) {
+      clear(seg); seg.setAttribute('data-syms', cs.map(function (x) { return x.sym; }).join(','));
+      cs.forEach(function (x) {
+        var b = btn('', x.sym); b.setAttribute('data-sym', x.sym);
+        b.addEventListener('click', function () { if (S.chaseSym === x.sym) return; S.chaseSym = x.sym; CHASE = null; renderChase(); });
+        seg.appendChild(b);
+      });
+    }
+    seg.hidden = cs.length < 2;
+    Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sym') === c.sym ? 'true' : 'false'); });
+    var o = cs.filter(function (x) { return x.sym !== c.sym; })[0] || null;
+    var node = c.node, st0 = c.start, nw = c.now, closes = normSeries(c.closes), sdn = dayNum(st0.day);
+    $('chaseFold').textContent = 'The ' + c.sym + ' pattern: a call pile ' + p0(st0.dist) + ' above the price became ' + c.sym + '’s top pile' + (c.unrecorded > 0 ? ' by ' : ' on ') + dS(st0.day) +
+      (c.touch ? '; the price touched it ' + dS(c.touch.day) + '.' : '; the price has been closing the gap since.');
+    $('chaseH').textContent = 'A big call pile ' + p0(st0.dist) + ' above ' + c.sym + '’s price became its top pile. ' + (c.touch ? 'The price went after it, and got there.' : 'Then the price started walking toward it.');
+    var steps = [];
+    var before = (c.piles || []).filter(function (p) { return p[0] < st0.day && p[1] !== node; });
+    if (before.length && num(c.prev_k)) {
+      var b0 = before[0][0], b1 = before[before.length - 1][0], bv = closeOn(closes, dayNum(b1)), same = before.every(function (p) { return p[1] === c.prev_k; });
+      steps.push({ dn: dayNum(b1), v: bv, place: 1, text: (b0 === b1 ? wS(b0) : dS(b0) + '–' + dS(b1)) + ' · ' +
+        (same ? 'The top call pile sits at ' + strike(c.prev_k) : 'The top call pile moves around, last at ' + strike(c.prev_k)) +
+        (num(bv) ? ', ' + a1(c.prev_k / bv - 1) + (c.prev_k >= bv ? ' above' : ' below') + ' the price.' : '.') });
+    }
+    steps.push({ dn: sdn, v: num(st0.close) ? st0.close : st0.spot, place: -1, text: (c.unrecorded > 0 ? '' : wS(st0.day) + ' · ' + px(st0.spot) + '. ') + startText(c) });
+    if (o && o.start) steps.push({ dn: dayNum(o.start.day), v: closeOn(closes, dayNum(o.start.day)), place: 1, text: wS(o.start.day) + ' · ' + pairText(c, o) });
+    if (Array.isArray(c.oi) && c.oi.length >= 2 && num(c.oi[0][1]) && c.oi[0][1]) {
+      var o0 = c.oi[0], o1 = c.oi[c.oi.length - 1], ch = o1[1] / o0[1] - 1;
+      steps.push({ dn: dayNum(o1[0]), v: closeOn(closes, dayNum(o1[0])), place: -1, text: dS(o0[0]) + ' → ' + dS(o1[0]) + ' · Calls at ' + strike(node) + ' (expiries still open): ' + int(o0[1]) + ' → ' + int(o1[1]) +
+        ' (' + chgTxt(ch) + '). ' + (ch >= 0.02 ? 'Traders kept adding.' : ch > -0.02 ? 'About the same: normal day-to-day churn.' : 'Fewer: some of these calls were closed or rolled.') });
+    }
+    if (c.touch) steps.push({ dn: dayNum(c.touch.day), v: c.touch.high, place: -1, high: true, text: wS(c.touch.day) + ' · high ' + px(c.touch.high) + '. Touched: ' + c.sym + ' reached the ' + strike(node) + ' pile, ' +
+      sessionsAfter(sdn, dayNum(c.touch.day)) + ' sessions after it became the top pile.' });
+    var rd = num(c.seen) && c.seen < c.held ? ' (we have a reading on ' + c.seen + ' of them)' : '';
+    var held = c.left ? strike(node) + ' stopped being the top pile ' + dS(c.left) + ', after ' + c.held + ' sessions' + rd + '. ' : 'Still the top pile after ' + c.held + ' sessions' + rd + '; ';
+    steps.push({ dn: dayNum(nw.day), v: nw.close, place: 1, now: true, text: 'Now · ' + wS(nw.day) + ' · ' + px(nw.close) + '. ' + held + (nw.close >= node ? 'the price is above the pile.' :
+      a1(nw.dist) + ' away: the price has covered ' + p0(c.closed) + ' of the gap' + (c.touch ? '.' : '. Not reached yet.')) });
+    steps = steps.map(function (s1, i) { s1._o = i; return s1; }).sort(function (a, b) { return (a.now ? 1 : 0) - (b.now ? 1 : 0) || a.dn - b.dn || a._o - b._o; });
+    CHASE = { c: c, steps: steps, closes: closes, node: node, sdn: sdn, active: CHASE && CHASE.c && CHASE.c.sym === c.sym ? CHASE.active : null };
+    var ol = $('chaseSteps'); clear(ol);
+    steps.forEach(function (s1, i) {
+      var li = document.createElement('li'), b = btn('', null);
+      b.appendChild(span('sn', String(i + 1))); b.appendChild(span('st-t', s1.text));
+      b.addEventListener('click', function () { setChaseStep(i); });
+      li.appendChild(b); ol.appendChild(li); s1.btn = b;
+    });
+    renderChaseChecks(c);
+    $('chaseNote').textContent = (lead ? 'We picked ' + c.sym + ' because it is the clearest example running now.' :
+      'We show ' + c.sym + ' next to ' + cs[0].sym + (c.sym === 'EWT' ? ' because it is the Taiwan fund whose biggest holding is TSMC.' : ' because it is the same pattern on a related name.') + ' It is not the furthest along: the hunt ranks that.') +
+      (c.touch ? '' : ' It hasn’t reached ' + strike(node) + ': a chase can stall, or the pile can move.') + ' Nothing here is tested yet.';
+    var n = P.chase ? P.chase.names.length : 0;
+    $('chaseHunt').textContent = 'Hunt this pattern: ' + (P.chase ? n + (n === 1 ? ' name matches' : ' names match') + (P.list === 'all' ? '' : ' on ' + LISTS[P.list].label) + ' today' : 'not in this file') + ' →';
+    $('chaseHunt').disabled = !P.chase || P.side !== 'calls';
+    if (chaseIsOpen()) drawChase();
+    setChaseStep(CHASE.active);
+  }
+  function renderChaseChecks(c) {
+    var host = $('chaseChecks'); clear(host);
+    var ck = {}; (Array.isArray(c.ck) ? c.ck : []).forEach(function (x) { if (Array.isArray(x) && typeof x[0] === 'string') ck[x[0]] = x; });
+    var since = Array.isArray(c.oi) && c.oi[0] ? dS(c.oi[0][0]) : 'our per-contract records started';
+    [['FAR', 'far', 'Above the price when it became the top pile', 'How far above the price the pile sat on the day it became the stock’s top call pile. The top pile usually changes when a nearer pile expires, so this shows where the biggest bet sits, not when it was placed.'],
+      ['STAYS PUT', 'held', 'Sessions as the top pile', 'Trading sessions it has been the top call pile since then. A day missing from our records counts as a gap, not a move.'],
+      ['CLOSING IN', 'closing', 'Share of the gap closed', 'How much of the dollar gap on that day the price has covered since: 0% = no closer, 100% = at the pile.'],
+      ['CALLS', 'calls', 'Calls at the pile, change', 'Open calls at that strike since ' + since + ', counting only expiries still open today, so options that simply expired don’t count as closed. A clear drop would mean traders are closing the bet; small moves either way are normal churn.']
+    ].forEach(function (r, i) {
+      var x = ck[r[1]] || [], val = typeof x[1] === 'string' ? x[1] : null;
+      var t = div('ck'), k = div('ck-k'), id = 'chk' + i;
+      k.appendChild(span('', r[0]));
+      var ib = btn('ib', 'i'); ib.setAttribute('aria-expanded', 'false'); ib.setAttribute('aria-controls', id); ib.setAttribute('aria-label', 'What ' + r[0] + ' means');
+      k.appendChild(ib); t.appendChild(k);
+      t.appendChild(div('ck-r')).textContent = r[2];
+      var v = div('ck-v');
+      if (val == null) { v.textContent = '–'; v.title = 'Not in this data file yet'; }
+      else { v.textContent = val + ' '; if (x[2] === true) v.appendChild(span('ok', '✓')); }
+      t.appendChild(v);
+      var p = para('ck-x', r[3]); p.id = id; p.hidden = true; t.appendChild(p);
+      ib.addEventListener('click', function () { var op = ib.getAttribute('aria-expanded') !== 'true'; ib.setAttribute('aria-expanded', op ? 'true' : 'false'); p.hidden = !op; });
+      host.appendChild(t);
+    });
+  }
+  function chaseRead(dn, v, isHigh) {
+    var ro = $('chaseRo'); clear(ro);
+    if (dn == null) { ro.textContent = 'Tap a step, or touch the chart, to read a day.'; return; }
+    ro.appendChild(span('d', wmd(dn)));
+    if (v == null) return;
+    ro.appendChild(document.createTextNode(' · ' + CHASE.c.sym + ' ' + (isHigh ? 'high ' : '') + px(v)));
+    var k = pileOn(CHASE.c, dn);
+    if (num(k)) { var x = k / v - 1; ro.appendChild(document.createTextNode(' · top call pile ' + strike(k) + (Math.abs(x) < 0.0005 ? ' at the price' : ', ' + a1(x) + (x >= 0 ? ' above' : ' below')))); }
+    else ro.appendChild(document.createTextNode(' · no record of the top pile that day'));
+  }
+  function setChaseStep(i) {
+    if (!CHASE) return;
+    CHASE.active = i;
+    CHASE.steps.forEach(function (s1, k) { if (s1.btn) { if (k === i) s1.btn.setAttribute('aria-current', 'step'); else s1.btn.removeAttribute('aria-current'); } });
+    if (CHASE.mark) CHASE.mark(i == null ? null : CHASE.steps[i]);
+    if (i == null) chaseRead(null); else { var s1 = CHASE.steps[i]; chaseRead(s1.dn, s1.v, s1.high); }
+  }
+  function drawChase() {
+    if (!CHASE) return;
+    var h = $('chaseChart'); clear(h);
+    var c = CHASE.c, steps = CHASE.steps, closes = CHASE.closes, node = CHASE.node;
+    h.setAttribute('aria-label', c.sym + ' chart: the top call pile and the price. Left and right arrows move through days.');
+    if (!closes) { h.appendChild(para('cap', 'No daily closes in this file.')); return; }
+    var W = Math.max(280, Math.round(h.clientWidth || 300)), H = W < 520 ? 210 : 240;
+    var L = 8, Rr = 10, T = 32, B = 22, pw = W - L - Rr, ph = H - T - B;
+    var first = closes.d[0], last = closes.d[closes.d.length - 1];
+    var SS = []; for (var d = first; d <= last; d++) if (isSession(d)) SS.push(d);
+    if (SS.length < 2) SS = [first, last + 1];
+    function X(dn) { var i = nearest(SS, dn); return L + (i / (SS.length - 1)) * pw; }
+    var piles = (c.piles || []).filter(function (p) { return num(p[1]); }).map(function (p) { return { dn: dayNum(p[0]), k: p[1] }; });
+    var vals = closes.c.concat([node]);
+    piles.forEach(function (p) { vals.push(p.k); });
+    if (c.touch && num(c.touch.high)) vals.push(c.touch.high);
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), pd = (hi - lo) * 0.05; lo -= pd; hi += pd;
+    var Y = lin(lo, hi, T + ph, T);
+    var s = svgNode(W, H); h.appendChild(s);
+    s.setAttribute('role', 'img');
+    s.setAttribute('aria-label', c.sym + ' chart in ' + steps.length + ' steps. ' + steps.map(function (s1, i) { return (i + 1) + ': ' + s1.text; }).join(' '));
+
+
+    var runs = [];
+    piles.forEach(function (p) { var r = runs[runs.length - 1]; if (r && r.k === p.k) r.b = p.dn; else runs.push({ k: p.k, a: p.dn, b: p.dn }); });
+    runs.forEach(function (r, i) {
+      var nx = runs[i + 1], x0 = X(r.a), x1 = nx ? (sessionsAfter(r.b, nx.a) <= 1 ? X(nx.a) : X(r.b)) : L + pw, on = r.k === node;
+      el('line', { x1: x0, x2: Math.max(x1, x0 + 2), y1: Y(r.k), y2: Y(r.k), stroke: on ? C.amber : C.muted, 'stroke-width': on ? 1.6 : 1.2, 'stroke-dasharray': on ? '6 4' : '3 3' }, s);
+      if (!on) tx(s, x0 + 2, Y(r.k) - 5, strike(r.k), { fill: C.muted, 'font-size': 10.5 }, C.bg);
+    });
+    tx(s, L + pw - 2, Y(node) - 5, strike(node) + ' · pile', { fill: C.amber, 'font-size': 11, 'font-weight': 700, 'text-anchor': 'end' }, C.bg);
+
+    var xs0 = X(CHASE.sdn), ys0 = Y(num(c.start.close) ? c.start.close : c.start.spot), yN = Y(node);
+    el('line', { x1: xs0, x2: xs0, y1: T - 6, y2: T + ph, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '1 3' }, s);
+    tx(s, xs0 + 4, T + 2, 'top pile', { fill: C.muted, 'font-size': 10.5 }, C.bg);
+    el('path', { d: 'M' + (xs0 - 4) + ' ' + ys0 + 'H' + xs0 + 'V' + yN + 'H' + (xs0 - 4), fill: 'none', stroke: C.amber, 'stroke-width': 1.6 }, s);
+    tx(s, xs0 - 7, (ys0 + yN) / 2 + 4, '+' + Math.round(c.start.dist * 100) + '%', { fill: C.amber, 'font-size': 12, 'font-weight': 700, 'text-anchor': 'end' }, C.bg);
+
+    var xs = [], pts = [], dl = '';
+    closes.d.forEach(function (dn, i) { var x = X(dn), y = Y(closes.c[i]); dl += (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); xs.push(x); pts.push({ dn: dn, v: closes.c[i] }); });
+    el('path', { d: dl, fill: 'none', stroke: C.light, 'stroke-width': 2, 'stroke-linejoin': 'round' }, s);
+    if (c.touch && num(c.touch.high)) el('circle', { cx: X(dayNum(c.touch.day)), cy: Y(c.touch.high), r: 4.5, fill: C.gold, stroke: C.bg, 'stroke-width': 1.6 }, s);
+    var labs = [{ x: L, t: monD(first, true), a: 'start' }, { x: L + pw, t: monD(last, true), a: 'end' }, { x: xs0, t: monD(CHASE.sdn, true), a: 'middle' }], kept = [];
+    labs.forEach(function (o) {
+      var w = textW(o.t, 11), x0 = o.a === 'start' ? o.x : o.a === 'end' ? o.x - w : o.x - w / 2;
+      if (kept.some(function (q) { return x0 < q.x1 + 8 && x0 + w + 8 > q.x0; })) return;
+      kept.push({ x0: x0, x1: x0 + w }); tx(s, o.x, H - 6, o.t, { fill: C.muted, 'font-size': 11, 'text-anchor': o.a });
+    });
+
+    var cross = el('g', { 'pointer-events': 'none' }, s), marks = el('g', {}, s), circles = [], placed = [];
+    steps.forEach(function (s1, i) {
+      if (s1.dn == null || !num(s1.v)) { circles.push(null); return; }
+      var x = X(s1.dn), y = Y(s1.v), cy = y + s1.place * 18;
+      if (cy - 11 < 2) cy = y + 18;
+      if (cy + 11 > T + ph + 4) cy = y - 18;
+      for (var t = 0; t < 4 && placed.some(function (q) { return Math.abs(q.x - x) < 24 && Math.abs(q.y - cy) < 24; }); t++) {
+        var up = cy - 24, dn = cy + 24;
+        cy = up - 11 >= 2 && !placed.some(function (q) { return Math.abs(q.x - x) < 24 && Math.abs(q.y - up) < 24; }) ? up : dn + 11 <= T + ph + 4 ? dn : up;
+      }
+      placed.push({ x: x, y: cy });
+      if (s1.now) nowDot(marks, x, y, 3.5);
+      var g = el('g', { 'class': 'stp', cursor: 'pointer' }, marks);
+      el('line', { x1: x, x2: x, y1: y, y2: cy, stroke: C.light, 'stroke-width': 1, 'stroke-opacity': 0.5 }, g);
+      var ci = el('circle', { cx: x, cy: cy, r: 11, fill: C.bg, stroke: C.light, 'stroke-width': 1.5 }, g);
+      var tt = tx(g, x, cy + 4, String(i + 1), { fill: C.light, 'font-size': 11.5, 'font-weight': 700, 'text-anchor': 'middle' });
+      el('circle', { cx: x, cy: cy, r: 12, fill: 'transparent' }, g);
+      g.addEventListener('click', function (e) { e.stopPropagation(); setChaseStep(i); });
+      circles.push({ c: ci, t: tt });
+    });
+    CHASE.mark = function (s1) {
+      clear(cross);
+      circles.forEach(function (o2, k) { if (!o2) return; var on = CHASE.steps[k] === s1; o2.c.setAttribute('fill', on ? C.fear : C.bg); o2.c.setAttribute('stroke', on ? C.fear : C.light); o2.t.setAttribute('fill', on ? '#fff' : C.light); });
+      if (s1 && s1.dn != null) { var x = X(s1.dn); el('line', { x1: x, x2: x, y1: T - 6, y2: T + ph, stroke: C.white, 'stroke-width': 1, 'stroke-opacity': 0.35 }, cross); }
+    };
+    attachReader(h, {
+      xs: xs,
+      show: function (i) {
+        var p = pts[i]; clear(cross);
+        el('line', { x1: xs[i], x2: xs[i], y1: T - 6, y2: T + ph, stroke: C.white, 'stroke-width': 1, 'stroke-opacity': 0.35 }, cross);
+        el('circle', { cx: xs[i], cy: Y(p.v), r: 3.5, fill: '#fff', stroke: C.bg, 'stroke-width': 1.2 }, cross);
+        chaseRead(p.dn, p.v);
+      },
+      rest: function () { setChaseStep(CHASE.active); }
+    });
+    if (CHASE.active != null) CHASE.mark(steps[CHASE.active]);
+  }
+
+
+  function huntWhy(n) {
+    var h = n.hunt, ul = document.createElement('ul'); ul.className = 'why';
+    [
+      ['Far', p0(h.d0) + ' above the price when it became the top call pile (' + (h.since_records ? 'already the top pile when our records start, ' : '') + dS(h.start) + ')'],
+      ['Stays put', h.held + ' sessions as the top pile' + (num(h.seen) && h.seen < h.held ? ' (we have a reading on ' + h.seen + ' of them)' : '')],
+      ['Closing in', p0(h.closed) + ' of the gap closed since then'],
+      ['Calls at the pile', num(h.oi0) && h.oi0 && num(h.oi_now) ? chgTxt(h.oi_now / h.oi0 - 1) + ' since ' + dS(h.oi0_day) + ' (expiries still open)' : 'not in our records yet']
+    ].forEach(function (x) {
+      var li = document.createElement('li');
+      li.appendChild(span('ok', '✓'));
+      li.appendChild(document.createTextNode(x[0] + ': ' + x[1]));
+      ul.appendChild(li);
+    });
+    if (h.opex) { var li2 = document.createElement('li'); li2.className = 'mut'; li2.appendChild(document.createTextNode('It became the top pile in the ' + dS(h.opex) + ' expiry week, when near-term piles drop out of the map: it was most likely there already.')); ul.appendChild(li2); }
+    return ul;
+  }
+  function renderHunt(host) {
+    var Hn = P.chase, q = S.q.trim().toUpperCase(), ql = S.q.trim().toLowerCase();
+    $('rankNote').textContent = 'Hunting the TSM pattern across ' + (P.list === 'all' ? 'all ' + (Hn && num(Hn.checked) ? int(Hn.checked) + ' ' : '') + 'names with a call pile' : LISTS[P.list].label) +
+      ': a big, mostly long-dated call pile that sat well above the price when it became the top pile, has stayed the top pile, and that the price has been closing in on without reaching it, while the calls there have not been cut back by much. Ranked by the share of the gap closed (the number before each name). Most are not on the best-match list: once the price gets close, a pile drops off it.';
+    $('rankNote').hidden = false;
+    var rows = Hn ? Hn.names.filter(function (n) { return !q || n.sym.indexOf(q) === 0 || (ql.length >= 2 && typeof n.name === 'string' && (' ' + n.name.toLowerCase()).indexOf(' ' + ql) >= 0); }) : [];
+    if (q && rows.length) $('rankNote').textContent += ' Showing your search only; the numbers are each name’s place in the hunt.';
+    if (!rows.length) {
+      host.appendChild(q ? emptyBox('No match starts with ' + q + '.') : P.list === 'all' ? emptyBox('No name shows the TSM pattern today.') :
+        emptyBox('No name on ' + LISTS[P.list].label + ' shows the TSM pattern today.', 'Whole list', function () { setList('all'); }));
+      return;
+    }
+    rows.forEach(function (n) { var r = addRow(host, n, null); r.c.stock.insertBefore(span('rk', String(n._i + 1)), r.c.stock.firstChild); });
+    Object.keys(S.open).forEach(function (sym) { if (rowRefs[sym]) openRow(rowRefs[sym], false); });
+  }
+
+
 
   function attachReader(holder, api) {
     holder._rd = api;
@@ -1068,6 +1385,7 @@
     cpday: { f: '_cpDay', cp: 'day', note: 'Ranked by calls against puts traded on the latest day, all of the stock’s options. The most call-heavy trading comes first. Volume counts contracts traded, bought or sold, so it shows where the activity is, not which way it leans. Names with very little trading sit at the bottom without a number.' },
     combo: { f: 'combo', asc: true, note: 'All three combined: a blend of each name’s standing on $ in calls, $ per day left and the business score. Names without a business score sit at the bottom.' }
   };
+  SORTS.chase = function () { return 0; };
   Object.keys(RANKS).forEach(function (k) {
     var f = RANKS[k].f;
     SORTS[k] = RANKS[k].asc
@@ -1136,6 +1454,8 @@
       $('rankNote').textContent = rk.note + (filt ? ' Showing ' + (S.tier !== 'all' ? 'tier ' + tierName(S.tier) : 'your search') + ' only; the numbers are each name’s place among ' + among + '.' : ' All tiers are ranked together' + (P.list === 'all' ? '.' : ', within ' + LISTS[P.list].label + '.'));
     }
     $('rankNote').hidden = !rk;
+    $('tierSeg').hidden = S.sort === 'chase';
+    if (S.sort === 'chase') { $('tierNote').hidden = true; renderHunt(host); return; }
     var rows = allRows();
     if (!rows.length) { host.appendChild(emptyBox('No name passes all five checks right now. That happens: we don’t lower the bar to fill the list.')); return; }
     if (S.tier !== 'all' && !P.counts[S.tier] && !rows.some(function (n) { return n.tier === S.tier; })) {
@@ -1224,6 +1544,7 @@
     });
   }
   function openLinked(sym) {
+    if (inHunt(sym) && (S.sort === 'chase' || !P.by[sym])) { setTimeout(function () { goToHuntRow(sym); }, 0); return; }
     if (P.by[sym]) { setTimeout(function () { goToRow(sym, false); }, 0); return; }
     if (P.list !== 'all' && P.allSyms[sym]) { setList('all'); setTimeout(function () { goToRow(sym, false); }, 0); return; }
     checkTicker(sym);
@@ -1234,11 +1555,17 @@
     if (!RAW) { return; }
     closePop(); ghosts = {}; $('updateBar').hidden = true; setStick();
     P = prep(RAW, k, S.side);
-    Object.keys(S.open).forEach(function (sym) { if (!P.by[sym]) delete S.open[sym]; });
+    var huntKeep = {}; if (S.sort === 'chase' && P.chase) P.chase.names.forEach(function (n) { huntKeep[n.sym] = 1; });
+    Object.keys(S.open).forEach(function (sym) { if (!P.by[sym] && !(typeof huntKeep !== 'undefined' && huntKeep[sym])) delete S.open[sym]; });
     renderAll();
   }
-  function setTier(k) { S.tier = k; if (k === 'C') { S.cOpen = true; sset('ps.cOpen', '1'); } sset('ps.tier', k); renderCounts(); renderList(); }
-  function setSort(k) { S.sort = SORTS[k] || k === 'best' ? k : 'best'; sset('ps.sort', S.sort); renderCounts(); renderList(); }
+  function setTier(k) {
+    leaveHunt();
+    S.tier = k; if (k === 'C') { S.cOpen = true; sset('ps.cOpen', '1'); } sset('ps.tier', k); renderCounts(); renderList(); }
+  function setSort(k) {
+    S.chaseParked = false;
+    S.sort = SORTS[k] || k === 'best' ? k : 'best'; sset('ps.sort', S.sort); renderCounts(); renderList();
+  }
   function setCOpen(o) { S.cOpen = o; sset('ps.cOpen', o ? '1' : '0'); renderList(); }
 
   function toggleRow(sym) { var r = rowRefs[sym]; if (!r) return; if (S.open[sym]) closeRow(r, true); else openRow(r, true); }
@@ -1268,6 +1595,7 @@
   function goToRow(sym, flash) {
     var n = P && P.by[sym]; if (!n) return false;
     var re = false;
+    if (leaveHunt()) re = true;
     if (S.tier !== 'all' && S.tier !== n.tier) { S.tier = 'all'; sset('ps.tier', 'all'); re = true; }
     if (n.tier === 'C' && !S.cOpen && S.tier !== 'C') { S.cOpen = true; sset('ps.cOpen', '1'); re = true; }
     if (S.q && n.sym.indexOf(S.q.trim().toUpperCase()) !== 0) { S.q = ''; $('q').value = ''; re = true; }
@@ -1289,6 +1617,7 @@
   function symHash(sym) {
     var pre = '';
     if (P && P.side === 'puts') pre = 'v=puts&o=';
+    if (S.sort === 'chase' && inHunt(sym)) pre = 's=chase&o=';
     return '#' + pre + encodeURIComponent(sym);
   }
   function setHash(sym) { try { history.replaceState(null, '', location.pathname + location.search + symHash(sym)); } catch (e) { } }
@@ -1318,6 +1647,7 @@
   }
 
   function whyList(n) {
+    if (n.hunt) return huntWhy(n);
     var w = SW(), ul = document.createElement('ul'); ul.className = 'why';
     var cp = cpOf(n), mv = n.mv, share = n.share;
     [
@@ -2124,6 +2454,11 @@
       if (helpBuilt) helpBuilt = false;
       renderAll(); return;
     }
+    if (S.sort === 'chase') {
+      if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }
+      if (!Object.keys(S.open).length) { renderAll(); return; }
+      huntUpdate(np, old); return;
+    }
     if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }
     var t = hm12(np.gen, NY), nNew = 0;
     np.names.forEach(function (n) { if (!old.by[n.sym]) nNew++; });
@@ -2139,6 +2474,7 @@
     renderSideBar();
     renderNet();
     renderFailed();
+    renderChaseOpt(); renderChase();
     renderListBar(); renderTiles(); renderCounts(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot(); renderStatus();
     if ($('numbers').open) renderNumTable();
     var nLeft = Object.keys(ghosts).filter(function (k) { return !np.by[k]; }).length;
@@ -2164,6 +2500,7 @@
     renderSideBar();
     renderNet();
     renderFailed();
+    renderChaseOpt(); renderChase();
     renderCpOpts(); renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
     if ($('numbers').open) renderNumTable();
     if (helpBuilt && !helpBuilt.real) helpBuilt = false;
@@ -2238,6 +2575,7 @@
     if (S.tier === 'C') S.cOpen = true;
   })();
   initFolds();
+  initChaseFold();
   renderCounts();
   renderBanners();
   Array.prototype.forEach.call(document.querySelectorAll('#tierSeg button'), function (b) { b.addEventListener('click', function () { setTier(b.getAttribute('data-tier')); }); });
@@ -2310,6 +2648,7 @@
     else if (P) Object.keys(S.open).forEach(function (k) { var r = rowRefs[k]; if (r && r.chart) drawRunway(r.chart); });
     GEO.spk = sw;
     if (P && STORY && storyIsOpen()) drawStory();
+    if (P && CHASE && chaseIsOpen()) drawChase();
     if (P) {
       Array.prototype.forEach.call(document.querySelectorAll('#closingRows .cl.open'), function (w) { if (w._draw) w._draw(); });
       Array.prototype.forEach.call(document.querySelectorAll('#hitRows .hl.open .hl-sum'), function (b) { b.click(); b.click(); });
