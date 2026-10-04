@@ -2,6 +2,8 @@
 
 
 
+
+
 (function () {
   'use strict';
 
@@ -20,10 +22,7 @@
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-
-
-  var WASH = 25, REARM = 50, RING_DEPTH = 5, RING_GAP = { '1D': 5, '1W': 2, '2W': 1, '1M': 1 };
-  var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var GUIDE = { lo: 25, hi: 50 };
 
 
   var HOLIDAYS = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03',
@@ -171,32 +170,59 @@
   var hover = { c1: null, c2: null, c3: null };
 
 
+
+  var BAD_FORMAT = 'the data format changed', BAD_DATA = 'the data looked broken';
+  function isArr(a, n) { return Array.isArray(a) && (n == null || a.length === n); }
   function validate(d) {
-    if (!d || typeof d !== 'object') return 'not JSON';
-    if (d.schema !== 1 || d.kind !== 'breadth') return 'unknown schema ' + d.schema;
-    var x = d.daily;
-    if (!x || !Array.isArray(x.d) || x.d.length < 300) return 'daily series missing';
+    if (!d || typeof d !== 'object') return BAD_DATA;
+    if ((d.schema !== 1 && d.schema !== 2) || d.kind !== 'breadth') return BAD_FORMAT;
+    var V = d.view, x = d.daily, i, k;
+    if (!V || typeof V !== 'object' || V.v !== 1) return BAD_FORMAT;
+    if (!x || !isArr(x.d) || x.d.length < 300) return BAD_DATA;
     var n = x.d.length;
-    if (['a50', 'n50', 'a200', 'n200', 'a20', 'n20', 'a100', 'n100', 'spy'].some(function (k) { return !Array.isArray(x[k]) || x[k].length !== n; })) return 'daily arrays differ in length';
-    for (var i = 1; i < 4; i++) {
-      var t = d.tf && d.tf[TFS[i]];
-      if (!t || !t.s || t.s.length < 10 || ['e', 'a50', 'n50', 'a200', 'n200'].some(function (k) { return !Array.isArray(t[k]) || t[k].length !== t.s.length; })) return TFS[i] + ' series missing';
+    if (!['a50', 'n50', 'spy'].every(function (q) { return isArr(x[q], n); })) return BAD_DATA;
+    if (!V.sp || !['v50', 'v200', 'v20', 'v100'].every(function (q) { return isArr(V.sp[q], n); })) return BAD_DATA;
+    if (!V.p13 || !['sp50', 'sp200', 'sp20', 'sp100'].every(function (q) { return isArr(V.p13[q], n); })) return BAD_DATA;
+    for (i = 1; i < 4; i++) {
+      var t = V.tf && V.tf[TFS[i]];
+      if (!t || !isArr(t.ei) || t.ei.length < 10 || !['si', 'v50', 'v200'].every(function (q) { return isArr(t[q], t.ei.length); }) ||
+        !isArr(V.p13[TFS[i]], t.ei.length)) return BAD_DATA;
     }
-    for (i = 0; i < 4; i++) if (!d.candles || !d.candles[TFS[i]]) return 'candle notes missing';
-    if (!(x.n50[n - 1] > 0)) return 'no members counted on the newest day';
-    if (!d.live || !d.live.asof_utc || isNaN(Date.parse(d.live.asof_utc))) return 'as-of time missing';
-    if (d.state !== 'LIVE' && d.state !== 'CLOSED') return 'unknown state ' + d.state;
+    for (i = 0; i < 4; i++) {
+      k = TFS[i];
+      var len = i ? V.tf[k].ei.length : n, Q = V.kdj && V.kdj[k];
+      if (!d.candles || !d.candles[k]) return BAD_DATA;
+      if (!Q || !isArr(Q.K, len) || !isArr(Q.D, len) || !isArr(Q.J, len) || !isArr(Q.xu) || !isArr(Q.xd)) return BAD_DATA;
+      if (!V.wash || !isArr(V.wash[k])) return BAD_DATA;
+    }
+    if (!V.pnow || !V.pnow.sp50 || !V.hero || !V.hero.low || !V.text || !V.text.wash_state || !V.after || !V.gauges) return BAD_DATA;
+    if (!(x.n50[n - 1] > 0)) return BAD_DATA;
+    if (!d.live || !d.live.asof_utc || isNaN(Date.parse(d.live.asof_utc))) return BAD_DATA;
+    if (d.state !== 'LIVE' && d.state !== 'CLOSED') return BAD_DATA;
     return null;
   }
-  function share(a, n) { return n > 0 ? 100 * a / n : null; }
-  function shares(A, N) { return A.map(function (a, i) { return share(a, N[i]); }); }
+  function hund(a) { return a.map(function (h) { return h == null ? null : h / 100; }); }
+
+
+
+  function washOf(rows, n) {
+    var W = { sig: [], rings: [], active: null, ends: {}, low: {}, vr: {}, lr: {} };
+    (rows || []).forEach(function (r) {
+      var i = r[0], end = r[1] < 0 ? n : r[1];
+      W.sig.push(i); W.ends[i] = end; W.low[i] = r[2]; W.vr[i] = r[4]; W.lr[i] = r[5];
+      if (r[3]) W.rings.push({ i: i, k: r[2] });
+      if (end === n) W.active = { i: i, low: r[2] };
+    });
+    return W;
+  }
   function prepare(d) {
-    var x = d.daily, P = { d: x.d.map(dayNum), spy: x.spy, tf: {} };
-    P.v = shares(x.a50, x.n50); P.t = shares(x.a200, x.n200); P.n = x.n50;
-    P.tf['1D'] = { s: P.d, e: P.d, v: P.v, t: P.t, a: x.a50, n: x.n50, a2: x.a200, n2: x.n200 };
+    var V = d.view, x = d.daily, P = { d: x.d.map(dayNum), spy: x.spy, tf: {}, V: V };
+    P.v = hund(V.sp.v50); P.t = hund(V.sp.v200); P.f20 = hund(V.sp.v20); P.f100 = hund(V.sp.v100); P.n = x.n50;
+    P.tf['1D'] = { s: P.d, e: P.d, v: P.v, t: P.t, a: x.a50, n: x.n50, p13: V.p13.sp50, p13t: V.p13.sp200 };
     ['1W', '2W', '1M'].forEach(function (k) {
-      var t = d.tf[k];
-      P.tf[k] = { s: t.s.map(dayNum), e: t.e.map(dayNum), v: shares(t.a50, t.n50), t: shares(t.a200, t.n200), a: t.a50, n: t.n50, a2: t.a200, n2: t.n200 };
+      var t = V.tf[k];
+      P.tf[k] = { s: t.si.map(function (i) { return P.d[i]; }), e: t.ei.map(function (i) { return P.d[i]; }), ei: t.ei,
+        v: hund(t.v50), t: hund(t.v200), p13: V.p13[k], p13t: null };
     });
     P.last = P.d[P.d.length - 1];
 
@@ -204,44 +230,20 @@
     TFS.forEach(function (k) {
       var T = P.tf[k], j = T.v.length - 1, c = d.candles[k];
       d.stats[k] = { latest: T.v[j], latest0: Math.round(T.v[j]), latest200: T.t[j], open: !!c.open, note: c.note || '', name: c.name || TF_NAME[k],
-        start: c.start, end: c.end, n: T.n[j], above: T.a[j], n2: T.n2[j], above2: T.a2[j], alarm: WASH };
+        start: c.start, end: c.end };
+      T.open = !!c.open; T.closed = T.open ? T.v.length - 1 : T.v.length;
 
-      T.wash = washouts(T.v, k);
+      T.wash = washOf(V.wash[k], T.v.length);
       T.peaks = T.wash.sig;
       T.ringOf = {}; T.wash.rings.forEach(function (r) { T.ringOf[r.k] = r.i; });
       T.sigOf = {}; T.wash.sig.forEach(function (i) { T.sigOf[i] = 1; });
     });
+    d.stats['1D'].n2 = V.hero.m200;
     P.kdj = prepareKdj(P);
-    P.pct = pctPrepare(P, d, 'v');
-    P.pct2 = pctPrepare(P, d, 't');
     P.stacks = prepareStacks(P, d);
     return P;
   }
 
-
-
-
-
-
-  function washouts(v, k) {
-    var sig = [], armed = true, i, j, n = v.length;
-    for (i = 0; i < n; i++) {
-      if (v[i] == null) continue;
-      if (armed && v[i] <= WASH) { sig.push(i); armed = false; }
-      else if (!armed && v[i] >= REARM) armed = true;
-    }
-    var rings = [], active = null, ends = {};
-    sig.forEach(function (i0) {
-      var end = n;
-      for (j = i0 + 1; j < n; j++) if (v[j] >= REARM) { end = j; break; }
-      var lo = i0;
-      for (j = i0; j < end; j++) if (v[j] != null && v[j] < v[lo]) lo = j;
-      ends[i0] = end;
-      if (lo - i0 >= RING_GAP[k] && v[lo] <= v[i0] - RING_DEPTH) rings.push({ i: i0, k: lo });
-      if (end === n) active = { i: i0, low: lo };
-    });
-    return { sig: sig, rings: rings, active: active, ends: ends };
-  }
 
   function episodeOf(T, j) {
     var s = T.wash.sig, w = null;
@@ -250,53 +252,27 @@
   }
 
 
-
-
-
-
-
-  var PCT_BASES = { s13: { from: '2013-01-01', word: 'since 2013', short: '2013+' }, s21: { from: '2021-01-01', word: 'since 2021', short: '2021+' } };
-
-
-  var PCT_LOW = { '1D': { days: 30 }, '1W': { n: 6 }, '2W': { n: 4 }, '1M': { n: 3 } };
-  var PCT_LOW_WORDS = 'Recent low = the lowest 50-day reading in the last 30 calendar days (daily), the last 6 weekly, 4 two-week or 3 monthly candles, the latest one included.';
-  function tenths(x) { return Math.round(x * 10); }
-  function upperBound(a, x) { var lo = 0, hi = a.length; while (lo < hi) { var m = (lo + hi) >> 1; if (a[m] <= x) lo = m + 1; else hi = m; } return lo; }
+  var PCT_BASES = { s13: { word: 'since 2013', short: '2013+' }, s21: { word: 'since 2021', short: '2021+' } };
+  var RECENT_LOW_TIP = 'Recent low = the lowest 50-day reading of the last few weeks, the latest day included.';
   function ordinal(n) { var t = n % 100, u = n % 10; return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th'); }
-  function pctPrepare(P, d, key) {
-    var out = {};
-    TFS.forEach(function (k) {
-      var T = P.tf[k], vs = T[key], n = vs.length, open = !!d.stats[k].open, closed = open ? n - 1 : n, o = { n: n, closed: closed, open: open, base: {}, key: key };
-      Object.keys(PCT_BASES).forEach(function (b) {
-        var first = lowerBound(T.e, dayNum(PCT_BASES[b].from)), vals = [];
-        for (var j = first; j < closed; j++) if (vs[j] != null) vals.push(tenths(vs[j]));
-        vals.sort(function (p, q) { return p - q; });
-        o.base[b] = { first: first, sorted: vals };
-      });
-      out[k] = o;
-    });
-    return out;
+
+  function rankOf(r, p) {
+    if (r == null) return null;
+    return { r: r, p: p == null ? r : p, low: r === 0, record: r === 100, ord: r === 0 ? 'lowest' : ordinal(r) };
   }
 
-
-  function pctOf(k, j, x, b, key) {
-    key = key || 'v';
-    var o = (key === 't' ? D.pct2 : D.pct)[k], B = o.base[b], cnt = upperBound(B.sorted, tenths(x)), n = B.sorted.length, own = D.tf[k][key];
-    if (j != null && j >= B.first && j < o.closed && own[j] != null) {
-      n--; if (tenths(own[j]) <= tenths(x)) cnt--;
-    }
-    if (n <= 0 || x == null) return null;
-    var p = 100 * cnt / n, r = Math.round(p), rec = cnt === n, low = cnt === 0;
-    if (r >= 100 && !rec) r = 99;
-    if (r <= 0 && !low) r = 1;
-    return { p: p, r: r, cnt: cnt, n: n, record: rec, low: low, open: j != null && j >= o.closed, ord: low ? 'lowest' : ordinal(r) };
+  function pctCandle(k, j, key) {
+    var T = D.tf[k], x = (key === 't' ? T.t : T.v)[j], N = D.V.pnow, latest = k === '1D' && j === T.v.length - 1;
+    var o = { k: k, j: j, x: x, open: j >= T.closed, s13: null, s21: null };
+    if (key === 't') { o.s13 = latest ? rankOf(N.sp200.r13) : T.p13t ? rankOf(T.p13t[j]) : null; return o; }
+    if (latest) { o.s13 = rankOf(N.sp50.r13, N.sp50.p13); o.s21 = rankOf(N.sp50.r21); }
+    else o.s13 = rankOf(T.p13[j]);
+    return o;
   }
-  function candleVal(k, j, key) { return D.tf[k][key || 'v'][j]; }
-  function pctCandle(k, j, key) { var x = candleVal(k, j, key); return { k: k, j: j, x: x, open: j >= D.pct[k].closed, s13: pctOf(k, j, x, 's13', key), s21: pctOf(k, j, x, 's21', key) }; }
-  function recentLow(k) {
-    var T = D.tf[k], last = T.v.length - 1, i0 = k === '1D' ? lowerBound(T.e, T.e[last] - (PCT_LOW[k].days - 1)) : Math.max(0, last + 1 - PCT_LOW[k].n), best = -1, bx = 0;
-    for (var j = i0; j <= last; j++) { var x = T.v[j]; if (x == null) continue; if (best < 0 || x < bx) { best = j; bx = x; } }
-    return pctCandle(k, best);
+
+  function recentLow() {
+    var L = D.V.hero.low;
+    return { k: '1D', j: L.i, x: D.v[L.i], open: !!L.open, s13: rankOf(L.r13, L.p) };
   }
   function pctWord(r) { return r ? (r.low ? 'lowest' : r.ord) : '–'; }
 
@@ -307,13 +283,6 @@
     return r.r <= 50 ? 'bottom ' + Math.max(1, r.r) + '%' : 'top ' + Math.max(1, 100 - r.r) + '%';
   }
   var PK_TXT = '#E8C547';
-  var LOW_SPAN = { '1D': '30 days', '1W': '6 weeks', '2W': '4 candles', '1M': '3 months' };
-  function lowWords(k) {
-    var Pk = recentLow(k), T = D.tf[k];
-    if (Pk.j === T.v.length - 1) return 'now = recent low (' + ('last ' + LOW_SPAN[k]).replace(/ /g, ' ') + ')';
-    var when = k === '1D' ? fmtDay(T.e[Pk.j], false) : k === '1M' ? fmtMonYear(T.s[Pk.j]).slice(0, 3) : 'to ' + fmtDay(T.e[Pk.j], false);
-    return 'recent low ' + pct1(Pk.x) + ' (' + when.replace(/ /g, ' ') + ') = ' + pctWord(Pk.s13);
-  }
 
 
   function status() {
@@ -428,29 +397,12 @@
   }
 
 
-
-  var ZONES = [[WASH, 'washed out'], [40, 'weak'], [60, 'mixed'], [80, 'broad'], [1e9, 'very broad']];
-  function zoneOf(v) { if (v <= WASH) return ZONES[0][1]; for (var i = 1; i < ZONES.length; i++) if (v < ZONES[i][0]) return ZONES[i][1]; return ZONES[ZONES.length - 1][1]; }
   function nowWords() { return closedNow() ? 'at today’s close (preliminary)' : doc.state === 'LIVE' ? 'today so far' : 'at the close'; }
   function spyOffHigh() { var s = doc.spy; return s && typeof s.pct_below_record === 'number' ? s.pct_below_record : null; }
 
-  function washStateWords(k) {
-    var T = D.tf[k], last = T.v.length - 1, A = T.wash.active, sig = T.wash.sig, unit = k === '1D' ? 'day' : 'candle';
-    if (A) {
-      var i = A.i, prevRe = null;
-      for (var j = i - 1; j >= 0; j--) if (T.v[j] >= REARM) { prevRe = j; break; }
-      var openSig = i === last && D.pct[k].open;
-      return { active: true, i: i, open: openSig, low: A.low, n: last - i + 1, prevRe: prevRe,
-        text: (openSig ? 'Would be a washout if it closed now: ' : 'In a washout since ' + fmtDay(T.e[i], true, k === '1D') + ' (' + unit + ' ' + (last - i + 1) + '): ') +
-          'the 50-day line ' + (openSig ? 'is at ' : 'closed at ') + pct1(T.v[i]) + (prevRe != null ? ', after it had been back to 50%+ on ' + fmtDay(T.e[prevRe], true) : '') + '.' +
-          (A.low !== i ? ' Lowest close since: ' + pct1(T.v[A.low]) + ' on ' + fmtDay(T.e[A.low], false) + (A.low === last && T === D.tf['1D'] && doc.state === 'LIVE' ? ' (today, so far)' : '') + '.' : '') +
-          ' It re-arms once it closes back at 50% or more.' };
-    }
-    var lastSig = sig.length ? sig[sig.length - 1] : null;
-    if (lastSig == null) return { active: false, text: 'No washout since ' + dnDate(T.s[0]).getUTCFullYear() + '. Armed: a close at or under 25% would be one.' };
-    var re = T.wash.ends[lastSig];
-    return { active: false, i: lastSig, text: 'No washout running. Armed: a close at or under 25% would be a new one. Last washout ' + fmtDay(T.e[lastSig], true) +
-      ' (' + pct1(T.v[lastSig]) + '); back to 50% on ' + fmtDay(T.e[re], true) + '.' };
+  function washStateWords() {
+    var W = D.V.text.wash_state, A = D.tf['1D'].wash.active;
+    return { active: !!W.on, lead: W.lead || '', text: W.body || '', i: A ? A.i : null };
   }
   function renderText() {
     var st = doc.stats, live = doc.state === 'LIVE', s1 = st['1D'], sessDn = dayNum(doc.live.session_date || doc.as_of.session);
@@ -463,23 +415,23 @@
       (live ? ' · as of ' + fmtTz(Date.parse(doc.live.asof_utc), 'America/New_York', 'ET', false) : '');
     renderHeroPct();
     var zl = $('zoneLine'); clear(zl);
-    var word = zoneOf(s1.latest);
+    var word = D.V.hero.zone || '';
     zl.appendChild(span('zw', word.charAt(0).toUpperCase() + word.slice(1)));
     zl.appendChild(span('', ' — ' + pct1(s1.latest) + ' of S&P 500 stocks are above their 50-day average ' + nowWords() +
       (s1.latest200 == null ? '.' : '; ' + pct1(s1.latest200) + ' above their 200-day.')));
-    var ws = washStateWords('1D'), wsn = $('washState'); clear(wsn);
+    var ws = washStateWords(), wsn = $('washState'); clear(wsn);
     wsn.appendChild(span(ws.active ? 'ws-on' : '', ''));
-    if (ws.active) { var b = document.createElement('b'); b.textContent = ws.open ? 'Washout so far. ' : 'Washout. '; wsn.appendChild(b); }
+    if (ws.active) { var b = document.createElement('b'); b.textContent = ws.lead; wsn.appendChild(b); }
     wsn.appendChild(document.createTextNode(ws.text));
-    $('zoneKey').textContent = 'Under 25% washed out · 25–40 weak · 40–60 mixed · 60–80 broad · 80+ very broad (50-day line).';
+    $('zoneKey').textContent = 'From low to high: washed out · weak · mixed · broad · very broad (50-day line).';
     $('howTo').textContent = 'Blue = the % of S&P 500 stocks above their 50-day average, orange = above their 200-day. Low = most stocks have been falling for weeks. ' +
-      'Yellow dot = a washout: the blue line closes at or under 25% after it had been back to 50%. Hollow ring = the deepest close of that washout. The same days are dotted on SPY.';
+      'Yellow dot = a washout: the blue line drops to a deeply washed-out level after a recovery. Hollow ring = the deepest close of that washout. The same days are dotted on SPY.';
     var R = pctCandle('1D', D.d.length - 1), off = spyOffHigh(), parts = [];
     parts.push((cn ? 'At today’s close (preliminary)' : live ? 'So far today' : 'At the close') + ', ' + pct1(s1.latest) + ' of stocks are above their 50-day average — ' +
       (R.s13 ? (R.s13.low ? 'the lowest reading since 2013' : R.s13.r <= 50 ? 'lower than ' + (100 - R.s13.r) + '% of days since 2013' : 'higher than ' + R.s13.r + '% of days since 2013') : '') +
       (s1.latest200 == null ? '.' : ' — and ' + pct1(s1.latest200) + ' above their 200-day.'));
     if (off != null) parts.push('SPY sits ' + (off < 0.05 ? 'at its record' : off.toFixed(1) + '% below its record') + '.');
-    if (ws.active && off != null && off <= 5) parts.push('Most past washouts came after the index had already fallen; this one has it within 5% of its high (see “After past washouts”).');
+    if (D.V.hero.near_high) parts.push('Most past washouts came after the index had already fallen; this one has it close to its high (see “After past washouts”).');
     $('rightNow').textContent = parts.join(' ');
     renderStackText(cn, live, sessDn);
     $('footData').textContent = 'Derived values only (counts of stocks; SPY, QQQ and IWM closes); no member prices are published. Prices about 15 minutes delayed during the session. Built ' +
@@ -500,7 +452,7 @@
     });
   }
   function renderHeroPct() {
-    var k = '1D', last = D.tf[k].v.length - 1, R = pctCandle(k, last), Pk = recentLow(k), R2 = pctCandle(k, last, 't');
+    var k = '1D', last = D.tf[k].v.length - 1, R = pctCandle(k, last), Pk = recentLow(), R2 = pctCandle(k, last, 't');
     heroNow = R; heroPk = Pk;
     var hp = $('heroPct'); clear(hp);
     hp.appendChild(span('hp-b', pctWord(R.s13) + (R.s13 && R.s13.low ? '' : ' percentile'))); hp.appendChild(document.createTextNode(' since 2013'));
@@ -509,8 +461,8 @@
     var pk = $('heroPeak'); clear(pk);
     var same = Pk.j === last, pdn = D.tf[k].e[Pk.j];
     var pkt = span('hp-rule', same ? 'today is the recent low' : 'recent low ' + pct1(Pk.x) + ' (' + fmtDay(pdn, false) + ') = ' + pctWord(Pk.s13) + (Pk.open ? ' so far' : ''));
-    pkt.title = PCT_LOW_WORDS; pk.appendChild(pkt);
-    pk.title = PCT_LOW_WORDS;
+    pkt.title = RECENT_LOW_TIP; pk.appendChild(pkt);
+    pk.title = RECENT_LOW_TIP;
     var g = $('gauge1'); clear(g);
     g.setAttribute('aria-label', 'Percentile gauge of the 50-day line since 2013: now ' + pctWord(R.s13) + (same ? '' : ', recent low ' + pctWord(Pk.s13)));
     var labs = document.createElement('div'); labs.className = 'g-labs'; g.appendChild(labs);
@@ -567,12 +519,12 @@
     var l1 = $('lg1'); clear(l1);
     l1.appendChild(legendItem('lg-b50', '% above 50-day average'));
     l1.appendChild(legendItem('lg-b200', '% above 200-day average'));
-    l1.appendChild(legendItem('lg-pk', 'washout (closed ≤25% after ≥50%; same day on SPY)'));
+    l1.appendChild(legendItem('lg-pk', 'washout (same day on SPY)'));
     l1.appendChild(legendItem('lg-ring', 'deepest close of that washout'));
     l1.appendChild(legendItem('lg-now', 'now'));
     l1.appendChild(legendItem('lg-nowring', 'now, in a washout (dashed = so far)'));
-    l1.appendChild(legendItem('lg-wash', 'washout line 25%'));
-    l1.appendChild(legendItem('lg-rearm', 're-arm line 50%'));
+    l1.appendChild(legendItem('lg-wash', 'washout line'));
+    l1.appendChild(legendItem('lg-rearm', 're-arm line'));
     var l2 = $('lg2'); clear(l2);
     l2.appendChild(legendItem('lg-b50', '50-day'));
     l2.appendChild(legendItem('lg-b200', '200-day'));
@@ -580,16 +532,16 @@
     l2.appendChild(legendItem('lg-ring', 'deepest close'));
     l2.appendChild(legendItem('lg-now', 'latest'));
     l2.appendChild(legendItem('lg-nowring', 'in a washout'));
-    l2.appendChild(legendItem('lg-wash', 'washout line 25%'));
-    l2.appendChild(legendItem('lg-rearm', 're-arm line 50%'));
+    l2.appendChild(legendItem('lg-wash', 'washout line'));
+    l2.appendChild(legendItem('lg-rearm', 're-arm line'));
     var l4 = $('lg4'); clear(l4);
     [20, 50, 100, 200].forEach(function (n) { var it = legendItem('lg-sp', n + '-day'); it.firstChild.style.borderTopColor = SPEED_C[n]; l4.appendChild(it); });
     l4.appendChild(legendItem('lg-pk', 'washout (50-day line only)'));
     l4.appendChild(legendItem('lg-ring', 'deepest close'));
     l4.appendChild(legendItem('lg-now', 'now'));
     l4.appendChild(legendItem('lg-nowring', 'in a washout'));
-    l4.appendChild(legendItem('lg-wash', 'washout line 25%'));
-    l4.appendChild(legendItem('lg-rearm', 're-arm line 50%'));
+    l4.appendChild(legendItem('lg-wash', 'washout line'));
+    l4.appendChild(legendItem('lg-rearm', 're-arm line'));
   }
 
   function renderStackText(cn, live, sessDn) {
@@ -599,18 +551,9 @@
       '; the Nasdaq-100 and the Russell 2000 update after each close.';
     var parts = I.map(function (p) { var v = val(p); return p.name + ' ' + (v == null ? '–' : pct0(v)); });
 
-    var jc = -1;
-    for (var j0 = D.d.length - 1; j0 >= 0 && jc < 0; j0--) if (I.every(function (p) { return p.lines[0].v[j0] != null; })) jc = j0;
-    var gapTxt = '';
-    if (jc >= 0 && I.length >= 2) {
-      var by = I.slice().sort(function (a, b) { return b.lines[0].v[jc] - a.lines[0].v[jc]; }), hi = by[0], lo = by[by.length - 1];
-      var hv = hi.lines[0].v, lv = lo.lines[0].v, gap = hv[jc] - lv[jc];
-
-      var first = lowerBound(D.d, dayNum('2013-01-01')), n = 0, below = 0;
-      for (var j = first; j < D.d.length; j++) if (j !== jc && hv[j] != null && lv[j] != null) { n++; if (hv[j] - lv[j] < gap) below++; }
-      gapTxt = ' Widest gap at the close of ' + fmtDay(D.d[jc], false) + ': ' + hi.name + ' over ' + lo.name + ' by ' + Math.round(gap) + ' points' +
-        (n ? ', wider than on ' + Math.round(100 * below / n) + '% of days since 2013' : '') + '.';
-    }
+    var G = D.V.idx_gap, gapTxt = '';
+    if (G) gapTxt = ' Widest gap at the close of ' + fmtDay(D.d[G.i], false) + ': ' + G.hi + ' over ' + G.lo + ' by ' + G.pts + ' points' +
+      (G.wider != null ? ', wider than on ' + G.wider + '% of days since 2013' : '') + '.';
     var late = I.filter(function (p) { return lastIdx(p.lines[0].v) < D.d.length - 1; });
     var lateTxt = late.length ? ' (the S&P ' + (cn ? 'at today’s close, preliminary' : live ? 'today so far' : 'at the close of ' + fmtDay(D.last, false)) + '; ' +
       late.map(function (p) { return p.name + ' at the close of ' + fmtDay(D.d[lastIdx(p.lines[0].v)], false); }).join(', ') + ')' : '';
@@ -625,7 +568,7 @@
   function washCell(k) {
     var T = D.tf[k], A = T.wash.active;
     if (!A) return 'armed';
-    return (A.i === T.v.length - 1 && D.pct[k].open ? 'so far' : 'since ' + fmtDay(T.e[A.i], false));
+    return (A.i === T.v.length - 1 && T.open ? 'so far' : 'since ' + fmtDay(T.e[A.i], false));
   }
   function renderTables() {
     var t = $('tfTable'); clear(t);
@@ -634,8 +577,8 @@
     var hr = t.insertRow();
     cols.forEach(function (c) { var th = document.createElement('th'); th.textContent = c[0]; if (c[1]) th.className = 'wide-only'; hr.appendChild(th); });
     function row(label, p, k, members) {
-      var ln = p.lines[k], li = lastIdx(ln.v), r = t.insertRow(), S = k ? p.pct2 : p.pct, v = li < 0 ? null : ln.v[li];
-      var R13 = seriesPct(S, li, v, 's13'), R21 = seriesPct(S, li, v, 's21');
+      var ln = p.lines[k], li = lastIdx(ln.v), r = t.insertRow(), N = D.V.pnow[k ? p.nk2 : p.nk] || {}, v = li < 0 ? null : ln.v[li];
+      var R13 = v == null ? null : rankOf(N.r13), R21 = v == null ? null : rankOf(N.r21);
       [label, v == null ? '–' : pct1(v) + (li === D.d.length - 1 && doc.state === 'LIVE' ? (closedNow() ? ' (prelim.)' : ' so far') : ''), pctWord(R13) + ' · ' + rankWord(R13), pctWord(R21),
         k === 0 && p.wash ? pWashState(p) : '', members, li < 0 ? '–' : fmtDay(D.d[li], true)].forEach(function (x, i) {
         var c = r.insertCell(); c.textContent = x; if (cols[i][1]) c.className = 'wide-only'; });
@@ -659,84 +602,36 @@
   }
 
 
-
-
-  var STUDY = { n: 23, done: 22, r63: 6.2, up63: 17, base63: 4.3, baseUp: 79, sameDrop: 6.4, p: 0.55, dip5: 11, baseDip5: 33,
-    r126: 10.9, up126: 19, n126: 22, nearN: 13, nearUp63: 9, nearUp126: 12, nearDip5: 7, nearBaseDip5: 30, era21: { n: 10, done: 9, r63: 9.0, up: 6 } };
-  var H1 = 21, H3 = 63, H6 = 126;
-  function fwd(i, h) { var j = i + h; return j < D.spy.length && D.spy[i] != null && D.spy[j] != null ? (D.spy[j] / D.spy[i] - 1) * 100 : null; }
-  function worst(i, h) {
-    if (i + h >= D.spy.length || D.spy[i] == null) return null;
-    var m = Infinity; for (var j = i + 1; j <= i + h; j++) if (D.spy[j] != null) m = Math.min(m, D.spy[j]);
-    return (m / D.spy[i] - 1) * 100;
-  }
-  function offHigh(i) {
-    var m = -Infinity; for (var j = Math.max(0, i - 251); j <= i; j++) if (D.spy[j] != null) m = Math.max(m, D.spy[j]);
-    return D.spy[i] == null ? null : (D.spy[i] / m - 1) * 100;
-  }
-  function median(a) { if (!a.length) return null; var s = a.slice().sort(function (p, q) { return p - q; }), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
   function sgn(x, dp) { return x == null ? '–' : (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(dp == null ? 1 : dp) + '%'; }
   function renderAfter() {
-    var T = D.tf['1D'], last = D.d.length - 1, base13 = lowerBound(D.d, dayNum('2013-01-01'));
-    var rows = T.wash.sig.filter(function (i) { return i >= base13; }).map(function (i) {
-      var end = T.wash.ends[i], lo = i;
-      for (var j = i; j < Math.min(end, last + 1); j++) if (D.v[j] < D.v[lo]) lo = j;
-      return { i: i, v: D.v[i], t: D.t[i], off: offHigh(i), lo: lo, r1: fwd(i, H1), r3: fwd(i, H3), r6: fwd(i, H6), dd: worst(i, H3), back: end <= last ? end - i : null };
-    });
-
-    var all3 = [], allDip = 0, allN = 0;
-    for (var i = base13; i + H3 <= last; i++) { var r = fwd(i, H3), w = worst(i, H3); if (r == null || w == null) continue; all3.push(r); allN++; if (w <= -5) allDip++; }
-    var done3 = rows.filter(function (o) { return o.r3 != null; }), done6 = rows.filter(function (o) { return o.r6 != null; });
-    var m3 = median(done3.map(function (o) { return o.r3; })), up3 = done3.filter(function (o) { return o.r3 > 0; }).length;
-    var m6 = median(done6.map(function (o) { return o.r6; })), up6 = done6.filter(function (o) { return o.r6 > 0; }).length;
-    var dip = done3.filter(function (o) { return o.dd <= -5; }).length, b3 = median(all3), bUp = all3.filter(function (x) { return x > 0; }).length / Math.max(1, all3.length) * 100;
+    var A = D.V.after;
     var tiles = $('studyTiles'); clear(tiles);
-    function tile(k, v, small, note, hl) {
-      var t0 = document.createElement('div'); t0.className = 'tile' + (hl ? ' hl' : '');
-      t0.appendChild(span('t-k', k));
-      var vv = document.createElement('div'); vv.className = 't-v'; vv.textContent = v;
-      if (small) { var sm = document.createElement('small'); sm.textContent = small; vv.appendChild(sm); }
+    function tile(o) {
+      var t0 = document.createElement('div'); t0.className = 'tile' + (o.hl ? ' hl' : '');
+      t0.appendChild(span('t-k', o.k));
+      var vv = document.createElement('div'); vv.className = 't-v'; vv.textContent = o.v;
+      if (o.small) { var sm = document.createElement('small'); sm.textContent = o.small; vv.appendChild(sm); }
       t0.appendChild(vv);
-      if (note) { var nn = document.createElement('div'); nn.className = 't-n'; nn.textContent = note; t0.appendChild(nn); }
+      if (o.note) { var nn = document.createElement('div'); nn.className = 't-n'; nn.textContent = o.note; t0.appendChild(nn); }
       tiles.appendChild(t0);
     }
-    var ws = washStateWords('1D'), off = spyOffHigh(), near = ws.active && off != null && off <= 5;
-    tile('Washouts since 2013 on this line', String(rows.length), rows.length && ws.active ? 'incl. the one now' : '',
-      'The official S5FI had ' + STUDY.n + ' over the same years (it reads 1–2 points lower before 2025).');
-    tile('SPY 3 months after (median)', sgn(m3), up3 + ' of ' + done3.length + ' up',
-      'Any day since 2013: ' + sgn(b3) + ', up ' + Math.round(bUp) + '% of the time.');
-    tile('SPY fell 5%+ first (within 3 months)', dip + ' of ' + done3.length, '',
-      'Any day since 2013: ' + Math.round(allDip / Math.max(1, allN) * 100) + '%.');
-    tile('The fair test (study)', sgn(STUDY.r63) + ' vs ' + sgn(STUDY.sameDrop), 'p ' + STUDY.p.toFixed(2),
-      'Washouts vs days with the SAME S&P drop from its high: no edge beyond the drop itself.', true);
-    tile('With the S&P within 5% of its high', STUDY.nearUp126 + ' of ' + STUDY.nearN, 'up at 6 months',
-      'Up at 3 months ' + STUDY.nearUp63 + ' of ' + STUDY.nearN + '; ' + STUDY.nearDip5 + ' of ' + STUDY.nearN + ' fell 5%+ first (' + STUDY.nearBaseDip5 + '% normally).' + (near ? ' Today is one of these.' : ''), near);
-    $('studyEli5').textContent = '';
-    var e = $('studyEli5'), eb = document.createElement('b'); eb.textContent = 'ELI5'; e.appendChild(eb);
-    e.appendChild(document.createTextNode('Washouts usually come after the market has already fallen. SPY was usually higher 3–6 months later, but days with the same drop did just as well, ' +
-      'so the bounce comes from buying lower, not from breadth itself. Often it dipped another 5% first.' + (near ? ' This one came with the index near its high: past cases like it got there in 6 months, on a bumpier road.' : '')));
+    (A.tiles || []).forEach(tile);
+    var e = $('studyEli5'); clear(e);
+    var eb = document.createElement('b'); eb.textContent = 'ELI5'; e.appendChild(eb);
+    e.appendChild(document.createTextNode(A.eli5 || ''));
     var t = $('washTable'); clear(t);
     var cap = document.createElement('caption'); cap.textContent = 'Every daily washout since 2013 on this page’s line (SPY price, not total return)'; t.appendChild(cap);
-    var cols = [['Washout day', ''], ['50-day', ''], ['200-day', 'w'], ['S&P off high', 'w'], ['Lowest close', 'w'], ['SPY 1 mo', 'w'], ['3 mo', ''], ['6 mo', ''], ['Worst dip 3 mo', 'w'], ['Back to 50%', 'w']];
+    var cols = [['Washout day', ''], ['50-day', ''], ['200-day', 'w'], ['S&P off high', 'w'], ['Lowest close', 'w'], ['SPY 1 mo', 'w'], ['3 mo', ''], ['6 mo', ''], ['Worst dip 3 mo', 'w'], ['Recovered after', 'w']];
     var hr = t.insertRow();
     cols.forEach(function (c) { var th = document.createElement('th'); th.textContent = c[0]; if (c[1]) th.className = 'wide-only'; hr.appendChild(th); });
-    rows.slice().reverse().forEach(function (o) {
-      var r = t.insertRow(), isNow = ws.active && ws.i === o.i;
-      if (isNow) r.className = 'now';
-      var cells = [[fmtDay(D.d[o.i], true, false) + (isNow ? ' (now)' : ''), ''], [pct1(o.v), ''], [o.t == null ? '–' : pct1(o.t), ''], [sgn(o.off), ''],
-        [o.lo === o.i ? 'that day' : pct1(D.v[o.lo]) + ' · ' + fmtDay(D.d[o.lo], false), ''],
-        [sgn(o.r1), o.r1 == null ? '' : o.r1 >= 0 ? 'up' : 'down'], [sgn(o.r3), o.r3 == null ? '' : o.r3 >= 0 ? 'up' : 'down'], [sgn(o.r6), o.r6 == null ? '' : o.r6 >= 0 ? 'up' : 'down'],
-        [sgn(o.dd), ''], [o.back == null ? 'not yet' : o.back + ' days', '']];
-      cells.forEach(function (c, i) { var td = r.insertCell(); td.textContent = c[0]; td.className = (cols[i][1] ? 'wide-only ' : '') + c[1]; });
+    (A.rows || []).forEach(function (cells, q) {
+      var r = t.insertRow();
+      if (q === A.now_i) r.className = 'now';
+      cells.forEach(function (c, i) { var td = r.insertCell(); td.textContent = c[0]; td.className = (cols[i] && cols[i][1] ? 'wide-only ' : '') + (c[1] || ''); });
     });
     var rs = t.insertRow(); rs.className = 'sum';
-    [['Median', ''], ['', ''], ['', 'w'], ['', 'w'], ['', 'w'], [sgn(median(rows.filter(function (o) { return o.r1 != null; }).map(function (o) { return o.r1; }))), 'w'],
-      [sgn(m3) + ' · ' + up3 + '/' + done3.length + ' up', ''], [sgn(m6) + ' · ' + up6 + '/' + done6.length + ' up', ''], [sgn(median(done3.map(function (o) { return o.dd; }))), 'w'], ['', 'w']]
-      .forEach(function (c) { var td = rs.insertCell(); td.textContent = c[0]; if (c[1]) td.className = 'wide-only'; });
-    $('studySrc').textContent = 'Table: this page’s 50-day line and SPY closes (price only), 21 / 63 / 126 sessions later; a horizon still in the future shows –. ' +
-      'Study tiles: breadth_now 2026-10-01 study (official S5FI, SPY total return, 2013+, the same re-arm rule): ' + STUDY.n + ' washouts, 3-month median ' + sgn(STUDY.r63) +
-      ' (' + STUDY.up63 + ' of ' + STUDY.done + ' up) vs ' + sgn(STUDY.base63) + ' any day; days with the same distance from the high did ' + sgn(STUDY.sameDrop) + ' (p ' + STUDY.p.toFixed(2) +
-      '). 2021+ alone: ' + sgn(STUDY.era21.r63) + ', up ' + STUDY.era21.up + ' of ' + STUDY.era21.done + '. Few cases; describes, does not predict.';
+    (A.sum || []).forEach(function (c, i) { var td = rs.insertCell(); td.textContent = c[0]; if (cols[i] && cols[i][1]) td.className = 'wide-only'; });
+    $('studySrc').textContent = A.src || '';
   }
 
 
@@ -915,7 +810,8 @@
       var py = Y(v);
       if (panelTop != null && py < panelTop + 6) return;
       el('line', { x1: xL, x2: xR, y1: py, y2: py, stroke: C.line, 'stroke-width': 1, opacity: 0.7 }, g);
-      tx(g, side === 'right' ? xR + 5 : xL - 5, py + 3.5, fmt(v), { fill: C.muted, 'font-size': 11, 'text-anchor': side === 'right' ? 'start' : 'end' });
+      var lab = fmt(v);
+      if (lab != null) tx(g, side === 'right' ? xR + 5 : xL - 5, py + 3.5, lab, { fill: C.muted, 'font-size': 11, 'text-anchor': side === 'right' ? 'start' : 'end' });
     });
   }
   function spyPanel(svg, X, x0, x1, left, top, w, h, labelSize, ticks, keep) {
@@ -946,12 +842,13 @@
   function spyR(W) { return W < 640 ? 2.4 : 3; }
   function spyDots(Y, X, days, r, rNow, todayIn, left, w, hollowDay) {
     var out = [], li = D.d.length - 1, now = todayIn && D.spy[li] != null ? { x: X(D.last), y: Y(D.spy[li]) } : null;
-    out.under = [];
     days.forEach(function (dn) {
       var i = bsearchLE(D.d, dn); if (i < 0 || D.d[i] !== dn || D.spy[i] == null) return;
       var x = X(dn), y = Y(D.spy[i]);
       if (x < Math.max(left, r + 0.5) || x > left + w || overlaps(Y.titleBox, dotBox(x, y, r))) return;
-      if (now && Math.hypot(x - now.x, y - now.y) < rNow + 5 + r) { out.under.push(dn); return; }
+      if (now && Math.hypot(x - now.x, y - now.y) < rNow + 5 + r) {
+        return;
+      }
       if (dn === hollowDay) hollowDot(Y.dots, x, y, r); else peakDot(Y.dots, x, y, r);
       out.push(dn);
     });
@@ -987,14 +884,14 @@
   function breadthTicks(Y) { return Math.abs(Y(0) - Y(25)) >= 20 ? [0, 25, 50, 75, 100] : [0, 50, 100]; }
 
   function washLines(g, Y, left, w) {
-    var py = Y(WASH), pr = Y(REARM);
+    var py = Y(GUIDE.lo), pr = Y(GUIDE.hi);
     el('line', { x1: left, x2: left + w, y1: pr, y2: pr, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '3 4', 'stroke-opacity': 0.8 }, g);
     el('line', { x1: left, x2: left + w, y1: py, y2: py, stroke: DOT.peak, 'stroke-width': 1, 'stroke-dasharray': '5 4', 'stroke-opacity': 0.7 }, g);
   }
 
 
   function washLabel(g, Y, left, w, label, size, obstacles, top, bot) {
-    var py = Y(WASH), lw = textW(label, size) + 6, h = size + 4;
+    var py = Y(GUIDE.lo), lw = textW(label, size) + 6, h = size + 4;
     var spots = [[left + 6, py - h - 2], [left + 6, py + 2], [left + w * 0.3, py - h - 2], [left + w * 0.3, py + 2]];
     for (var i = 0; i < spots.length; i++) {
       var b = { x: spots[i][0], y: spots[i][1], w: lw, h: h };
@@ -1039,7 +936,6 @@
   }
   var lastDaily = [];
   var dotDays = {};
-  var dotDebug = {};
   function overlaps(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
   function crossLayer(svg) { return el('g', { 'pointer-events': 'none' }, svg); }
   var GEO = { c1: null, c2: null, c3: null };
@@ -1081,7 +977,7 @@
     breadthPaths(g, X, Y, T1, x0, x1, clip, lineWidth(span, narrow), false, pw);
     var obstacles = [];
     var tx0 = X(D.last), ty = Y(st.latest), ty2 = st.latest200 == null ? null : Y(st.latest200);
-    var rNow = narrow ? 5 : 6, rPk = narrow ? (span > 2600 ? 3 : 4) : 4.5, open1 = D.pct['1D'].open;
+    var rNow = narrow ? 5 : 6, rPk = narrow ? (span > 2600 ? 3 : 4) : 4.5, open1 = T1.open;
     if (todayIn) { obstacles.push(nowBox(tx0, ty, rNow)); if (ty2 != null) obstacles.push(nowBox(tx0, ty2, rNow - 1)); }
 
 
@@ -1090,7 +986,7 @@
       if (i === last || D.d[i] < x0 || D.d[i] > x1) return;
       var x = X(D.d[i]); if (x >= Math.max(L, rPk + 0.5) && x <= L + pw) cands.push({ dn: D.d[i], i: i, v: D.v[i], x: x, y: Y(D.v[i]) });
     });
-    cands.sort(function (a, b) { return a.v - b.v; });
+    cands.sort(function (a, b) { return T1.wash.vr[a.i] - T1.wash.vr[b.i]; });
     var minDx = (2 * spyR(W) + 1.5) * Math.max(1, pw / (pw2 || pw));
     var dots = thinDots(cands, rPk, obstacles.slice(), minDx);
     var rings = [];
@@ -1123,10 +1019,10 @@
       if (ty2 != null) todayLabel('200-day ' + pct1(st.latest200), ty2, C.b200l, ts - 1);
     }
 
-    var labelled = [], placed = 0, maxLabels = phone ? 4 : narrow ? 5 : 9, long = span > 240;
+    var placed = 0, maxLabels = phone ? 4 : narrow ? 5 : 9, long = span > 240;
     var eps = T1.wash.sig.map(function (i) { return { i: i, lo: episodeLow(T1, i) }; })
       .filter(function (e) { return e.lo !== last && D.d[e.lo] >= x0 && D.d[e.lo] <= x1; })
-      .sort(function (a, b) { return D.v[a.lo] - D.v[b.lo]; });
+      .sort(function (a, b) { return T1.wash.lr[a.i] - T1.wash.lr[b.i]; });
     eps.forEach(function (e) {
       if (placed >= maxLabels) return;
       var dn = D.d[e.lo], px = X(dn), py = Y(D.v[e.lo]), dd = dnDate(dn);
@@ -1149,9 +1045,9 @@
       obstacles.push(box);
       tx(lab, box.x + w / 2, box.y + s1, big, withHalo({ fill: C.white, 'font-size': s1, 'font-weight': 700, 'text-anchor': 'middle' }));
       tx(lab, box.x + w / 2, box.y + s1 + s2 + 1, small, withHalo({ fill: C.text, 'font-size': s2, 'text-anchor': 'middle' }));
-      placed++; labelled.push(dn);
+      placed++;
     });
-    washLabel(lab, Y, L, pw, 'washout line 25%', narrow ? 11 : 11.5, obstacles, mTop, mTop + mH);
+    washLabel(lab, Y, L, pw, 'washout line', narrow ? 11 : 11.5, obstacles, mTop, mTop + mH);
     var dotG = el('g', {}, svg);
     dotDays = {};
     rings.forEach(function (d) { ringDot(dotG, d.x, d.y, rPk); });
@@ -1167,8 +1063,6 @@
     lastDaily = dots.map(function (d) { return d.dn; });
     var spyDays = lastDaily.slice(); if (lastSig) spyDays.push(D.last);
     var spyShown = spyDots(spyY, X, spyDays, spyR(W), narrow ? 3.5 : 4, todayIn, L, pw, open1 && lastSig ? D.last : null);
-    dotDebug.c1 = { wash: lastDaily.map(isoOf), rings: rings.map(function (d) { return isoOf(d.dn); }), labelled: labelled.map(isoOf), spy: spyShown.map(isoOf),
-      spyUnderNow: spyShown.under.map(isoOf), now: todayIn ? isoOf(D.last) : null, nowIsWashout: lastSig, nowRing: !!(todayIn && T1.wash.active) };
     timeAxis(svg, X, ticks, H - 4, 0, W);
     var cross = crossLayer(svg);
     function set(dn) {
@@ -1197,7 +1091,7 @@
 
   function washTag(k, j) {
     var T = D.tf[k], last = T.v.length - 1;
-    if (T.sigOf[j]) return j === last && D.pct[k].open ? 'washout so far' : 'washout';
+    if (T.sigOf[j]) return j === last && T.open ? 'washout so far' : 'washout';
     if (T.ringOf[j] != null) return 'deepest close of the ' + fmtDay(T.e[T.ringOf[j]], false) + ' washout';
     var ep = episodeOf(T, j);
     return ep != null ? 'in a washout (' + (k === '1D' ? 'day ' : 'candle ') + (j - ep + 1) + ')' : '';
@@ -1227,58 +1121,42 @@
   var SPEED_L = { 20: '#A6EEF6', 50: C.light, 100: '#D2CAFF', 200: C.b200l };
   function lastIdx(v) { for (var i = v.length - 1; i >= 0; i--) if (v[i] != null) return i; return -1; }
 
-  function seriesPct(S, j, x, b) {
-    var B = S.base[b], cnt = upperBound(B.sorted, tenths(x)), n = B.sorted.length;
-    if (j != null && j >= B.first && j < S.closed && S.v[j] != null) { n--; if (tenths(S.v[j]) <= tenths(x)) cnt--; }
-    if (n <= 0 || x == null) return null;
-    var p = 100 * cnt / n, r = Math.round(p), rec = cnt === n, low = cnt === 0;
-    if (r >= 100 && !rec) r = 99;
-    if (r <= 0 && !low) r = 1;
-    return { p: p, r: r, cnt: cnt, n: n, record: rec, low: low, open: j != null && j >= S.closed, ord: low ? 'lowest' : ordinal(r) };
+  function panelPct(p, j) {
+    var latest = j >= 0 && j === lastIdx(p.lines[0].v), N = D.V.pnow[p.nk] || {}, R = D.V.p13[p.pk];
+    return { s13: latest ? rankOf(N.r13) : rankOf(R && j >= 0 ? R[j] : null), s21: latest ? rankOf(N.r21) : null, open: j >= p.closed };
   }
-  function seriesPrep(v, liveOpen, dates) {
-    var n = v.length, li = lastIdx(v), closed = liveOpen && li === n - 1 ? n - 1 : n, S = { v: v, closed: closed, base: {} };
-    Object.keys(PCT_BASES).forEach(function (b) {
-      var first = lowerBound(dates, dayNum(PCT_BASES[b].from)), vals = [];
-      for (var j = first; j < closed; j++) if (v[j] != null) vals.push(tenths(v[j]));
-      vals.sort(function (p, q) { return p - q; });
-      S.base[b] = { first: first, sorted: vals };
-    });
-    return S;
-  }
-  function panelPct(p, j) { var v = p.lines[0].v, S = p.pct; return { s13: seriesPct(S, j, v[j], 's13'), s21: seriesPct(S, j, v[j], 's21'), open: j >= S.closed }; }
-
-  var IDX_ORDER = [['SPX', 'S&P 500', 'SPY'], ['NDX', 'Nasdaq-100', 'QQQ'], ['R2000', 'Russell 2000', 'IWM']];
+  var IDX_ORDER = [['SPX', 'S&P 500', 'SPY', 'sp50', 'sp50', 'sp200'], ['NDX', 'Nasdaq-100', 'QQQ', 'ndx50', 'ndx50', 'ndx200'],
+    ['R2000', 'Russell 2000', 'IWM', 'r2k50', 'r2k50', 'r2k200']];
   function prepareStacks(P, d) {
-    var liveOpen = d.state === 'LIVE' && !!d.candles['1D'].open, T1 = P.tf['1D'];
+    var liveOpen = d.state === 'LIVE' && !!d.candles['1D'].open, T1 = P.tf['1D'], V = P.V;
     var out = { idx: [], speeds: [] };
+
+    function closedOf(v, live) { var n = v.length; return live && lastIdx(v) === n - 1 ? n - 1 : n; }
     IDX_ORDER.forEach(function (o) {
       var key = o[0], v, t, wash, e = null;
       if (key === 'SPX') { v = P.v; t = P.t; wash = T1.wash; }
       else {
         e = d.idx && d.idx[key]; if (!e) return;
         v = e.f50.map(function (x) { return x == null ? null : x / 10; }); t = e.f200.map(function (x) { return x == null ? null : x / 10; });
-        wash = washouts(v, '1D');
+        wash = washOf(V.wash[key], v.length);
       }
       var spyOff = d.spy && typeof d.spy.pct_below_record === 'number' ? -d.spy.pct_below_record : null;
       var p = { id: key, name: o[1], etf: { sym: o[2], off: key === 'SPX' ? spyOff : e.etf_off_high },
-        session: key === 'SPX' ? null : dayNum(e.session), listed: key === 'SPX' ? d.live.members_listed : e.listed,
+        session: key === 'SPX' ? null : dayNum(e.session), listed: key === 'SPX' ? d.live.members_listed : e.listed, pk: o[3], nk: o[4], nk2: o[5],
         lines: [{ v: v, color: C.fear, light: C.light, w: 0.2, label: '50-day' }, { v: t, color: C.b200, light: C.b200l, w: 0, label: '200-day' }], wash: wash };
       p.sigOf = {}; p.wash.sig.forEach(function (i) { p.sigOf[i] = 1; });
       p.ringOf = {}; p.wash.rings.forEach(function (r) { p.ringOf[r.k] = r.i; });
-      p.pct = seriesPrep(v, liveOpen && key === 'SPX', P.d); p.pct2 = seriesPrep(t, liveOpen && key === 'SPX', P.d);
+      p.closed = closedOf(v, liveOpen && key === 'SPX');
       out.idx.push(p);
     });
-    var f20 = shares(d.daily.a20, d.daily.n20), f100 = shares(d.daily.a100, d.daily.n100);
-    [[20, f20], [50, P.v], [100, f100], [200, P.t]].forEach(function (o) {
-      var p = { id: 'S' + o[0], name: o[0] + '-day', len: o[0], lines: [{ v: o[1], color: SPEED_C[o[0]], light: SPEED_L[o[0]], w: 0.2, label: o[0] + '-day' }],
+    [[20, P.f20, 'sp20'], [50, P.v, 'sp50'], [100, P.f100, 'sp100'], [200, P.t, 'sp200']].forEach(function (o) {
+      var p = { id: 'S' + o[0], name: o[0] + '-day', len: o[0], pk: o[2], nk: o[2], lines: [{ v: o[1], color: SPEED_C[o[0]], light: SPEED_L[o[0]], w: 0.2, label: o[0] + '-day' }],
         wash: o[0] === 50 ? T1.wash : null };
       p.sigOf = {}; p.ringOf = {};
       if (p.wash) { p.wash.sig.forEach(function (i) { p.sigOf[i] = 1; }); p.wash.rings.forEach(function (r) { p.ringOf[r.k] = r.i; }); }
-      p.pct = seriesPrep(o[1], liveOpen, P.d);
+      p.closed = closedOf(o[1], liveOpen);
       out.speeds.push(p);
     });
-    P.f20 = f20; P.f100 = f100;
     return out;
   }
   function stackPanels(key) { return key === 'c2' ? D.stacks.idx : D.stacks.speeds; }
@@ -1286,7 +1164,7 @@
   function pWashTag(p, j) {
     if (!p.wash) return '';
     var last = lastIdx(p.lines[0].v);
-    if (p.sigOf[j]) return j === last && p.pct.closed <= j ? 'washout so far' : 'washout';
+    if (p.sigOf[j]) return j === last && p.closed <= j ? 'washout so far' : 'washout';
     if (p.ringOf[j] != null) return 'deepest close of the ' + fmtDay(D.d[p.ringOf[j]], false) + ' washout';
     var s = p.wash.sig, w = null;
     for (var q = 0; q < s.length && s[q] <= j; q++) w = s[q];
@@ -1296,14 +1174,14 @@
     if (!p.wash) return '';
     var A = p.wash.active, last = lastIdx(p.lines[0].v);
     if (!A) return 'no washout · armed';
-    return 'washout ' + (A.i === last && p.pct.closed <= last ? 'so far' : 'since ' + fmtDay(D.d[A.i], false));
+    return 'washout ' + (A.i === last && p.closed <= last ? 'so far' : 'since ' + fmtDay(D.d[A.i], false));
   }
   function pAsOf(p) {
     var li = lastIdx(p.lines[0].v);
     return li >= 0 && li < D.d.length - 1 ? 'close of ' + fmtDay(D.d[li], false) : '';
   }
   function pctWords(R, sf) { return pctWord(R) + (R && R.low ? '' : ' percentile') + (sf || ''); }
-  function stackSoFar(p) { return p.pct.closed < p.lines[0].v.length && lastIdx(p.lines[0].v) === p.lines[0].v.length - 1 ? (closedNow() ? ' (prelim.)' : ' so far') : ''; }
+  function stackSoFar(p) { return p.closed < p.lines[0].v.length && lastIdx(p.lines[0].v) === p.lines[0].v.length - 1 ? (closedNow() ? ' (prelim.)' : ' so far') : ''; }
   function stackHead(p, L, pw, RA) {
     var right = L + pw + RA, rows = [], li = lastIdx(p.lines[0].v), R = panelPct(p, li), sf = stackSoFar(p), main = p.lines[0];
     var big = li < 0 ? '–' : pct0(main.v[li]), vW = textW(big, 22, 700), nameR = L + 2 + textW(p.name, 14, 700) + 10, o = pctWord(R.s13), tp = rankWord(R.s13);
@@ -1344,14 +1222,13 @@
     var x0 = view.x0, x1 = view.x1, span = x1 - x0, X = lin(x0, x1, L, L + pw);
     var H = spyH + N * (gap + panH) + headSum + 24;
     var svg = svgFor(holder, W, H), ticks = timeTicks(x0, x1, X, 11, tu);
-    var T1 = D.tf['1D'], last1 = D.d.length - 1, lastSig = !!T1.sigOf[last1], open1 = D.pct['1D'].open, todayIn = D.last >= x0 && D.last <= x1;
+    var T1 = D.tf['1D'], last1 = D.d.length - 1, lastSig = !!T1.sigOf[last1], open1 = T1.open, todayIn = D.last >= x0 && D.last <= x1;
     var keep2 = {}; lastDaily.forEach(function (dn) { keep2[bsearchLE(D.d, dn)] = 1; });
     var spyY = spyPanel(svg, X, x0, x1, L, 0, pw, spyH, 12, ticks, keep2), snap = [];
     var spyDays = lastDaily.slice(); if (lastSig) spyDays.push(D.last);
     var spyShown = spyDots(spyY, X, spyDays, spyR(W), wide ? 4 : 3.5, todayIn, L, pw, open1 && lastSig ? D.last : null);
     spyShown.forEach(function (dn) { snap.push({ x: X(dn), y: spyY(D.spy[bsearchLE(D.d, dn)]), dn: dn }); });
     if (todayIn && D.spy[last1] != null) snap.push({ x: X(D.last), y: spyY(D.spy[last1]), dn: D.last });
-    dotDebug[key] = { spy: spyShown.map(isoOf), panels: {} };
     var y = spyH, drawn = [];
     panelsAll.forEach(function (p) {
       var main = p.lines[0], li = lastIdx(main.v), R = panelPct(p, li), sf = stackSoFar(p);
@@ -1392,7 +1269,7 @@
           if (i === li || D.d[i] < x0 || D.d[i] > x1) return;
           var px = X(D.d[i]); if (px >= Math.max(L, rPk + 0.5) && px <= L + pw) cands.push({ j: i, v: main.v[i], x: px, y: Y(main.v[i]) });
         });
-        cands.sort(function (a, b) { return a.v - b.v; });
+        cands.sort(function (a, b) { return p.wash.vr[a.j] - p.wash.vr[b.j]; });
         kept = thinDots(cands, rPk, obs);
         p.wash.rings.forEach(function (r) {
           if (r.k === li || D.d[r.k] < x0 || D.d[r.k] > x1) return;
@@ -1404,13 +1281,11 @@
         rings.forEach(function (d) { ringDot(g, d.x, d.y, rPk); snap.push({ x: d.x, y: d.y, dn: D.d[d.j] }); });
         kept.forEach(function (d) { peakDot(g, d.x, d.y, rPk); snap.push({ x: d.x, y: d.y, dn: D.d[d.j] }); });
       }
-      dotDebug[key].panels[p.id] = { wash: kept.map(function (d) { return isoOf(D.d[d.j]) + ' ' + f1(d.v); }).sort(), rings: rings.map(function (d) { return isoOf(D.d[d.j]); }).sort(),
-        last: li >= 0 ? isoOf(D.d[li]) : null, active: !!(p.wash && p.wash.active) };
       if (lastIn) {
         var t2 = p.lines[1];
         if (t2 && t2.v[li] != null) nowDot(g, nx, Y(t2.v[li]), rNow - 1, true);
         nowDot(g, nx, ny, rNow); snap.push({ x: nx, y: ny, dn: D.d[li] });
-        if (p.wash && p.wash.active) washRing(g, nx, ny, rNow, !!p.sigOf[li] && p.pct.closed <= li);
+        if (p.wash && p.wash.active) washRing(g, nx, ny, rNow, !!p.sigOf[li] && p.closed <= li);
       }
       if (wide) {
         var cx = L + pw + RA + 14, cw = RC - 18, bot = y + panH - 4;
@@ -1475,7 +1350,7 @@
       c.appendChild(span('k', p.name + (wt === 'washout' || wt === 'washout so far' ? ' · ' + wt : '')));
       var vs = span('v', v == null ? '–' : pct0(v)); vs.style.color = main.light; c.appendChild(vs);
       if (p.lines[1] && p.lines[1].v[di] != null) c.appendChild(span('v2', pct0(p.lines[1].v[di])));
-      var R = v == null ? null : seriesPct(p.pct, di, v, 's13');
+      var R = v == null ? null : rankOf(D.V.p13[p.pk] ? D.V.p13[p.pk][di] : null);
       c.appendChild(span('pc', ' ' + pctWord(R)));
       var asOfT = di !== di0 ? 'close of ' + fmtDay(D.d[di], false) : '', tagT = wt && wt !== 'washout' && wt !== 'washout so far' ? wt : '';
       c.appendChild(span('s', v == null ? (di > li ? 'not yet (updates at the close)' : 'no reading') :
@@ -1718,67 +1593,24 @@
 
 
 
-
-
-  function kdjStep(win, x, kp, dp) {
-    var lo = x, hi = x;
-    for (var i = 0; i < win.length; i++) { if (win[i] < lo) lo = win[i]; if (win[i] > hi) hi = win[i]; }
-    var rsv = hi === lo ? 50 : (x - lo) / (hi - lo) * 100, k = (rsv + 2 * kp) / 3;
-    return { k: k, d: (k + 2 * dp) / 3 };
-  }
-  function kdjSeries(v) {
-    var n = v.length, K = new Array(n), Dd = new Array(n), J = new Array(n), k = 50, d = 50;
-    for (var i = 0; i < n; i++) {
-      var r = kdjStep(v.slice(Math.max(0, i - 8), i), v[i], k, d);
-      k = r.k; d = r.d; K[i] = k; Dd[i] = d; J[i] = 3 * k - 2 * d;
-    }
-    return { K: K, D: Dd, J: J };
-  }
-
-
-
-
-  function flipLevel(v, Q, open) {
-    var n = v.length, b = open ? n - 1 : n;
-    if (b < 1) return null;
-    var win = v.slice(Math.max(0, b - 8), b), kp = Q.K[b - 1], dp = Q.D[b - 1], rising = Q.K[n - 1] > Q.D[n - 1], lvl = null, flips = false;
-    for (var i = 0; i <= 1000; i++) {
-      var x = i / 10, r = kdjStep(win, x, kp, dp), up = r.k > r.d;
-      if (up !== rising) flips = true;
-      if (rising && up && lvl === null) lvl = x;
-      if (!rising && !up) lvl = x;
-    }
-    return flips ? lvl : null;
-  }
-  function kdjCrosses(Q) {
-    var c = {};
-    for (var i = 1; i < Q.K.length; i++) {
-      if (Q.K[i] > Q.D[i] && Q.K[i - 1] <= Q.D[i - 1]) c[i] = 'up';
-      else if (Q.K[i] < Q.D[i] && Q.K[i - 1] >= Q.D[i - 1]) c[i] = 'down';
-    }
-    return c;
-  }
-  function kOpen(k) {
-    var st = doc.stats[k];
-    if (!st || !st.open) return false;
-    return k !== '1D' || (!!doc.live.is_live && !doc.live.session_closed);
-  }
   function prepareKdj(P) {
     var out = {};
     TFS.forEach(function (k) {
-      var T = P.tf[k], n = T.v.length, Q = kdjSeries(T.v), idx = new Array(n), spy = new Array(n);
-      for (var i = 0; i < n; i++) { idx[i] = i; var di = bsearchLE(P.d, T.e[i]); spy[i] = di >= 0 ? P.spy[di] : null; }
-      Q.n = n; Q.idx = idx; Q.spy = spy; Q.open = kOpen(k); Q.cross = kdjCrosses(Q);
-      Q.peak = {}; T.peaks.forEach(function (j) { Q.peak[j] = 1; });
-      Q.rising = Q.K[n - 1] > Q.D[n - 1];
-      Q.flip = flipLevel(T.v, Q, Q.open);
+      var T = P.tf[k], R = P.V.kdj[k], n = T.v.length, idx = new Array(n), spy = new Array(n), ten = function (a) { return a.map(function (x) { return x / 10; }); };
+      var Q = { K: ten(R.K), D: ten(R.D), J: ten(R.J) };
+      for (var i = 0; i < n; i++) { idx[i] = i; var di = T.ei ? T.ei[i] : i; spy[i] = di >= 0 ? P.spy[di] : null; }
+      Q.n = n; Q.idx = idx; Q.spy = spy; Q.open = !!R.op; Q.cross = {};
+      R.xu.forEach(function (j) { Q.cross[j] = 'up'; });
+      R.xd.forEach(function (j) { Q.cross[j] = 'down'; });
+      Q.rising = !!R.up;
+      Q.flip = typeof R.fl === 'number' ? R.fl : null;
       out[k] = Q;
     });
     return out;
   }
 
 
-  var KV = {}, KN = {}, KB = {}, kDebug = {}, kPending = {}, kRaf = false;
+  var KV = {}, KN = {}, KB = {}, kPending = {}, kRaf = false;
   function kPad(span) { return Math.max(0.9, span * 0.02); }
   function kHi(k, span) { return KN[k] - 1 + kPad(span); }
   function kLatestSpan(k, x0) { var b = KN[k] - 1 - x0; return 0.9 >= 0.02 * (b + 0.9) ? b + 0.9 : b / 0.98; }
@@ -1972,7 +1804,7 @@
     var lg = $('lg3'); clear(lg);
     lg.appendChild(legendItem('lg-bar', '50-day breadth %'));
     lg.appendChild(legendItem('lg-pk', 'washout on that candle size (same candle on SPY)'));
-    lg.appendChild(legendItem('lg-wash', 'washout line 25%'));
+    lg.appendChild(legendItem('lg-wash', 'washout line'));
     lg.appendChild(legendItem('lg-ln lg-k', 'K'));
     lg.appendChild(legendItem('lg-ln lg-d', 'D'));
     lg.appendChild(legendItem('lg-ln lg-j', 'J'));
@@ -2115,7 +1947,6 @@
       if (x1 > x0) el('rect', { x: x0.toFixed(1), y: top, width: Math.max(1, x1 - x0).toFixed(1), height: h, fill: C.fear, 'fill-opacity': 0.2 }, g);
     }
     function grid(g, top, h) { ticks.forEach(function (t) { el('line', { x1: t.x, x2: t.x, y1: top, y2: top + h, stroke: C.line, 'stroke-width': 1, opacity: 0.7 }, g); }); }
-    var dbg = { k: k, n: n, open: open, x0: v.x0, x1: v.x1, ppc: ppc, L: L, pw: pw, spyH: spyH, fH: fH, kH: kH };
 
 
     var rPk = narrow ? 3.2 : 3.8, pkIn = T.peaks.filter(function (j) { return j >= a && j <= b && j < last; }), keepPk = {};
@@ -2170,7 +2001,7 @@
       });
       if (best) {
         tx(gS, right, best.base, pl, withHalo({ fill: C.white, 'font-size': pfs, 'font-weight': 700, 'text-anchor': 'end' }));
-        dbg.priceBox = best.box; dbg.spyDot = { x: sx, y: sy, r: rS }; obsS.push(best.box);
+        obsS.push(best.box);
       }
     }
     var dotObsS = obsS.slice();
@@ -2202,8 +2033,8 @@
         stroke: C.light, 'stroke-width': 1.1, 'stroke-dasharray': '2 1.5' }, gb);
     }
 
-    el('line', { x1: L, x2: L + pw, y1: Yf(REARM), y2: Yf(REARM), stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '3 4' }, gF);
-    var ay = Yf(WASH);
+    el('line', { x1: L, x2: L + pw, y1: Yf(GUIDE.hi), y2: Yf(GUIDE.hi), stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '3 4' }, gF);
+    var ay = Yf(GUIDE.lo);
     el('line', { x1: L, x2: L + pw, y1: ay, y2: ay, stroke: DOT.peak, 'stroke-width': 1, 'stroke-dasharray': '5 4', 'stroke-opacity': 0.8 }, gF);
 
     function barHit(bx) {
@@ -2214,12 +2045,11 @@
     var flipTxt = kFlipText(k, Q);
     var titleF = paneTitle(gF, L + 7, fTop + 13, '50-DAY BREADTH %', flipTxt, KC.yel);
 
-    var alab = 'washout 25%', aw = textW(alab, 11) + 6;
+    var alab = 'washout line', aw = textW(alab, 11) + 6;
     var abox = { x: L + 6, y: ay - 16, w: aw, h: 14 }, obsF = [titleF];
     if (overlaps(abox, titleF) || abox.y < fTop + 2) abox.y = ay + 2;
     var aShow = abox.y + abox.h <= fTop + fH - 1, gAl = el('g', {}, gF);
     if (aShow) obsF.push(abox);
-    dbg.flipText = flipTxt;
 
 
     var gFl = el('g', {}, gF), gFd = el('g', {}, gF), cands = [], dotObs = [];
@@ -2227,18 +2057,22 @@
       var x = X(j); if (x < L + rPk + 0.5 || x > L + pw - rPk - 0.5) return;
       cands.push({ j: j, v: T.v[j], x: x, y: Math.max(fTop + rPk + 1.5, Yf(T.v[j])) });
     });
-    cands.sort(function (p, q) { return p.v - q.v; });
-    var edgeCut = pkIn.filter(function (j) { var x = X(j); return x < L + rPk + 0.5 || x > L + pw - rPk - 0.5; });
-    var keptF = thinDots(cands, rPk, obsF), spyPk = [], spyUnder = [], spyHidden = [], spyKept = [];
+    cands.sort(function (p, q) { return T.wash.vr[p.j] - T.wash.vr[q.j]; });
+    var keptF = thinDots(cands, rPk, obsF), spyKept = [];
     keptF.forEach(function (d) {
       peakDot(gFd, d.x, d.y, rPk); obsF.push(dotBox(d.x, d.y, rPk)); dotObs.push(dotBox(d.x, d.y, rPk)); snap.push({ x: d.x, y: d.y, dn: d.j });
-      if (Q.spy[d.j] == null) { spyHidden.push(d.j); return; }
+      if (Q.spy[d.j] == null) {
+        return;
+      }
       var y2 = Ys(Q.spy[d.j]), bx = dotBox(d.x, y2, rPk);
-      if (spyNow && Math.hypot(d.x - spyNow.x, y2 - spyNow.y) < spyNow.r + rPk + 0.5) spyUnder.push(d.j);
-      if (dotObsS.some(function (o) { return overlaps(o, bx); }) || spyKept.some(function (o) { return Math.hypot(o.x - d.x, o.y - y2) < 2 * rPk + 0.5; })) { spyHidden.push(d.j); return; }
+      if (dotObsS.some(function (o) { return overlaps(o, bx); }) || spyKept.some(function (o) { return Math.hypot(o.x - d.x, o.y - y2) < 2 * rPk + 0.5; })) {
+        return;
+      }
       spyKept.push({ x: d.x, y: y2, j: d.j });
     });
-    spyKept.forEach(function (d) { peakDot(gSd, d.x, d.y, rPk); obsS.push(dotBox(d.x, d.y, rPk)); snap.push({ x: d.x, y: d.y, dn: d.j }); spyPk.push(d.j); });
+    spyKept.forEach(function (d) {
+      peakDot(gSd, d.x, d.y, rPk); obsS.push(dotBox(d.x, d.y, rPk)); snap.push({ x: d.x, y: d.y, dn: d.j });
+    });
 
     if (lastIn && T.sigOf[last]) {
       var lx = X(last), lyy = Math.max(fTop + rPk + 3, Yf(T.v[last]));
@@ -2265,18 +2099,12 @@
       el('rect', { x: tagB.x.toFixed(1), y: tagB.y.toFixed(1), width: tw.toFixed(1), height: 15, rx: 2, fill: KC.yel }, gTag);
       tx(gTag, tagB.x + tw / 2, tagY + 3.8, tagT, { fill: C.bg, 'font-size': 11, 'font-weight': 700, 'text-anchor': 'middle' });
       tagB.full = true; obsF.push(tagB);
-      dbg.flipY = tagY; dbg.flipTag = tagT; dbg.flipSide = tagB === tagLft ? 'L' : 'R';
     }
     if (!aShow) obsF = obsF.filter(function (o) { return o !== abox; });
     if (aShow) {
       el('rect', { x: abox.x, y: abox.y, width: abox.w, height: abox.h, fill: C.panel, 'fill-opacity': 0.85 }, gAl);
       tx(gAl, abox.x + 3, abox.y + 11, alab, { fill: '#E8C547', 'font-size': 11 });
     }
-    dbg.alarmBox = aShow ? { x: abox.x, y: abox.y, w: abox.w, h: abox.h } : null;
-    var jl = function (j) { return isoOf(T.s[j]) + (T.s[j] !== T.e[j] ? '..' + isoOf(T.e[j]) : '') + ' ' + f1(T.v[j]); };
-    var byJ = function (p, q) { return p - q; };
-    dbg.peaks = { rule: pkIn.slice().sort(byJ).map(jl), wash: keptF.map(function (d) { return d.j; }).sort(byJ).map(jl), spy: spyPk.sort(byJ).map(jl),
-      spyUnderNow: spyUnder.sort(byJ).map(jl), spyHidden: spyHidden.sort(byJ).map(jl), edgeCut: edgeCut.map(jl), r: rPk };
 
     var rX = open && lastIn && col.w <= 16 && col.x - 1 < L + pw - 2 ? col.x - 1 : null;
     var labS = kInsideLabels(gS, pt.ticks.map(function (t) { return { y: Ys(t), s: t.toFixed(pt.dec) }; }), L, pw, obsS, kLineHit(X, Ys, Q.spy, a, b, 2), 0, spyH, false, rX);
@@ -2304,7 +2132,6 @@
         el('circle', { cx: gxx.toFixed(1), cy: yy.toFixed(1), r: gr, fill: C.bg, stroke: s[1], 'stroke-width': 1.7 }, gG);
         ghostY[s[0]] = yy; snap.push({ x: gxx, y: yy, dn: last }); obsK.push(dotBox(gxx, yy, gr + 1));
       });
-      dbg.ghostDots = 3;
     }
 
 
@@ -2339,8 +2166,6 @@
     obsK.push(titleK);
     var labK = kInsideLabels(gK, [100, 50, 0].map(function (t) { return { y: Yk(t), s: String(t) }; }), L, pw, obsK,
       anyHit([kLineHit(X, Yk, Q.K, a, b, 1.5), kLineHit(X, Yk, Q.D, a, b, 1.5)]), kTop, kTop + kH, true, rX);
-    dbg.yLabels = { spy: labS.map(function (o) { return o.s + o.side; }), fear: labF.map(function (o) { return o.s + o.side; }), kdj: labK.map(function (o) { return o.s + o.side; }) };
-    dbg.crosses = crossShown.length; dbg.crossList = crossShown; dbg.crossOnLast = Q.cross[last] || null;
 
 
     ticks.forEach(function (t) {
@@ -2374,8 +2199,6 @@
       bt.disabled = z === 'reset' ? !v.custom : z === 'in' ? s <= lim.min + 0.5 : s >= lim.max - 1e-6;
     });
     var ww = kWinWords(k); if (B.win.textContent !== ww) B.win.textContent = ww;
-    dbg.ticks = ticks.map(function (t) { return t.label; }); dbg.H = H; dbg.W = W;
-    kDebug[k] = dbg;
   }
   function kReadout(k, j, picked) {
     var B = KB[k], Q = D.kdj[k], T = D.tf[k], ro = B.ro, isLast = j === Q.n - 1;
@@ -2407,7 +2230,7 @@
     if (!doc || !D || !D.kdj) return;
     var todo = Object.keys(kPending); kPending = {};
     try { todo.forEach(drawKdj); $('kdjErr').hidden = true; renderKChips(); }
-    catch (e) { var er = $('kdjErr'); er.hidden = false; er.textContent = 'The KDJ section could not be drawn (' + e.message + ').'; }
+    catch (e) { var er = $('kdjErr'); er.hidden = false; er.textContent = 'The KDJ section could not be drawn.'; }
   }
   function initKdjBlocks() {
     TFS.forEach(function (k) {
@@ -2420,14 +2243,14 @@
   }
 
 
-  var GZ = {"cutoff":"2026-10-01","drops":["2015-08-21","2016-01-13","2018-02-08","2018-04-02","2018-10-24","2019-06-03","2020-02-27","2020-09-08","2021-03-08","2022-01-20","2023-10-26","2024-08-02","2025-03-10","2026-03-27","2026-07-29"],"generated":"2026-10-03","source":"edge_study (official TradingView breadth, Yahoo QQQ/IWM/SPY, VIX), 2013+","storms":{"breaks":10,"down":{"days":508,"rv":24.1,"vix":27.1},"excess_pct":20,"up":{"days":2930,"rv":12.5,"vix":16.1}},"thin":{"bands":[{"days":371,"drop_days":136,"hi":60.0,"label":"under 60%","lo":0,"pct":36.7},{"days":755,"drop_days":172,"hi":70.0,"label":"60-70%","lo":60.0,"pct":22.8},{"days":1322,"drop_days":107,"hi":100,"label":"over 70%","lo":70.0,"pct":8.1}],"bands_2021":[{"days":221,"drop_days":54,"hi":60.0,"label":"under 60%","lo":0,"pct":24.4},{"days":306,"drop_days":98,"hi":70.0,"label":"60-70%","lo":60.0,"pct":32.0},{"days":325,"drop_days":20,"hi":100,"label":"over 70%","lo":70.0,"pct":6.2}],"base_pct":17.0,"base_pct_2021":20.2,"broad_from":70.0,"days_known":2448,"drop_pct":-10.0,"near_pct":-5.0,"spans":[["2014-10-07","2014-10-07"],["2014-10-09","2014-10-09"],["2014-10-21","2014-10-23"],["2015-06-29","2015-07-10"],["2015-07-27","2015-07-28"],["2015-08-11","2015-08-14"],["2015-08-18","2015-08-19"],["2015-10-16","2015-10-20"],["2015-10-22","2015-10-30"],["2015-11-04","2015-11-30"],["2015-12-02","2016-01-05"],["2016-03-29","2016-04-08"],["2016-04-12","2016-04-25"],["2016-05-25","2016-05-26"],["2016-06-09","2016-06-10"],["2016-06-23","2016-06-23"],["2016-07-07","2016-07-08"],["2016-09-09","2016-09-09"],["2016-10-28","2016-10-28"],["2016-11-01","2016-11-04"],["2017-10-31","2017-10-31"],["2017-11-02","2017-11-02"],["2017-11-14","2017-11-14"],["2018-05-07","2018-05-09"],["2018-05-15","2018-05-15"],["2018-05-21","2018-05-21"],["2018-05-29","2018-05-31"],["2018-06-25","2018-07-05"],["2018-09-06","2018-09-06"],["2018-09-10","2018-09-17"],["2018-09-25","2018-09-25"],["2018-10-01","2018-10-03"],["2018-10-05","2018-10-09"],["2018-10-16","2018-10-17"],["2019-03-13","2019-03-14"],["2019-10-03","2019-10-03"],["2019-10-08","2019-10-08"],["2020-05-08","2020-05-11"],["2020-05-18","2020-05-19"],["2020-05-21","2020-05-22"],["2021-10-07","2021-10-07"],["2021-11-26","2021-12-02"],["2021-12-06","2021-12-10"],["2021-12-16","2021-12-17"],["2021-12-21","2021-12-22"],["2022-01-05","2022-01-06"],["2023-05-03","2023-05-03"],["2023-05-16","2023-05-16"],["2023-05-25","2023-05-25"],["2023-11-03","2023-11-06"],["2023-11-08","2023-11-09"],["2024-06-03","2024-06-03"],["2024-09-20","2024-09-23"],["2024-09-25","2024-09-25"],["2024-10-07","2024-10-08"],["2024-10-23","2024-10-24"],["2024-10-28","2024-10-28"],["2024-10-30","2024-11-05"],["2024-11-15","2024-11-15"],["2024-11-19","2024-11-20"],["2024-12-13","2024-12-31"],["2025-01-03","2025-01-08"],["2025-01-16","2025-01-16"],["2025-01-27","2025-01-27"],["2025-01-29","2025-01-29"],["2025-05-13","2025-05-13"],["2025-05-15","2025-05-15"],["2025-05-21","2025-05-22"],["2025-05-28","2025-06-03"],["2025-06-05","2025-06-05"],["2025-06-20","2025-06-20"],["2025-07-31","2025-08-07"],["2025-08-11","2025-08-11"],["2025-08-26","2025-08-26"],["2025-09-02","2025-09-03"],["2025-09-09","2025-09-10"],["2025-09-12","2025-09-25"],["2025-09-30","2025-10-01"],["2025-10-08","2025-10-20"],["2025-10-29","2025-11-14"],["2025-11-24","2025-12-04"],["2025-12-08","2025-12-16"],["2025-12-18","2025-12-19"],["2025-12-31","2026-01-05"],["2026-01-08","2026-01-08"],["2026-01-12","2026-01-26"],["2026-01-28","2026-02-04"],["2026-02-06","2026-02-11"],["2026-02-18","2026-02-20"],["2026-02-24","2026-03-02"],["2026-03-04","2026-03-05"],["2026-03-09","2026-03-11"],["2026-03-17","2026-03-17"],["2026-04-08","2026-05-26"],["2026-05-29","2026-06-04"],["2026-06-08","2026-06-08"],["2026-06-11","2026-06-22"],["2026-06-25","2026-06-25"],["2026-06-30","2026-06-30"],["2026-09-09","2026-09-14"],["2026-09-17","2026-10-01"]],"stretches":{"drop":5,"n":13,"rows":[{"days":5,"drop":false,"drop_days":0,"end":"2014-10-23","resolved":true,"start":"2014-10-07"},{"days":100,"drop":true,"drop_days":66,"end":"2016-11-04","resolved":true,"start":"2015-06-29"},{"days":3,"drop":false,"drop_days":0,"end":"2017-11-14","resolved":true,"start":"2017-10-31"},{"days":32,"drop":true,"drop_days":16,"end":"2018-10-17","resolved":true,"start":"2018-05-07"},{"days":2,"drop":false,"drop_days":0,"end":"2019-03-14","resolved":true,"start":"2019-03-13"},{"days":2,"drop":false,"drop_days":0,"end":"2019-10-08","resolved":true,"start":"2019-10-03"},{"days":6,"drop":false,"drop_days":0,"end":"2020-05-22","resolved":true,"start":"2020-05-08"},{"days":17,"drop":true,"drop_days":16,"end":"2022-01-06","resolved":true,"start":"2021-10-07"},{"days":3,"drop":false,"drop_days":0,"end":"2023-05-25","resolved":true,"start":"2023-05-03"},{"days":4,"drop":false,"drop_days":0,"end":"2023-11-09","resolved":true,"start":"2023-11-03"},{"days":1,"drop":false,"drop_days":0,"end":"2024-06-03","resolved":true,"start":"2024-06-03"},{"days":35,"drop":true,"drop_days":16,"end":"2025-01-29","resolved":true,"start":"2024-09-20"},{"days":176,"drop":true,"drop_days":22,"end":"2026-10-01","resolved":false,"start":"2025-05-13"}]},"thin_below":60.0,"window":63},"thrust":{"arm":25,"base_median":3.0,"base_since":"2013-10-14","base_up_pct":65.0,"edge_hi":5.0,"edge_lo":3.5,"events":[{"date":"2014-02-24","iwm63":-3.6,"r2fi":56.7},{"date":"2014-06-05","iwm63":1.5,"r2fi":57.6},{"date":"2014-10-28","iwm63":4.0,"r2fi":63.5},{"date":"2015-10-08","iwm63":-9.7,"r2fi":55.6},{"date":"2016-03-02","iwm63":9.5,"r2fi":60.1},{"date":"2016-11-09","iwm63":13.0,"r2fi":55.3},{"date":"2019-01-18","iwm63":5.6,"r2fi":57.0},{"date":"2019-09-10","iwm63":6.0,"r2fi":58.0},{"date":"2020-04-29","iwm63":10.6,"r2fi":69.5},{"date":"2020-10-07","iwm63":30.5,"r2fi":59.8},{"date":"2022-10-28","iwm63":5.0,"r2fi":61.5},{"date":"2023-11-14","iwm63":15.0,"r2fi":60.8},{"date":"2024-05-09","iwm63":0.6,"r2fi":56.1},{"date":"2025-05-12","iwm63":9.4,"r2fi":66.2},{"date":"2026-04-09","iwm63":13.3,"r2fi":57.6}],"fire":55,"median":6.0,"n":15,"rally_median":-0.4,"rearm":63,"up":13,"window":15}};
-
 
 
 
 
   var GC = { amber: '#E8A33D', yel: '#FFD84D', green: '#26A69A', orange: '#F0883E', red: '#EF5350', blue: '#3987E5', light: '#8EC0FA',
              bar: '#3A3F52', grey: '#8A8E99', ink: '#131722', dim: '#5D6270' };
+  var CHIP_C = { amber: GC.amber, grey: GC.grey, green: GC.green, dim: GC.dim, yel: GC.yel, orange: GC.orange };
+  var NA_DRAW = 'Not available in this build (the data looked broken).';
   var GZS = { thin: null, thrust: null, storms: null };
   var GZW = 0;
   var gzUid = 0;
@@ -2437,9 +2260,9 @@
     return 'url(#' + id + ')';
   }
   function gzNum(v) { return typeof v === 'number' && isFinite(v); }
-  function gzLast(a, upto) { for (var i = upto == null ? a.length - 1 : upto; i >= 0; i--) if (gzNum(a[i])) return i; return -1; }
   function gzQ(card, k) { return $(card).querySelector('[data-g="' + k + '"]'); }
   function gzText(card, k, s) { var n = gzQ(card, k); if (n) n.textContent = s == null ? '' : s; return n; }
+  function gzTexts(card, G, keys) { keys.forEach(function (k) { gzText(card, k, G[k]); }); }
   function gzParts(node, parts) {
     clear(node);
     parts.forEach(function (p) { if (p && p[1]) node.appendChild(span(p[0], p[1])); });
@@ -2453,192 +2276,58 @@
     if (!ok) { gzQ(card, 'chip').hidden = true; gzText(card, 'asof', ''); }
   }
   function gzDay(iso, yr) { return fmtDay(dayNum(iso), !!yr); }
-  function gzOneIn(p) { return Math.max(1, Math.round(100 / p)); }
-  function gzInt(v) { return Math.round(v).toLocaleString('en-US'); }
-  function gzS(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
-  function gzWord(n) { return ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n] || String(n); }
-  function gzDates(list) {
-    var one = list.every(function (s) { return s.slice(0, 4) === list[0].slice(0, 4); });
-    var p = list.map(function (s) { return gzDay(s, !one); });
-    var t = p.length > 1 ? p.slice(0, -1).join(', ') + ' and ' + p[p.length - 1] : p[0] || '';
-    return one && p.length ? t + ', ' + list[0].slice(0, 4) : t;
+  function inRuns(runs, j, excl) { for (var k = 0; k < runs.length; k++) if (j >= runs[k][0] && (excl ? j < runs[k][1] : j <= runs[k][1])) return true; return false; }
+
+
+  function thinText(G) {
+    var c = 'gzThin';
+    gzChip(c, G.state, CHIP_C[G.chip] || GC.grey);
+    gzTexts(c, G, ['sub', 'asof', 'big', 'unit', 'l1', 'l2', 'cap', 'ct', 'how', 'now', 'src']);
   }
-
-  function gzHigh52(q) {
-    var n = q.length, out = new Array(n), dq = [], cnt = 0;
-    for (var i = 0; i < n; i++) {
-      if (gzNum(q[i])) { while (dq.length && q[dq[dq.length - 1]] <= q[i]) dq.pop(); dq.push(i); cnt++; }
-      if (i >= 252 && gzNum(q[i - 252])) cnt--;
-      while (dq.length && dq[0] <= i - 252) dq.shift();
-      out[i] = cnt >= 126 && dq.length ? q[dq[0]] : null;
-    }
-    return out;
-  }
-
-  function gzCal() { return doc.daily.d.concat(Array.isArray(doc.sessions_ahead) ? doc.sessions_ahead : []); }
-  function gzCalAt(cal, i) {
-    if (i < cal.length) return cal[i];
-    var dn = dayNum(cal[cal.length - 1]);
-    for (var k = cal.length - 1; k < i; k++) dn = nextSession(dn);
-    return isoOf(dn);
-  }
-
-
-  function gzInputs() {
-    var n = doc.daily.d.length, I = doc.idx || {}, nd = I.NDX, r2 = I.R2000;
-    function arr(a) { return Array.isArray(a) && a.length === n; }
-    return {
-      thin: !!(nd && arr(nd.f200) && arr(nd.etf_c) && gzLast(nd.f200) >= 0),
-      thrust: !!(r2 && arr(r2.f50) && arr(r2.etf_c) && gzLast(r2.f50) >= 0 && Array.isArray(doc.sessions_ahead)),
-      storms: arr(doc.daily.spy) && n >= 260
-    };
-  }
-
-
-  var THIN_C = { 'THIN RALLY': GC.amber, 'MIXED': GC.grey, 'BROAD RALLY': GC.green, 'PULLBACK': GC.dim, 'NO QQQ PRICE': GC.dim };
-  function thinState() {
-    var nd = doc.idx.NDX, d = doc.daily.d, n = d.length, f = nd.f200, q = nd.etf_c, T = GZ.thin, cutDn = dayNum(GZ.cutoff), i;
-    var nq = gzLast(f), lq = gzLast(q, nq), hi = gzHigh52(q);
-
-    var noQ = lq < 0 || hi[lq] == null;
-    var ndth = f[nq] / 10, offRaw = noQ ? null : (q[lq] / hi[lq] - 1) * 100, off = noQ ? null : f1(offRaw);
-    var near = !noQ && offRaw > T.near_pct;
-
-    var sp = T.spans.map(function (s) { return [dayNum(s[0]), dayNum(s[1])]; }), flag = new Array(n), si = 0;
-    for (i = 0; i < n; i++) {
-      var dn = D.d[i];
-      if (i > nq) { flag[i] = false; continue; }
-      if (dn <= cutDn) { while (si < sp.length && sp[si][1] < dn) si++; flag[i] = si < sp.length && sp[si][0] <= dn; }
-      else flag[i] = gzNum(f[i]) && gzNum(q[i]) && hi[i] != null && f[i] < T.thin_below * 10 && (q[i] / hi[i] - 1) * 100 > T.near_pct;
-    }
-    var band = -1;
-    T.bands.forEach(function (b, k) { if (ndth >= b.lo && (ndth < b.hi || (k === T.bands.length - 1 && ndth <= b.hi))) band = k; });
-    var state = noQ ? 'NO QQQ PRICE' : !near ? 'PULLBACK' : ndth < T.thin_below ? 'THIN RALLY' : ndth < T.broad_from ? 'MIXED' : 'BROAD RALLY';
-    var w0 = Math.max(0, nq - 251), on = 0, flagged = [];
-    for (i = w0; i <= nq; i++) if (flag[i]) on++;
-    for (i = 0; i <= nq; i++) if (flag[i]) flagged.push(i);
-
-    var st0 = null, stN = 0;
-    flagged.forEach(function (j, k) { if (k === 0 || j - flagged[k - 1] > T.window) { st0 = j; stN = 0; } stN++; });
-    var stretchOn = !noQ && flagged.length > 0 && nq - flagged[flagged.length - 1] <= T.window;
-
-
-    var drops = GZ.drops.slice(), lastD = drops.length ? dayNum(drops[drops.length - 1]) : null, armed = lastD == null, after = [];
-    for (i = 0; i < n; i++) {
-      if (!gzNum(q[i]) || hi[i] == null) continue;
-      if (lastD != null && D.d[i] < lastD) continue;
-      if (q[i] >= hi[i]) armed = true;
-      else if (armed && (q[i] / hi[i] - 1) * 100 <= T.drop_pct) { if (D.d[i] > cutDn) after.push(d[i]); armed = false; }
-    }
-    var dropIdx = {};
-    drops.concat(after).forEach(function (s) { var j = bsearchLE(D.d, dayNum(s)); if (j >= 0 && D.d[j] === dayNum(s)) dropIdx[j] = 1; });
-    var stretch = null;
-    if (stretchOn) {
-      stretch = { start: d[st0], days: stN, sessions: nq - st0 + 1, drops: drops.concat(after).filter(function (s) { return s >= d[st0] && s <= d[nq]; }) };
-    }
-    return { ok: true, state: state, noQ: noQ, ndth: ndth, offHigh: off, near: near, band: band, nq: nq, lq: lq, asOf: nd.session || d[nq],
-      flag: flag, hi: hi, q: q, f: f, on252: on, len252: nq - w0 + 1, flagged: flagged, stretch: stretch, dropsAfter: after, dropOpen: !armed, dropIdx: dropIdx };
-  }
-  function thinText(S) {
-    var c = 'gzThin', T = GZ.thin, B = T.bands, B21 = T.bands_2021 || [], drop = Math.abs(T.drop_pct), nearW = Math.abs(T.near_pct);
-    var atHigh = !S.noQ && S.offHigh >= -0.05, offW = S.noQ ? '' : atHigh ? 'at its 52-week high' : Math.abs(S.offHigh).toFixed(1) + '% below its 52-week high';
-    gzChip(c, S.state, THIN_C[S.state]);
-    gzText(c, 'sub', 'When QQQ is near its high but few Nasdaq-100 stocks are above their 200-day, a ' + drop + '% drop has followed more often');
-    gzText(c, 'asof', 'as of the ' + gzDay(S.asOf) + ' close · Nasdaq-100 breadth and QQQ update after each close');
-    gzText(c, 'big', pct1(S.ndth));
-    gzText(c, 'unit', 'of Nasdaq-100 stocks above their 200-day');
-    gzText(c, 'l1', S.noQ ? 'QQQ: prices missing in this update' : 'QQQ ' + offW + (S.near ? '' : ' (more than ' + nearW + '%: not a near-high day)'));
-    gzText(c, 'l2', S.noQ ? 'Thin-rally days: not available without QQQ prices' : 'Thin-rally days: ' + S.on252 + ' of the last ' + S.len252 + ' sessions');
-    gzText(c, 'cap', 'How often a day with QQQ near its high was followed by a ' + drop + '% drop within 3 months, by Nasdaq-100 breadth. Bars: 2013+' +
-      (B21.length ? ' · small figures: since 2021' : '') + (gzNum(T.base_pct) ? ' · all near-high days: ' + Math.round(T.base_pct) + '%' : ''));
-    gzText(c, 'ct', S.noQ ? '' : 'QQQ since ' + doc.daily.d[0].slice(0, 4) + ' (log scale) · red dot = QQQ first closed ' + drop + '% under its 52-week high · amber strip = thin-rally days');
-
-
-    var rp = function (x) { return Math.round(x.pct) + '%'; }, how = 'Plain counts, not a forecast. When QQQ was near its high, a ' + drop +
-      '% drop followed within 3 months on ' + rp(B[0]) + ' of days with breadth under ' + T.thin_below + '%, against ' + rp(B[B.length - 1]) +
-      ' with breadth over ' + T.broad_from + '% (2013+).';
-    if (B21.length === B.length) {
-      var p21 = '(' + B21.map(rp).join(' / ') + ')', last21 = B21[B21.length - 1].pct;
-      var broadBest = B21.every(function (x, k) { return k === B21.length - 1 || x.pct > last21; });
-      var midWorst = B21.length === 3 && B21[1].pct > B21[0].pct && B21[1].pct > B21[2].pct;
-      how += midWorst && broadBest ? ' Since 2021 the middle band did worst ' + p21 + ', so the steady part is that broad rallies rarely broke.' :
-        broadBest ? ' Since 2021: ' + p21.slice(1, -1) + ', so the steady part is that broad rallies rarely broke.' : ' Since 2021: ' + p21.slice(1, -1) + '.';
-    }
-    gzText(c, 'how', how + ' ' + T.stretches.n + ' separate stretches, ' + T.stretches.drop + ' led to a drop. Context for sizing risk, not a sell signal.');
-    var b = B[S.band] || null, bp = b ? Math.round(b.pct) + '%' : '–', b21 = B21[S.band] ? ' (' + Math.round(B21[S.band].pct) + '% since 2021)' : '', now;
-    var breadthW = pct1(S.ndth) + ' of Nasdaq-100 stocks are above their 200-day';
-    if (S.state === 'THIN RALLY') {
-      now = 'QQQ is ' + offW + ' and only ' + breadthW + '.';
-      if (S.stretch) {
-        var sd = S.stretch.drops;
-        now += ' This thin stretch began ' + gzDay(S.stretch.start, true) + ' and ' + (sd.length ? 'has already seen ' + gzWord(sd.length) + ' ' + drop + '% drop' +
-          (sd.length === 1 ? '' : 's') + ' (' + gzDates(sd) + ').' : 'has not seen a ' + drop + '% drop yet.');
-      }
-    } else if (S.state === 'MIXED') now = 'QQQ is ' + offW + ' and ' + breadthW + ': the middle band, not a thin rally. A ' + drop +
-      '% drop followed within 3 months on ' + bp + ' of days like this since 2013' + b21 + '.';
-    else if (S.state === 'BROAD RALLY') now = 'QQQ is ' + offW + ' and ' + breadthW + ': a broad rally. A ' + drop +
-      '% drop followed within 3 months on only ' + bp + ' of days like this since 2013' + b21 + '.';
-    else if (S.state === 'PULLBACK') now = 'QQQ is ' + Math.abs(S.offHigh).toFixed(1) + '% below its 52-week high, more than the ' + nearW + '% these counts cover, so they do not apply today. ' +
-      (S.dropsAfter.length && S.dropOpen ? 'It closed ' + drop + '% under that high on ' + gzDay(S.dropsAfter[S.dropsAfter.length - 1], true) + '; Nasdaq-100 breadth is ' + pct1(S.ndth) + '.' :
-        'They come back once QQQ is within ' + nearW + '% of its high; Nasdaq-100 breadth is ' + pct1(S.ndth) + ' now.');
-    else now = 'QQQ prices are missing in this update, so the card cannot tell if QQQ is near its high. Nasdaq-100 breadth is ' + pct1(S.ndth) +
-      (b ? ' (the ' + b.label + ' band)' : '') + '.';
-    gzText(c, 'now', now);
-    gzText(c, 'src', 'Why counts, not a percentage: a fitted “chance of a drop” model, replayed day by day since 2016, was badly calibrated. ' +
-      'The same check on the S&P 500 found nothing. Near the high means QQQ within ' + nearW + '% of its 52-week high (its highest close of the last 252 sessions). In the bars, a ' + drop +
-      '% drop means QQQ traded at least ' + drop + '% under that day’s close at some point in the next 3 months (63 sessions). History: ' +
-      'TradingView’s official Nasdaq-100 breadth (NDTH) to ' + gzDay(GZ.cutoff, true) + '; after it, our live count of today’s members. ' +
-      'QQQ closes are split-adjusted, not dividend-adjusted.');
-  }
-  function drawThinBars(S) {
-    var holder = gzQ('gzThin', 'mini'), W = Math.max(240, Math.round(holder.clientWidth)), ph = gzPhone(), B = GZ.thin.bands, cur = S.band;
+  function drawThinBars(G) {
+    var holder = gzQ('gzThin', 'mini'), W = Math.max(240, Math.round(holder.clientWidth)), ph = gzPhone(), B = G.bars, cur = G.cur, near = !!G.near;
     var hiP = Math.max(40, Math.max.apply(null, B.map(function (b) { return b.pct; })) * 1.08), col = [GC.amber, GC.grey, GC.green], svg, g;
-    var B21 = GZ.thin.bands_2021 || [], drop = Math.abs(GZ.thin.drop_pct);
-    function barFill(k) { return k === cur && S.near ? col[Math.min(k, 2)] : GC.bar; }
-    function since21(k) { return B21[k] ? 'since 2021: ' + Math.round(B21[k].pct) + '%' : ''; }
-    function tip(k) {
-      var b = B[k], t = gzInt(b.days) + ' near-high days since 2013, ' + gzInt(b.drop_days) + ' followed by a ' + drop + '% drop';
-      return B21[k] ? t + '; since 2021: ' + gzInt(B21[k].days) + ' days, ' + gzInt(B21[k].drop_days) + ' followed by one' : t;
-    }
+    var has21 = B.some(function (b) { return b.pct21 != null; });
+    function barFill(k) { return k === cur && near ? col[Math.min(k, 2)] : GC.bar; }
+    function since21(k) { return B[k].pct21 != null ? 'since 2021: ' + Math.round(B[k].pct21) + '%' : ''; }
     if (ph) {
-      var rowH = B21.length ? 42 : 30, lw = 74, H = B.length * rowH + 4;
+      var rowH = has21 ? 42 : 30, lw = 74, H = B.length * rowH + 4;
       svg = svgFor(holder, W, H); g = el('g', {}, svg);
-      var tagW = textW('37%', 13, 700) + 6 + textW(S.near ? '← now' : '← breadth now', 11.5) + 4, bw = W - lw - 8 - tagW;
+      var tagW = textW('37%', 13, 700) + 6 + textW(near ? '← now' : '← breadth now', 11.5) + 4, bw = W - lw - 8 - tagW;
       B.forEach(function (b, k) {
         var y = 4 + k * rowH, w = Math.max(2, b.pct / hiP * bw), on = k === cur;
         tx(g, lw, y + 16, b.label, { fill: on ? C.white : C.muted, 'font-size': 12, 'text-anchor': 'end', 'font-weight': on ? 600 : 400 });
         var r = el('rect', { x: lw + 8, y: y + 3, width: w.toFixed(1), height: 18, rx: 2, fill: barFill(k) }, g);
-        if (on && !S.near) { r.setAttribute('stroke', col[Math.min(k, 2)]); r.setAttribute('stroke-dasharray', '3 3'); }
+        if (on && !near) { r.setAttribute('stroke', col[Math.min(k, 2)]); r.setAttribute('stroke-dasharray', '3 3'); }
         tx(g, lw + 8 + w + 6, y + 17, Math.round(b.pct) + '%', { fill: C.white, 'font-size': 13, 'font-weight': 700 });
-        if (on) tx(g, lw + 8 + w + 6 + textW(Math.round(b.pct) + '%', 13, 700) + 6, y + 17, S.near ? '← now' : '← breadth now', { fill: S.near ? col[Math.min(k, 2)] : C.muted, 'font-size': 11.5 });
-        if (B21[k]) tx(g, lw + 8, y + 35, since21(k), { fill: C.muted, 'font-size': 11 });
-        var t = el('title', {}, r); t.textContent = tip(k);
+        if (on) tx(g, lw + 8 + w + 6 + textW(Math.round(b.pct) + '%', 13, 700) + 6, y + 17, near ? '← now' : '← breadth now', { fill: near ? col[Math.min(k, 2)] : C.muted, 'font-size': 11.5 });
+        if (b.pct21 != null) tx(g, lw + 8, y + 35, since21(k), { fill: C.muted, 'font-size': 11 });
+        var t = el('title', {}, r); t.textContent = b.tip;
       });
       return;
     }
-    var H2 = B21.length ? 166 : 150, base = H2 - (B21.length ? 40 : 24), top = 34, slot = W / B.length, bwd = Math.min(92, slot - 26);
+    var H2 = has21 ? 166 : 150, base = H2 - (has21 ? 40 : 24), top = 34, slot = W / B.length, bwd = Math.min(92, slot - 26);
     svg = svgFor(holder, W, H2); g = el('g', {}, svg);
     B.forEach(function (b, k) {
       var cx = slot * (k + 0.5), h = Math.max(2, b.pct / hiP * (base - top)), on = k === cur;
       var r = el('rect', { x: (cx - bwd / 2).toFixed(1), y: (base - h).toFixed(1), width: bwd.toFixed(1), height: h.toFixed(1), rx: 2, fill: barFill(k) }, g);
-      if (on && !S.near) { r.setAttribute('stroke', col[Math.min(k, 2)]); r.setAttribute('stroke-dasharray', '3 3'); }
-      var t = el('title', {}, r); t.textContent = tip(k);
+      if (on && !near) { r.setAttribute('stroke', col[Math.min(k, 2)]); r.setAttribute('stroke-dasharray', '3 3'); }
+      var t = el('title', {}, r); t.textContent = b.tip;
       tx(g, cx, base - h - 6, Math.round(b.pct) + '%', { fill: C.white, 'font-size': 15, 'font-weight': 700, 'text-anchor': 'middle' });
-      if (on) tx(g, cx, base - h - 25, S.near ? 'now' : 'breadth now', { fill: S.near ? col[Math.min(k, 2)] : C.muted, 'font-size': 12, 'text-anchor': 'middle' });
+      if (on) tx(g, cx, base - h - 25, near ? 'now' : 'breadth now', { fill: near ? col[Math.min(k, 2)] : C.muted, 'font-size': 12, 'text-anchor': 'middle' });
       tx(g, cx, base + 17, b.label, { fill: on ? C.white : C.muted, 'font-size': 12.5, 'text-anchor': 'middle', 'font-weight': on ? 600 : 400 });
-      if (B21[k]) tx(g, cx, base + 33, since21(k), { fill: C.muted, 'font-size': 11, 'text-anchor': 'middle' });
+      if (b.pct21 != null) tx(g, cx, base + 33, since21(k), { fill: C.muted, 'font-size': 11, 'text-anchor': 'middle' });
     });
   }
-  function drawThinChart(S) {
+  function drawThinChart(G) {
     var holder = gzQ('gzThin', 'chart'), W = Math.max(260, Math.round(holder.clientWidth)), ph = W < 520;
-    if (S.noQ) {
+    if (G.q_i1 < 0) {
       clear(holder); holder._gz = null;
       gzParts(gzQ('gzThin', 'ro'), [['m', 'QQQ prices are missing in this update, so the QQQ chart is not drawn.']]);
       return;
     }
     var L = ph ? 32 : 42, R = 6, top = 8, plotH = ph ? 196 : 292, stripH = ph ? 8 : 12, stripY = top + plotH + 8, H = stripY + stripH + 22, pw = W - L - R;
-    var q = S.q, i0 = 0, i1 = S.lq, i;
-    while (i0 < i1 && !gzNum(q[i0])) i0++;
+    var q = doc.idx.NDX.etf_c, i0 = G.q_i0, i1 = G.q_i1, i;
     var lo = Infinity, hi = -Infinity;
     for (i = i0; i <= i1; i++) if (gzNum(q[i])) { lo = Math.min(lo, q[i]); hi = Math.max(hi, q[i]); }
     var svg = svgFor(holder, W, H), g = el('g', {}, svg), X = lin(D.d[i0], D.d[i1], L, L + pw);
@@ -2649,14 +2338,8 @@
     gzYears(g, X, D.d[i0], D.d[i1], L, L + pw, H - 6, ph);
 
     el('rect', { x: L, y: stripY, width: pw, height: stripH, fill: C.line, rx: 1 }, g);
-    var runs = [], a = null;
-    for (i = i0; i <= S.nq + 1; i++) {
-      var on = i <= S.nq && S.flag[i];
-      if (on && a == null) a = i;
-      if (!on && a != null) { runs.push([a, i - 1]); a = null; }
-    }
     var px = [];
-    runs.forEach(function (r) {
+    G.runs.forEach(function (r) {
       var x0 = X(D.d[r[0]]) - 0.6, x1 = X(D.d[r[1]]) + 0.6;
       if (x1 - x0 < 1.6) { var mid = (x0 + x1) / 2; x0 = mid - 0.8; x1 = mid + 0.8; }
       var p = px[px.length - 1];
@@ -2667,8 +2350,8 @@
     var clip = gzClip(svg, L, top - 6, pw + 6, plotH + 12);
     el('path', { d: pathOf(decimate(D.d, q, i0, i1, X), Y), fill: 'none', stroke: C.text, 'stroke-width': ph ? 0.9 : 1.1, 'stroke-linejoin': 'round', 'clip-path': clip }, g);
     var dg = el('g', {}, g), rr = ph ? 2.7 : 3.6;
-    Object.keys(S.dropIdx).forEach(function (k) {
-      k = +k; if (k < i0 || k > i1 || !gzNum(q[k])) return;
+    G.drops.forEach(function (k) {
+      if (k < i0 || k > i1 || !gzNum(q[k])) return;
       el('circle', { cx: X(D.d[k]).toFixed(1), cy: Y(q[k]).toFixed(1), r: rr, fill: GC.red, stroke: C.panel, 'stroke-width': 1.2 }, dg);
     });
     nowDot(g, X(D.d[i1]), Y(q[i1]), ph ? 3.2 : 4);
@@ -2682,143 +2365,65 @@
         el('line', { x1: x, x2: x, y1: top, y2: stripY + stripH, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '2 3' }, cross);
         el('circle', { cx: x, cy: Y(q[j]), r: 3.4, fill: 'none', stroke: C.white, 'stroke-width': 1.5 }, cross);
       },
-      text: function (j) { return thinRo(S, j); }, rest: function () { return thinRo(S, i1); }
+      text: function (j) { return thinRo(G, j); }, rest: function () { return thinRo(G, i1); }
     });
   }
-  function thinRo(S, j) {
-    var p = [['d', fmtDay(D.d[j], true)], ['', ' · QQQ '], ['v', S.q[j].toFixed(2)]], cutDn = dayNum(GZ.cutoff);
-    if (D.d[j] > cutDn && gzNum(S.f[j])) p.push(['', ' · ' + (S.f[j] / 10).toFixed(1) + '% above 200-day' +
-      (S.hi[j] != null ? ' · ' + Math.abs((S.q[j] / S.hi[j] - 1) * 100).toFixed(1) + '% below 52-week high' : '')]);
-    if (S.flag[j]) p.push(['a', ' · thin-rally day']);
-    if (S.dropIdx[j]) p.push(['r', ' · first close ' + Math.abs(GZ.thin.drop_pct) + '% under its 52-week high']);
+  function thinRo(G, j) {
+    var q = doc.idx.NDX.etf_c, f = doc.idx.NDX.f200, p = [['d', fmtDay(D.d[j], true)], ['', ' · QQQ '], ['v', q[j].toFixed(2)]];
+    if (j >= G.ro_from && gzNum(f[j])) {
+      var off = G.off52[j - G.ro_from];
+      p.push(['', ' · ' + (f[j] / 10).toFixed(1) + '% above 200-day' + (off != null ? ' · ' + off.toFixed(1) + '% below 52-week high' : '')]);
+    }
+    if (inRuns(G.runs, j)) p.push(['a', ' · thin-rally day']);
+    if (G.drops.indexOf(j) >= 0) p.push(['r', ' · start of a big drop']);
     return p;
   }
 
 
   var THR_C = { ARMED: GC.yel, FIRED: GC.green, IDLE: GC.grey };
-  function thrustState() {
-    var r2 = doc.idx.R2000, d = doc.daily.d, r = r2.f50, iw = r2.etf_c, Tz = GZ.thrust, cal = gzCal();
-    var ARM = Tz.arm * 10, FIRE = Tz.fire * 10, WIN = Tz.window, RE = Tz.rearm, i, j, cnt = 0;
-    var n = gzLast(r);
-    for (i = 0; i <= n; i++) if (gzNum(r[i])) cnt++;
-    if (cnt < WIN + 2) throw new Error('too few Russell 2000 readings');
-
-
-
-    var crosses = [], thrusts = [], lastC = -1e9, prev = null;
-    for (i = 0; i <= n; i++) {
-      if (!gzNum(r[i])) continue;
-      if (r[i] >= FIRE && prev != null && prev < FIRE) {
-        var washed = false;
-        for (j = Math.max(0, i - WIN); j < i; j++) if (gzNum(r[j]) && r[j] <= ARM) { washed = true; break; }
-        if (washed) {
-          crosses.push(i);
-          if (i - lastC > RE) thrusts.push(i);
-          lastC = i;
-        }
-      }
-      prev = r[i];
-    }
-    var li = gzLast(iw, n), S = { ok: true, n: n, r: r, iw: iw, noIwm: gzLast(iw) < 0, cal: cal, value: r[n] / 10, asOf: d[n], crosses: crosses, thrusts: thrusts,
-      lastCross: lastC, lastThrust: thrusts.length ? d[thrusts[thrusts.length - 1]] : null, firedOn: null, iwmSince: null, k: null };
-    for (j = n; j >= 0; j--) if (gzNum(r[j]) && r[j] <= ARM) { S.lastLe25 = d[j]; break; }
-    var e = thrusts.length ? thrusts[thrusts.length - 1] : null;
-    if (e != null && n - e <= RE) {
-      S.state = 'FIRED'; S.e = e; S.firedOn = d[e]; S.fireVal = r[e] / 10; S.windowEnd = gzCalAt(cal, e + RE);
-      S.iwmSince = li >= e && gzNum(iw[e]) ? (iw[li] / iw[e] - 1) * 100 : null;
-    } else {
-      var k = -1;
-      for (j = n; j >= Math.max(0, n - (WIN - 1)); j--) if (gzNum(r[j]) && r[j] <= ARM) { k = j; break; }
-      if (k >= 0) {
-        S.state = 'ARMED'; S.k = k; S.armDay = d[k]; S.deadline = gzCalAt(cal, k + WIN); S.sessionsLeft = k + WIN - n;
-        if (n + 1 - lastC <= RE) S.blockedUntil = gzCalAt(cal, lastC + RE + 1);
-      } else {
-        S.state = 'IDLE';
-        for (j = n - WIN; j >= Math.max(0, n - RE); j--) if (gzNum(r[j]) && r[j] <= ARM) { S.lapsedArm = d[j]; S.lapsedEnd = gzCalAt(cal, j + WIN); break; }
-      }
-    }
-
-    var cutDn = dayNum(GZ.cutoff);
-    S.live = thrusts.filter(function (t) { return D.d[t] > cutDn; }).map(function (t) {
-      var end = gzLast(iw, Math.min(t + RE, li));
-      return { date: d[t], r: r[t] / 10, iwm63: gzNum(iw[t]) && end >= t && gzNum(iw[end]) ? (iw[end] / iw[t] - 1) * 100 : null, pending: t + RE > li };
-    });
-
-    S.matched = Tz.events.filter(function (ev) {
-      var a = bsearchLE(D.d, dayNum(ev.date));
-      return thrusts.some(function (t) { return Math.abs(t - a) <= 5; });
-    }).length;
-    return S;
-  }
-  function thrustText(S) {
-    var c = 'gzThrust', Tz = GZ.thrust, arm = Tz.arm, fire = Tz.fire;
-    gzChip(c, S.state, THR_C[S.state]);
-    gzText(c, 'sub', 'A thrust is when the share of Russell 2000 stocks above their 50-day jumps from ' + arm + '% or less to ' + fire + '% or more within ' + Tz.window + ' sessions');
-    gzText(c, 'asof', 'as of the ' + gzDay(S.asOf) + ' close · Russell 2000 breadth and IWM update after each close');
-    gzText(c, 'big', pct1(S.value));
-    gzText(c, 'unit', 'of Russell 2000 stocks above their 50-day');
-    var l1, l2, now;
-    if (S.state === 'ARMED') {
-      l1 = 'Needs ' + fire + '% at a close on or before ' + gzDay(S.deadline) + ' (' + gzS(S.sessionsLeft, 'session') + ' left).';
-      l2 = 'Armed by the ' + gzDay(S.armDay) + ' close at or under ' + arm + '%.';
-      now = 'Armed: the line closed at ' + pct1(S.value) + ' on ' + gzDay(S.asOf) +
-        '. A close at ' + fire + '% or more by ' + gzDay(S.deadline) + ' would be a thrust; if not, the window lapses.';
-      if (S.blockedUntil) now += ' A cross before ' + gzDay(S.blockedUntil) + ' would not count (within ' + Tz.rearm + ' sessions of the last one).';
-    } else if (S.state === 'FIRED') {
-      var iwmW = S.iwmSince != null ? sgn(S.iwmSince) : null, endW = gzDay(S.windowEnd, true);
-      l1 = 'Fired on ' + gzDay(S.firedOn, true) + ' at ' + pct1(S.fireVal) + '.';
-      l2 = iwmW != null ? 'IWM since then ' + iwmW + ' (the 3-month window ends ' + endW + ').' :
-        'IWM since then: not available (' + (S.noIwm ? 'IWM prices missing in this update' : 'no IWM close on that day') + '; the 3-month window ends ' + endW + ').';
-      now = 'Fired: the line went from ' + arm + '% or less to ' + pct1(S.fireVal) + ' on ' + gzDay(S.firedOn, true) + ', within ' + Tz.window + ' sessions. ' +
-        (iwmW != null ? 'IWM is ' + iwmW + ' since; ' : 'IWM since: not available; ') +
-        'the 3-month window ends ' + endW + '.';
-    } else {
-      l1 = 'Arms when the line closes at or under ' + arm + '%.';
-      l2 = S.lapsedArm ? 'The last window (armed ' + gzDay(S.lapsedArm) + ') ended ' + gzDay(S.lapsedEnd) + ' without a thrust.' :
-        S.lastThrust ? 'Last thrust on our line: ' + gzDay(S.lastThrust, true) + '.' : '';
-      now = 'Idle: the line is at ' + pct1(S.value) + ', above the ' + arm + '% arm line, so no clock is running.' +
-        (S.lapsedArm ? ' The last window lapsed on ' + gzDay(S.lapsedEnd) + ' without reaching ' + fire + '%.' : '');
-    }
-    gzText(c, 'l1', l1); gzText(c, 'l2', l2); gzText(c, 'now', now);
-    var pf = gzQ(c, 'pfill'), fr = Math.max(0, Math.min(1, (S.value - arm) / (fire - arm)));
+  function thrustText(G) {
+    var c = 'gzThrust', col = THR_C[G.state] || GC.grey;
+    gzChip(c, G.state, CHIP_C[G.chip] || col);
+    gzTexts(c, G, ['sub', 'asof', 'big', 'unit', 'l1', 'l2', 'now']);
+    var pf = gzQ(c, 'pfill'), fr = Math.max(0, Math.min(1, +G.progress || 0));
     pf.style.width = Math.max(1.2, fr * 100).toFixed(1) + '%';
-    pf.style.background = THR_C[S.state];
-    gzText(c, 'parm', arm + '%  armed'); gzText(c, 'pfire', 'fires  ' + fire + '%');
-    gzParts(gzQ(c, 'states'), [['', 'States: '], [S.state === 'IDLE' ? 'on' : '', 'IDLE'], ['', '  ·  '], [S.state === 'ARMED' ? 'on' : '', 'ARMED (clock running)'],
-      ['', '  ·  '], [S.state === 'FIRED' ? 'on' : '', 'FIRED (hit ' + fire + '% in time)']]);
-    Array.prototype.forEach.call(gzQ(c, 'states').querySelectorAll('.on'), function (n) { n.style.color = S.state === 'IDLE' ? C.text : THR_C[S.state]; });
-    gzText(c, 'ct', 'Russell 2000 % above 50-day, last 4 months' + (S.state === 'ARMED' ? ' · yellow band = the ' + Tz.window + '-session window' : ''));
-    var baseW = gzNum(Tz.base_up_pct) ? ' (any 3 months since ' + (Tz.base_since || '2013').slice(0, 4) + ': ' + Math.round(Tz.base_up_pct) + '% up, typical ' + sgn(Tz.base_median, 0) + ')' : '';
-    gzText(c, 'ct2', 'IWM over the 3 months after each past thrust · ' + Tz.up + ' of ' + Tz.n + ' up' + baseW + (S.live.some(function (e) { return e.iwm63 != null; }) ? ' · hollow = fired after ' + gzDay(GZ.cutoff, true) : ''));
-    gzText(c, 'how', 'ARMED alone has meant nothing. FIRED is the part that mattered: after past thrusts IWM did about ' + Tz.edge_lo + ' to ' + Tz.edge_hi +
-      ' points better over the next 3 months than after other bounces of the same size. Only ' + Tz.n + ' thrusts since 2013, and most of that gap comes from 2021 on, ' +
-      'so treat it as a tilt, not a rule.');
-    gzText(c, 'src', 'History: TradingView’s official Russell 2000 breadth line (R2FI), which gives the ' + Tz.n + ' thrusts in the lower chart. The live line is ' +
-      'our own count of today’s members: usually within about 1 point of TradingView’s line since mid-2024, and it finds ' + S.matched + ' of the ' + Tz.n +
-      ' past thrusts. So a close call at ' + arm + '% or ' + fire + '%, and with it the arm day or the deadline, can be a session off from TradingView’s chart. ' +
-      'IWM closes: screener cache, split-adjusted.');
+    pf.style.background = col;
+    gzText(c, 'parm', G.parm); gzText(c, 'pfire', G.pfire);
+    gzParts(gzQ(c, 'states'), [['', 'States: '], [G.state === 'IDLE' ? 'on' : '', 'IDLE'], ['', '  ·  '], [G.state === 'ARMED' ? 'on' : '', 'ARMED (clock running)'],
+      ['', '  ·  '], [G.state === 'FIRED' ? 'on' : '', 'FIRED (hit the fire line in time)']]);
+    Array.prototype.forEach.call(gzQ(c, 'states').querySelectorAll('.on'), function (n) { n.style.color = G.state === 'IDLE' ? C.text : col; });
+    gzTexts(c, G, ['ct', 'ct2', 'how', 'src']);
   }
-  function drawThrustLine(S) {
-    var holder = gzQ('gzThrust', 'chart'), W = Math.max(260, Math.round(holder.clientWidth)), ph = W < 520, Tz = GZ.thrust;
-    var L = 26, R = 6, top = 8, plotH = ph ? 150 : 168, H = top + plotH + 24, pw = W - L - R, r = S.r, n = S.n, i;
-    var iA = Math.max(0, n - 83), iB = S.state === 'ARMED' ? S.k + Tz.window : n;
-    var lo = 100, hi = 0;
-    for (i = iA; i <= n; i++) if (gzNum(r[i])) { lo = Math.min(lo, r[i] / 10); hi = Math.max(hi, r[i] / 10); }
-    lo = Math.max(0, Math.min(Tz.arm - 10, lo - 5)); hi = Math.min(100, Math.max(Tz.fire + 12, hi + 6));
+  function thrustCal(G, i) { return i <= G.i_n ? doc.daily.d[i] : G.axis[i - G.i_n - 1]; }
+  function drawThrustLine(G) {
+    var holder = gzQ('gzThrust', 'chart'), W = Math.max(260, Math.round(holder.clientWidth)), ph = W < 520;
+    var L = 26, R = 6, top = 8, plotH = ph ? 150 : 168, H = top + plotH + 24, pw = W - L - R, r = doc.idx.R2000.f50, n = G.i_n, i;
+    var iA = G.i_a, iB = G.i_b, lo = G.y[0], hi = G.y[1], lineY = {};
+    G.lines.forEach(function (o) { lineY[o[1]] = o[0]; });
     var svg = svgFor(holder, W, H), g = el('g', {}, svg), X = lin(iA, iB + (iB === n ? 0.5 : 0), L, L + pw), Y = lin(lo, hi, top + plotH, top);
-    var yt = [Tz.arm, Tz.fire]; if (hi >= 78) yt.push(75); if (lo <= 2) yt.unshift(0);
-    yTicks(g, Y, yt, L + pw, L, function (v) { return String(v); }, 'left');
-    if (S.state === 'ARMED') el('rect', { x: X(S.k).toFixed(1), y: top, width: (X(iB) - X(S.k)).toFixed(1), height: plotH, fill: GC.yel, 'fill-opacity': 0.09 }, g);
-    if (S.state === 'FIRED' && S.e >= iA) el('rect', { x: X(S.e).toFixed(1), y: top, width: Math.max(1, X(Math.min(iB, S.e + Tz.rearm)) - X(S.e)).toFixed(1), height: plotH, fill: GC.green, 'fill-opacity': 0.07 }, g);
-    [[Tz.arm, GC.yel, 'arm line'], [Tz.fire, GC.green, 'fire line']].forEach(function (o) {
-      el('line', { x1: L, x2: L + pw, y1: Y(o[0]), y2: Y(o[0]), stroke: o[1], 'stroke-width': 1, 'stroke-dasharray': '5 4', 'stroke-opacity': 0.85 }, g);
+
+    var lab = {}, yt = G.ticks.slice();
+    G.ticks.forEach(function (v) { lab[v] = 1; });
+    G.lines.forEach(function (o) { yt.push(o[0]); });
+    yt.sort(function (a, b) { return a - b; });
+    yTicks(g, Y, yt, L + pw, L, function (v) { return lab[v] ? String(v) : null; }, 'left');
+    if (G.band) {
+      var bA = G.band[0], bB = G.band[1];
+      if (G.band[2] === 'armed') el('rect', { x: X(bA).toFixed(1), y: top, width: (X(bB) - X(bA)).toFixed(1), height: plotH, fill: GC.yel, 'fill-opacity': 0.09 }, g);
+      else el('rect', { x: X(bA).toFixed(1), y: top, width: Math.max(1, X(bB) - X(bA)).toFixed(1), height: plotH, fill: GC.green, 'fill-opacity': 0.07 }, g);
+    }
+    var LINE = [['arm', GC.yel, 'arm line'], ['fire', GC.green, 'fire line']];
+    LINE.forEach(function (o) {
+      if (lineY[o[0]] == null) return;
+      var y0 = Y(lineY[o[0]]);
+      el('line', { x1: L, x2: L + pw, y1: y0, y2: y0, stroke: o[1], 'stroke-width': 1, 'stroke-dasharray': '5 4', 'stroke-opacity': 0.85 }, g);
     });
 
-    var cal = S.cal, months = 0, ticks = [];
-    for (i = iA + 1; i <= iB; i++) { var a = gzCalAt(cal, i), b = gzCalAt(cal, i - 1); if (a.slice(5, 7) !== b.slice(5, 7)) months++; }
+    var months = 0, ticks = [];
+    for (i = iA + 1; i <= iB; i++) { var a = thrustCal(G, i), b = thrustCal(G, i - 1); if (a.slice(5, 7) !== b.slice(5, 7)) months++; }
     var mid = !ph && months > 0 && pw / Math.max(1, months) > 120;
     for (i = iA + 1; i <= iB; i++) {
-      var s = gzCalAt(cal, i), p = gzCalAt(cal, i - 1), dn = dayNum(s);
+      var s = thrustCal(G, i), p = thrustCal(G, i - 1), dn = dayNum(s);
       if (s.slice(5, 7) !== p.slice(5, 7)) ticks.push({ i: i, label: mid ? fmtDay(dn, false) : MON[+s.slice(5, 7) - 1] });
       else if (mid && +s.slice(8, 10) >= 15 && +p.slice(8, 10) < 15) ticks.push({ i: i, label: fmtDay(dn, false) });
     }
@@ -2835,7 +2440,7 @@
       path += (gap ? 'M' : 'L') + X(i).toFixed(1) + ' ' + Y(r[i] / 10).toFixed(1); gap = false;
     }
     el('path', { d: path, fill: 'none', stroke: GC.blue, 'stroke-width': ph ? 1.6 : 1.8, 'stroke-linejoin': 'round' }, g);
-    S.thrusts.forEach(function (t) { if (t >= iA) el('circle', { cx: X(t).toFixed(1), cy: Y(r[t] / 10).toFixed(1), r: 3.4, fill: GC.green, stroke: C.panel, 'stroke-width': 1.2 }, g); });
+    G.thrusts.forEach(function (t) { if (t >= iA) el('circle', { cx: X(t).toFixed(1), cy: Y(r[t] / 10).toFixed(1), r: 3.4, fill: GC.green, stroke: C.panel, 'stroke-width': 1.2 }, g); });
 
 
     var nb = nowBox(X(n), Y(r[n] / 10), ph ? 3.2 : 4), pts = [];
@@ -2848,9 +2453,10 @@
       }
       return false;
     }
-    [[Tz.fire, GC.green, 'fire line'], [Tz.arm, GC.yel, 'arm line']].forEach(function (o) {
-      var w = textW(o[2], 11), y0 = Y(o[0]), spots = [], k, best = null;
-      if (S.state === 'ARMED') spots.push([X(iB) - 4 - w, y0 - 4], [X(iB) - 4 - w, y0 + 13]);
+    [LINE[1], LINE[0]].forEach(function (o) {
+      if (lineY[o[0]] == null) return;
+      var w = textW(o[2], 11), y0 = Y(lineY[o[0]]), spots = [], k, best = null;
+      if (G.state === 'ARMED') spots.push([X(iB) - 4 - w, y0 - 4], [X(iB) - 4 - w, y0 + 13]);
       [0, 0.25, 0.5, 0.7].forEach(function (f) { var x = L + 6 + (pw - w - 12) * f; spots.push([x, y0 - 4], [x, y0 + 13]); });
       for (k = 0; k < spots.length && best == null; k++) {
         var bx = { x: spots[k][0] - 1, y: spots[k][1] - 10, w: w + 2, h: 13 };
@@ -2871,26 +2477,25 @@
         el('line', { x1: x, x2: x, y1: top, y2: top + plotH, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '2 3' }, cross);
         if (j <= n && gzNum(r[j])) el('circle', { cx: x, cy: Y(r[j] / 10), r: 3.4, fill: 'none', stroke: C.white, 'stroke-width': 1.5 }, cross);
       },
-      text: function (j) { return thrustRo(S, j); }, rest: function () { return thrustRo(S, n); }
+      text: function (j) { return thrustRo(G, j); }, rest: function () { return thrustRo(G, n); }
     });
   }
-  function thrustRo(S, j) {
-    var s = gzCalAt(S.cal, j), p = [['d', fmtDay(dayNum(s), true)]];
-    if (j > S.n) {
+  function thrustRo(G, j) {
+    var r = doc.idx.R2000.f50, p = [['d', fmtDay(dayNum(thrustCal(G, j)), true)]];
+    if (j > G.i_n) {
       p.push(['m', ' · no close yet']);
-      if (S.state === 'ARMED' && j <= S.k + GZ.thrust.window) p.push(['y', ' · inside the window' + (j === S.k + GZ.thrust.window ? ' (last day)' : '')]);
+      if (G.state === 'ARMED' && j <= G.i_b) p.push(['y', ' · inside the window' + (j === G.i_b ? ' (last day)' : '')]);
       return p;
     }
-    p.push(['', ' · Russell 2000 above 50-day '], ['v', gzNum(S.r[j]) ? (S.r[j] / 10).toFixed(1) + '%' : '–']);
-    if (S.thrusts.indexOf(j) >= 0) p.push(['g', ' · thrust']);
-    else if (S.crosses.indexOf(j) >= 0) p.push(['m', ' · crossed ' + GZ.thrust.fire + '%, but too soon after the last thrust to count']);
-    if (gzNum(S.r[j]) && S.r[j] <= GZ.thrust.arm * 10) p.push(['y', ' · at or under ' + GZ.thrust.arm + '%']);
+    p.push(['', ' · Russell 2000 above 50-day '], ['v', gzNum(r[j]) ? (r[j] / 10).toFixed(1) + '%' : '–']);
+    if (G.thrusts.indexOf(j) >= 0) p.push(['g', ' · thrust']);
+    else if (G.soon.indexOf(j) >= 0) p.push(['m', ' · crossed the fire line, but too soon after the last thrust to count']);
+    if (G.at_arm.indexOf(j) >= 0) p.push(['y', ' · at or under the arm line']);
     return p;
   }
-  function drawThrustPops(S) {
-    var holder = gzQ('gzThrust', 'chart2'), W = Math.max(260, Math.round(holder.clientWidth)), ph = W < 520, Tz = GZ.thrust;
-    var ev = Tz.events.map(function (e) { return { date: e.date, r: e.r2fi, v: e.iwm63, pending: false, study: true }; });
-    S.live.forEach(function (e) { if (e.iwm63 != null) ev.push({ date: e.date, r: e.r, v: e.iwm63, pending: e.pending, study: false }); });
+  function drawThrustPops(G) {
+    var holder = gzQ('gzThrust', 'chart2'), W = Math.max(260, Math.round(holder.clientWidth)), ph = W < 520;
+    var ev = G.events.map(function (e) { return { date: e.d, r: e.r, v: e.v, pending: !!e.pend, study: !!e.study }; });
     var L = 40, R = 6, top = 10, plotH = ph ? 118 : 136, H = top + plotH + 22, pw = W - L - R, m = ev.length;
     var vmin = Math.min.apply(null, ev.map(function (e) { return e.v; })), vmax = Math.max.apply(null, ev.map(function (e) { return e.v; }));
     var lo = Math.min(-12, vmin - 3), hi = Math.max(32, vmax + 3);
@@ -2898,7 +2503,7 @@
     var yt = []; for (var v = Math.ceil(lo / 10) * 10; v <= hi; v += 10) yt.push(v);
     yTicks(g, Y, yt, L + pw, L, function (v) { return v === 0 ? '0' : (v > 0 ? '+' : '−') + Math.abs(v) + '%'; }, 'left');
     el('line', { x1: L, x2: L + pw, y1: Y(0), y2: Y(0), stroke: C.muted, 'stroke-width': 1 }, g);
-    el('line', { x1: L, x2: L + pw, y1: Y(Tz.median), y2: Y(Tz.median), stroke: GC.light, 'stroke-width': 1.1, 'stroke-dasharray': '4 3' }, g);
+    el('line', { x1: L, x2: L + pw, y1: Y(G.median), y2: Y(G.median), stroke: GC.light, 'stroke-width': 1.1, 'stroke-dasharray': '4 3' }, g);
     var lw = textW('’26', 11) + 6, every = Math.max(1, Math.ceil(lw / slot));
     ev.forEach(function (e, k) {
       var x = L + slot * (k + 0.5), c = e.v >= 0 ? GC.green : GC.red;
@@ -2908,7 +2513,7 @@
       var t = el('title', {}, dot); t.textContent = e.date + ': IWM ' + sgn(e.v) + (e.pending ? ' so far' : ' over the next 3 months');
       if (k === m - 1 || (k % every === 0 && m - 1 - k >= every)) tx(g, x, H - 5, '’' + e.date.slice(2, 4), { fill: e.study ? C.muted : C.text, 'font-size': 11, 'text-anchor': 'middle' });
     });
-    tx(g, L + 6, Y(Tz.median) - 5, 'typical ' + sgn(Tz.median, 0), withHalo({ fill: GC.light, 'font-size': 11.5 }));
+    tx(g, L + 6, Y(G.median) - 5, 'typical ' + sgn(G.median, 0), withHalo({ fill: GC.light, 'font-size': 11.5 }));
     var cross = el('g', { 'pointer-events': 'none' }, svg);
     gzHover(holder, gzQ('gzThrust', 'ro2'), {
       W: W, cross: cross,
@@ -2923,72 +2528,21 @@
         return [['d', gzDay(e.date, true)], ['', ' · ' + (e.study ? 'TradingView ' : 'our line ')], ['v', pct1(e.r)], ['', ' · IWM ' + (e.pending ? 'so far ' : '3 months later ')],
           [e.v >= 0 ? 'g' : 'r', sgn(e.v)]];
       },
-      rest: function () {
-        return [['', 'Typical (median) '], ['v', sgn(Tz.median, 0)], ['', ' · ' + Tz.up + ' of ' + Tz.n + ' up' +
-          (gzNum(Tz.base_up_pct) ? ' · any 3 months: ' + sgn(Tz.base_median, 0) + ', ' + Math.round(Tz.base_up_pct) + '% up' : '')], ['m', HOVER ? ' · hover a thrust' : ' · tap a thrust']];
-      }
+      rest: function () { return [['', 'Typical (median) '], ['v', sgn(G.median, 0)], ['', G.rest], ['m', HOVER ? ' · hover a thrust' : ' · tap a thrust']]; }
     });
   }
 
 
-  function stormState() {
-
-    var s = doc.daily.spy, d = doc.daily.d, n = s.length, sma = new Array(n), win = [], head = 0, sum = 0, i;
-    for (i = 0; i < n; i++) {
-      sma[i] = null;
-      if (!gzNum(s[i])) continue;
-      win.push(s[i]); sum += s[i];
-      if (win.length - head > 200) sum -= win[head++];
-      if (win.length - head === 200) sma[i] = sum / 200;
-    }
-    var li = gzLast(s);
-    if (li < 0 || sma[li] == null) throw new Error('fewer than 200 SPY closes');
-    var spy = s[li], m = sma[li], gap = (spy / m - 1) * 100, above = gap >= 0, since = null, prev = li;
-    for (i = li - 1; i >= 0; i--) {
-      if (!gzNum(s[i])) continue;
-      if (sma[i] == null) break;
-      if ((s[i] >= sma[i]) !== above) { since = prev; break; }
-      prev = i;
-    }
-
-
-    var L = doc.live, today = !!(L && L.session_date && d[n - 1] === L.session_date && li === n - 1);
-    var live = !!(L && L.is_live && !L.session_closed && today);
-    return { ok: true, state: above ? 'CALM SIDE' : 'STORMY SIDE', spy: spy, sma200: m, gap: gap, flipPct: above ? (1 - m / spy) * 100 : (m / spy - 1) * 100,
-      live: live, prelim: doc.state === 'LIVE' && !live && today, li: li, sma: sma, s: s, since: since };
+  function stormText(G) {
+    var c = 'gzStorms';
+    gzChip(c, G.state, CHIP_C[G.chip] || GC.green);
+    gzTexts(c, G, ['sub', 'asof', 'big', 'unit', 'l1', 'l2', 'cap', 'ct', 'how', 'now', 'src']);
   }
-  function stormText(S) {
-    var c = 'gzStorms', G = GZ.storms, up = S.gap >= 0, dl = D.d[S.li], prelim = S.prelim;
-    gzChip(c, S.state, up ? GC.green : GC.orange);
-    gzText(c, 'sub', 'SPY against its 200-day average · below it, the same VIX has come with bigger moves');
-    gzText(c, 'asof', S.live ? 'so far today · as of ' + hm(Date.parse(doc.live.asof_utc)) + ' ET (prices ~15 min delayed)' :
-      'as of the ' + fmtDay(dl, false) + ' close' + (prelim ? ' (preliminary)' : ''));
-    gzText(c, 'big', sgn(S.gap));
-    gzText(c, 'unit', 'SPY ' + (up ? 'above' : 'below') + ' its 200-day average');
-    gzText(c, 'l1', up ? 'A fall of about ' + S.flipPct.toFixed(1) + '% would put it below.' : 'A rise of about ' + S.flipPct.toFixed(1) + '% would put it back above.');
-    gzText(c, 'l2', 'SPY ' + S.spy.toFixed(2) + (S.live ? ' so far today' : '') + ' · 200-day ' + S.sma200.toFixed(2) + '. Says how rough, not which way.');
-    gzText(c, 'cap', 'grey = what VIX expected · colour = how much SPY really moved the next month (2013+ averages, % a year). VIX usually guesses high.');
-    gzText(c, 'ct', 'SPY, last 2 years · red = days SPY closed below its 200-day average');
-    var v1 = function (x) { return x.toFixed(1); };
-    gzText(c, 'how', 'VIX is the options market’s guess of how much stocks will move, and it usually guesses high. Above the 200-day, next month’s real moves came in ' +
-      'well under it (' + v1(G.up.rv) + ' against ' + v1(G.up.vix) + '). Below it they came in only a little under (' + v1(G.down.rv) + ' against ' + v1(G.down.vix) +
-      '): at the same VIX, moves below the line ran about ' + G.excess_pct + '% bigger. It does not call direction. Bumpier rides, not a sell signal.');
-    var sinceW = S.since != null ? ' It has been ' + (up ? 'above' : 'below') + ' since ' + fmtDay(D.d[S.since], true) + '.' : '';
-    gzText(c, 'now', up ? 'SPY is ' + Math.abs(S.gap).toFixed(1) + '% above its 200-day average: the calm side, where next month’s real moves have come in ' +
-      'well under what VIX expected (' + v1(G.up.rv) + ' against ' + v1(G.up.vix) + ').' + sinceW :
-      'SPY is ' + Math.abs(S.gap).toFixed(1) + '% below its 200-day average: the stormy side. Here next month’s real moves have come close to what VIX expected (' +
-      v1(G.down.rv) + ' against ' + v1(G.down.vix) + '), about ' + G.excess_pct + '% bigger than at the same VIX above the line.' + sinceW);
-    gzText(c, 'src', 'Study: SPY against its 200-day average, 2013+ (' + gzInt(G.up.days) + ' days above, ' + gzInt(G.down.days) + ' below). How much SPY really moved means ' +
-      'its realised volatility over the next month, as a yearly rate, against VIX that day. The ' + G.excess_pct + '% compares days below and above the 200-day with VIX, ' +
-      'the ratio of VIX to 3-month VIX, and the drawdown held equal. ' + (G.breaks ? 'In the ' + G.breaks + ' breaks since 2013, the' : 'Since 2013, the') +
-      ' next 3 months’ returns were not reliably worse than after other days with the same drop and VIX, though the dips along the way were deeper. ' +
-      'SPY closes: the page’s own screener cache' + (S.live ? ', with today’s delayed price as the last point.' : '.'));
-  }
-  function drawStormBars(S) {
-    var holder = gzQ('gzStorms', 'mini'), W = Math.max(240, Math.round(holder.clientWidth)), G = GZ.storms, up = S.gap >= 0;
-    var H = 150, base = H - 24, top = 30, hiV = Math.max(G.up.vix, G.up.rv, G.down.vix, G.down.rv) * 1.06;
+  function drawStormBars(G) {
+    var holder = gzQ('gzStorms', 'mini'), W = Math.max(240, Math.round(holder.clientWidth)), B = G.bars, up = G.state === 'CALM SIDE';
+    var H = 150, base = H - 24, top = 30, hiV = Math.max(B.up.vix, B.up.rv, B.down.vix, B.down.rv) * 1.06;
     var svg = svgFor(holder, W, H), g = el('g', {}, svg), gw = W / 2, bw = Math.min(72, gw / 2 - 16);
-    [['above 200-day', G.up, GC.blue, up], ['below 200-day', G.down, GC.orange, !up]].forEach(function (o, k) {
+    [['above 200-day', B.up, GC.blue, up], ['below 200-day', B.down, GC.orange, !up]].forEach(function (o, k) {
       var cx = gw * (k + 0.5), topB = base - Math.max(o[1].vix, o[1].rv) / hiV * (base - top);
       [[o[1].vix, GC.bar, C.muted, 'VIX expected'], [o[1].rv, o[2], C.white, 'SPY really moved, next month']].forEach(function (b, j) {
         var x = cx + (j ? 2 : -bw - 2), h = Math.max(2, b[0] / hiV * (base - top));
@@ -3000,9 +2554,11 @@
       if (o[3]) tx(g, cx, Math.max(12, topB - 26), 'now', { fill: up ? GC.green : GC.orange, 'font-size': 12, 'text-anchor': 'middle' });
     });
   }
-  function drawStormChart(S) {
+  function drawStormChart(G) {
     var holder = gzQ('gzStorms', 'chart'), W = Math.max(260, Math.round(holder.clientWidth)), ph = W < 520;
-    var L = ph ? 34 : 40, R = 6, top = 8, plotH = ph ? 196 : 286, H = top + plotH + 24, pw = W - L - R, s = S.s, sma = S.sma, i1 = S.li, i0 = Math.max(0, i1 - 503), i;
+    var L = ph ? 34 : 40, R = 6, top = 8, plotH = ph ? 196 : 286, H = top + plotH + 24, pw = W - L - R, s = doc.daily.spy, i1 = G.i1, i0 = G.i0, i;
+    var sma = new Array(D.d.length);
+    for (i = 0; i < sma.length; i++) sma[i] = i >= i0 && i <= i1 ? G.sma[i - i0] : null;
     var lo = Infinity, hi = -Infinity;
     for (i = i0; i <= i1; i++) {
       if (gzNum(s[i])) { lo = Math.min(lo, s[i]); hi = Math.max(hi, s[i]); }
@@ -3013,16 +2569,11 @@
     for (var v = Math.ceil((lo - pad) / step) * step; v <= hi + pad; v += step) yt.push(v);
     yTicks(g, Y, yt, L + pw, L, function (v) { return String(Math.round(v)); }, 'left');
 
-    var a = null;
-    for (i = i0; i <= i1 + 1; i++) {
-      var below = i <= i1 && (gzNum(s[i]) ? sma[i] != null && s[i] < sma[i] : a != null);
-      if (below && a == null) a = i;
-      if (!below && a != null) {
-        var xa = (a > i0 ? (X(D.d[a - 1]) + X(D.d[a])) / 2 : X(D.d[a])), xb = (i <= i1 ? (X(D.d[i - 1]) + X(D.d[i])) / 2 : X(D.d[i - 1]));
-        el('rect', { x: xa.toFixed(1), y: top, width: Math.max(1.5, xb - xa).toFixed(1), height: plotH, fill: GC.red, 'fill-opacity': 0.16 }, g);
-        a = null;
-      }
-    }
+    G.below.forEach(function (rb) {
+      var a = rb[0], e = rb[1];
+      var xa = (a > i0 ? (X(D.d[a - 1]) + X(D.d[a])) / 2 : X(D.d[a])), xb = (e <= i1 ? (X(D.d[e - 1]) + X(D.d[e])) / 2 : X(D.d[e - 1]));
+      el('rect', { x: xa.toFixed(1), y: top, width: Math.max(1.5, xb - xa).toFixed(1), height: plotH, fill: GC.red, 'fill-opacity': 0.16 }, g);
+    });
 
     var tk = [], d0 = dnDate(D.d[i0]), y = d0.getUTCFullYear(), mo = Math.floor(d0.getUTCMonth() / 3) * 3 + 3;
     for (; ; mo += 3) { if (mo >= 12) { y += Math.floor(mo / 12); mo %= 12; } var dn = Date.UTC(y, mo, 1) / 864e5; if (dn > D.d[i1]) break; tk.push({ dn: dn, label: MON[mo] + ' ’' + String(y).slice(2) }); }
@@ -3050,15 +2601,16 @@
         el('line', { x1: x, x2: x, y1: top, y2: top + plotH, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '2 3' }, cross);
         el('circle', { cx: x, cy: Y(s[j]), r: 3.4, fill: 'none', stroke: C.white, 'stroke-width': 1.5 }, cross);
       },
-      text: function (j) { return stormRo(S, j); }, rest: function () { return stormRo(S, i1); }
+      text: function (j) { return stormRo(G, sma, j); }, rest: function () { return stormRo(G, sma, i1); }
     });
   }
-  function stormRo(S, j) {
-    var p = [['d', fmtDay(D.d[j], true)], ['', ' · SPY '], ['v', S.s[j].toFixed(2)]];
-    if (j === S.li && S.live) p.push(['m', ' (so far today)']);
-    if (S.sma[j] != null) {
-      var gp = (S.s[j] / S.sma[j] - 1) * 100;
-      p.push(['', ' · 200-day '], ['o', S.sma[j].toFixed(2)], [gp >= 0 ? 'g' : 'r', ' · ' + sgn(gp) + (gp >= 0 ? ' above' : ' below')]);
+  function stormRo(G, sma, j) {
+    var s = doc.daily.spy, p = [['d', fmtDay(D.d[j], true)], ['', ' · SPY '], ['v', s[j].toFixed(2)]];
+    if (j === G.i1 && G.live) p.push(['m', ' (so far today)']);
+    var gp = j >= G.i0 && j <= G.i1 ? G.gap[j - G.i0] : null;
+    if (sma[j] != null && gp != null) {
+      var below = inRuns(G.below, j, true);
+      p.push(['', ' · 200-day '], ['o', sma[j].toFixed(2)], [below ? 'r' : 'g', ' · ' + (below ? '−' : '+') + (gp / 10).toFixed(1) + '%' + (below ? ' below' : ' above')]);
     }
     return p;
   }
@@ -3107,21 +2659,21 @@
   }
 
 
-  var GZ_CARDS = [['thin', 'gzThin', thinState, thinText, function (S) { drawThinBars(S); drawThinChart(S); }],
-                  ['thrust', 'gzThrust', thrustState, thrustText, function (S) { drawThrustLine(S); drawThrustPops(S); }],
-                  ['storms', 'gzStorms', stormState, stormText, function (S) { drawStormBars(S); drawStormChart(S); }]];
+  var GZ_CARDS = [['thin', 'gzThin', thinText, function (G) { drawThinBars(G); drawThinChart(G); }],
+                  ['thrust', 'gzThrust', thrustText, function (G) { drawThrustLine(G); drawThrustPops(G); }],
+                  ['storms', 'gzStorms', stormText, function (G) { drawStormBars(G); drawStormChart(G); }]];
   function renderGauges() {
     if (!$('gauges')) return;
-    var ok = null;
-    try { ok = gzInputs(); } catch (e) { ok = {}; }
+    var GS = (D && D.V.gauges) || {};
     GZ_CARDS.forEach(function (c) {
+      var G = GS[c[0]];
       GZS[c[0]] = null;
       try {
-        if (!ok[c[0]]) { GZS[c[0]] = { ok: false, state: 'NA' }; gzShow(c[1], false, 'Not available in this build (the numbers it needs are not in this data file yet).'); return; }
-        var S = c[2](); c[3](S); GZS[c[0]] = S; gzShow(c[1], true);
+        if (!G || !G.ok) { GZS[c[0]] = { ok: false, state: 'NA' }; gzShow(c[1], false, G && G.na ? G.na : NA_DRAW); return; }
+        c[2](G); GZS[c[0]] = { ok: true, state: G.state, G: G }; gzShow(c[1], true);
       } catch (e) {
-        GZS[c[0]] = { ok: false, state: 'NA', error: String(e && e.message || e) };
-        gzShow(c[1], false, 'Not available in this build (' + (e && e.message || e) + ').');
+        GZS[c[0]] = { ok: false, state: 'NA' };
+        gzShow(c[1], false, NA_DRAW);
       }
     });
     drawGauges();
@@ -3134,7 +2686,7 @@
     GZ_CARDS.forEach(function (c) {
       var S = GZS[c[0]];
       if (!S || !S.ok) return;
-      try { c[4](S); } catch (e) { S.ok = false; S.drawError = String(e && e.message || e); gzShow(c[1], false, 'Not available in this build (' + S.drawError + ').'); }
+      try { c[3](S.G); } catch (e) { S.ok = false; S.drawError = true; gzShow(c[1], false, NA_DRAW); }
     });
   }
   (function () {
@@ -3146,27 +2698,6 @@
     }
     if ('ResizeObserver' in window) new ResizeObserver(req).observe(sec); else window.addEventListener('resize', req);
   })();
-
-  try {
-    Object.defineProperty(window, '__breadthGauges', { configurable: true, get: function () {
-      if (!D) return null;
-      var A = GZS.thin, B = GZS.thrust, S = GZS.storms, o = {};
-      o.thin = !A || !A.state || A.state === 'NA' ? { state: 'NA', error: A && (A.error || A.drawError) || null } : { state: A.state, ndth: A.ndth, offHigh: A.offHigh,
-        band: A.band, bandLabel: GZ.thin.bands[A.band] ? GZ.thin.bands[A.band].label : null, onLast252: A.on252, onShareLast252: f1(A.on252 / A.len252 * 100),
-        lastFlagDates: A.flagged.slice(-10).map(function (i) { return doc.daily.d[i]; }), dropsAfterCutoff: A.dropsAfter.slice(), asOf: A.asOf,
-        stretch: A.stretch, noQqq: !!A.noQ, drawError: A.drawError || null };
-      o.thrust = !B || !B.state || B.state === 'NA' ? { state: 'NA', error: B && (B.error || B.drawError) || null } : { state: B.state, value: B.value, asOf: B.asOf,
-        lastLe25: B.lastLe25 || null, armDay: B.armDay || null, deadline: B.deadline || null, sessionsLeft: B.sessionsLeft == null ? null : B.sessionsLeft, lastThrust: B.lastThrust,
-        firedOn: B.firedOn, iwmSince: B.iwmSince == null ? null : f1(B.iwmSince), windowEnd: B.windowEnd || null, blockedUntil: B.blockedUntil || null,
-        lapsed: B.lapsedArm ? { arm: B.lapsedArm, end: B.lapsedEnd } : null, thrusts: B.thrusts.map(function (i) { return doc.daily.d[i]; }),
-        liveThrusts: B.live, matchedStudy: B.matched, noIwm: !!B.noIwm, drawError: B.drawError || null };
-      o.storms = !S || !S.state || S.state === 'NA' ? { state: 'NA', error: S && (S.error || S.drawError) || null } : { state: S.state, spy: S.spy,
-        sma200: Math.round(S.sma200 * 100) / 100, gap: Math.round(S.gap * 100) / 100, flipPct: Math.round(S.flipPct * 100) / 100, live: S.live,
-        since: S.since != null ? doc.daily.d[S.since] : null, drawError: S.drawError || null };
-      o.drawnAt = GZW;
-      return JSON.parse(JSON.stringify(o));
-    } });
-  } catch (e) { }
 
 
 
@@ -3198,7 +2729,7 @@
   function fsSize() { if (FS.key) { var m = fsMinH(FS.key) + 'px'; if (fsSlot('chart').style.flexBasis !== m) fsSlot('chart').style.flexBasis = m; } }
   function fsDraw(now) {
     if (!FS.key || !D) return;
-    if (FS.key.charAt(0) === 'c') { if (now) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); } } else requestRender(); }
+    if (FS.key.charAt(0) === 'c') { if (now) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn.'); } } else requestRender(); }
     else { requestKdj(FS.key.slice(1)); if (now) drawKdjPending(); }
   }
   function fsHint() {
@@ -3259,7 +2790,7 @@
     setInert(false);
 
     if (doc && D) {
-      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); }
+      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn.'); }
       TFS.forEach(function (k) { kPending[k] = 1; }); drawKdjPending();
     }
     renderKChips();
@@ -3356,8 +2887,8 @@
     $('content').hidden = false;
     renderStatus(); renderText();
     try { drawCharts(); }
-    catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); return; }
-    try { renderKdjText(); } catch (e) { var er = $('kdjErr'); er.hidden = false; er.textContent = 'The KDJ section could not be drawn (' + e.message + ').'; }
+    catch (e) { showFatal('The charts could not be drawn.'); return; }
+    try { renderKdjText(); } catch (e) { var er = $('kdjErr'); er.hidden = false; er.textContent = 'The KDJ section could not be drawn.'; }
     requestKdj('all'); drawKdjPending();
     renderGauges();
   }
@@ -3367,7 +2898,7 @@
     requestAnimationFrame(function () {
       rafPending = false;
       if (!doc) return;
-      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); }
+      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn.'); }
     });
   }
 
@@ -3384,6 +2915,10 @@
   }
 
 
+
+
+  function pageErr(msg) { var e = new Error(msg); e.shown = msg; return e; }
+  function shownMsg(e) { return e && typeof e.shown === 'string' ? e.shown : BAD_DATA; }
   function getJSON(name) {
     var ctl = ('AbortController' in window) ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, FETCH_TIMEOUT_MS);
@@ -3391,11 +2926,11 @@
     return fetch(base + name + '?m=' + bust, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined })
       .then(function (r) {
         clearTimeout(timer);
-        if (!r.ok) throw new Error(name + ': HTTP ' + r.status);
-        return r.json().catch(function () { throw new Error(name + ' is not valid JSON'); });
+        if (!r.ok) throw pageErr(name + ': HTTP ' + r.status);
+        return r.json().catch(function () { throw pageErr(name + ' is not valid JSON'); });
       }, function (e) {
         clearTimeout(timer);
-        throw new Error(e && e.name === 'AbortError' ? name + ' timed out' : 'network error fetching ' + name);
+        throw pageErr(e && e.name === 'AbortError' ? name + ' timed out' : 'network error fetching ' + name);
       });
   }
   var loading = false;
@@ -3403,11 +2938,12 @@
     if (loading) return; loading = true;
     getJSON(FILE).then(function (d) {
       var bad = validate(d);
-      if (bad) throw new Error('the data looked broken: ' + bad);
+      if (bad) throw pageErr(bad);
       var changed = !doc || d.generated_epoch !== doc.generated_epoch;
       var hadView = !!D, wasLatest = hadView ? atLatest(view) : true, prevN = {}, prevS = {};
       TFS.forEach(function (k) { prevN[k] = KN[k]; prevS[k] = D && D.tf[k] ? D.tf[k].s : null; });
-      doc = d; D = prepare(d); loadedAt = now(); lastErr = null;
+      var P = prepare(d);
+      doc = d; D = P; loadedAt = now(); lastErr = null;
       TFS.forEach(function (k) { KN[k] = D.kdj[k].n; });
       kdjAfterLoad(prevN, prevS);
 
@@ -3415,8 +2951,8 @@
       else view = wasLatest ? toLatest(view, view.x0) : clampView(view);
       if (changed) renderAll(); else renderStatus();
     }).catch(function (e) {
-      if (!doc) showFatal('Could not load the data (' + e.message + ').');
-      else { lastErr = { at: now(), msg: e.message }; renderStatus(); }
+      if (!doc) showFatal('Could not load the data (' + shownMsg(e) + ').');
+      else { lastErr = { at: now(), msg: shownMsg(e) }; renderStatus(); }
     }).then(function () { loading = false; });
   }
   function poll() {
@@ -3426,7 +2962,7 @@
       var e = m && m.files && m.files[FILE];
       if (!e || e.generated_at !== doc.generated_epoch) load();
       else { lastErr = null; renderStatus(); }
-    }).catch(function (e) { lastErr = { at: now(), msg: e.message }; renderStatus(); });
+    }).catch(function (e) { lastErr = { at: now(), msg: shownMsg(e) }; renderStatus(); });
   }
 
 
@@ -3460,47 +2996,6 @@
   attachGestures($('chart2'), 'c2');
   attachGestures($('chart3'), 'c3');
   initKdjBlocks();
-
-  try {
-    Object.defineProperty(window, '__breadthView', { configurable: true, get: function () {
-      if (!D) return null;
-      return { chip: view.chip, custom: view.custom, x0: view.x0, x1: view.x1, from: isoOf(Math.floor(view.x0)), to: isoOf(Math.floor(view.x1)),
-        span: view.x1 - view.x0, atLatest: atLatest(view), latest: isoOf(D.last), first: isoOf(D.d[0]), limits: spanLimits(), renders: renders,
-        title: spanWords() };
-    } });
-    Object.defineProperty(window, '__breadthFs', { configurable: true, get: function () {
-      return { key: FS.key, y: FS.y, pushed: FS.pushed, pendingBack: FS.pendingBack, kchip: kChip };
-    } });
-    Object.defineProperty(window, '__breadthDots', { configurable: true, get: function () { return D ? JSON.parse(JSON.stringify(dotDebug)) : null; } });
-
-    Object.defineProperty(window, '__breadthKdj', { configurable: true, get: function () {
-      if (!D || !D.kdj) return null;
-      var o = {};
-      TFS.forEach(function (k) {
-        var Q = D.kdj[k], n = Q.n, v = KV[k], B = KB[k];
-        o[k] = { n: n, v50: D.tf[k].v[n - 1], K: Q.K[n - 1], D: Q.D[n - 1], J: Q.J[n - 1], open: Q.open, rising: Q.rising, flip: Q.flip,
-          flipDir: Q.flip == null ? null : (Q.rising ? 'weakening' : 'improving'), crossLast: Q.cross[n - 1] || null,
-          window: v ? { x0: v.x0, x1: v.x1, custom: v.custom, atLatest: kAtLatest(k, v), words: B.win.textContent, chip: kChip,
-            cnt: Math.min(n - 1, Math.floor(v.x1)) - Math.max(0, Math.ceil(v.x0)) + 1, want: kChipCount(k, kChip), shown: kChipShown(k) } : null,
-          shown: { header: B.val.textContent, note: B.note.textContent, readout: B.ro.textContent }, draw: kDebug[k] || null,
-          recent: { K: Q.K.slice(-12), D: Q.D.slice(-12), J: Q.J.slice(-12) } };
-      });
-      return JSON.parse(JSON.stringify(o));
-    } });
-
-    Object.defineProperty(window, '__breadthWash', { configurable: true, get: function () {
-      if (!D) return null;
-      var o = {};
-      TFS.forEach(function (k) {
-        var T = D.tf[k], R = pctCandle(k, T.v.length - 1), R2 = pctCandle(k, T.v.length - 1, 't');
-        o[k] = { n: T.v.length, latest: T.v[T.v.length - 1], latest200: T.t[T.t.length - 1], sig: T.wash.sig.map(function (i) { return isoOf(T.e[i]) + ' ' + f1(T.v[i]); }),
-          rings: T.wash.rings.map(function (r) { return isoOf(T.e[r.i]) + '->' + isoOf(T.e[r.k]) + ' ' + f1(T.v[r.k]); }),
-          active: T.wash.active ? { i: isoOf(T.e[T.wash.active.i]), low: isoOf(T.e[T.wash.active.low]) } : null,
-          pct: { s13: R.s13, s21: R.s21, p200: R2.s13 }, open: D.pct[k].open };
-      });
-      return JSON.parse(JSON.stringify(o));
-    } });
-  } catch (e) { }
   if ('ResizeObserver' in window) {
     var lastW = 0;
     new ResizeObserver(function (ents) {

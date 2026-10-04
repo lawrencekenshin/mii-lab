@@ -110,12 +110,12 @@
             <p class="gz-line" data-g="l1"></p>
             <p class="gz-line" data-g="l2"></p>
             <p class="gz-cap" data-g="cap"></p>
-            <div class="gz-mini" data-g="mini" role="img" aria-label="Share of near-high days followed by a 10% drop, by breadth band, since 2013 and since 2021"></div>
+            <div class="gz-mini" data-g="mini" role="img" aria-label="Share of near-high days followed by a big drop, by breadth band, since 2013 and since 2021"></div>
           </div>
           <div class="gz-right">
             <p class="gz-ct" data-g="ct"></p>
             <div class="gz-ro" data-g="ro" aria-live="polite"></div>
-            <div class="gz-chart" data-g="chart" role="img" aria-label="QQQ since 2013 on a log scale with the days QQQ first closed 10% under its 52-week high and the thin-rally days"></div>
+            <div class="gz-chart" data-g="chart" role="img" aria-label="QQQ since 2013 on a log scale with the start of each big drop and the thin-rally days"></div>
           </div>
         </div>
         <div class="box gz-box" data-g="box" hidden>
@@ -259,7 +259,7 @@
       <div class="card-head">
         <div class="card-title">
           <h2 id="t3">Breadth · KDJ</h2>
-          <p class="sub">SPY price · 50-day breadth · KDJ(9,3,3) of the 50-day breadth, per candle size</p>
+          <p class="sub">SPY price · 50-day breadth · KDJ of the 50-day breadth, per candle size</p>
         </div>
       </div>
       <div class="controls kdj-controls">
@@ -347,11 +347,11 @@
   </div>
 
   <footer class="foot">
-    <p>Breadth = the share of today’s index members whose close is above its 20-, 50-, 100- or 200-day simple average, with TradingView’s convention (a member with fewer closes than the average needs, such as a recent listing, counts as above). Checked against TradingView’s own indices on the days since the Sep 21, 2026 rebalance: the S&amp;P 500 20- and 50-day lines and the Nasdaq-100 50-day line equal S5TW / S5FI / NDFI; the 100- and 200-day lines (S5OH / S5TH / NDTH) and the Russell 2000 (IWM’s holdings, not the exact index list; R2FI / R2TH) are within a fraction of a point. Earlier readings run higher than the official indices, because names that later left an index are not counted: since mid-2024 about 1–2 points on the S&amp;P 500, 4–6 on the Nasdaq-100, 1–2 on the Russell 2000.</p>
-    <p>Washout = the 50-day line closes at or under 25% after it had closed back at or above 50% since the previous washout. Hollow ring = the deepest close of a washout that had not reset, at least 5 points under the washout day. The KDJ blocks’ weekly, 2-week and monthly candles use the breadth of their last trading day.</p>
-    <p>Nasdaq-100 and Russell 2000: the same rule on today’s members of each index (screener price caches), updated after each close; the S&amp;P 500 also updates during the session. Today’s Russell 2000 list holds many young companies, so its early years count fewer, surviving names. The Russell 1000 is left out: it moves with the S&amp;P 500 almost exactly.</p>
+    <p>Breadth = the share of today’s index members whose close is above its 20-, 50-, 100- or 200-day average. Earlier readings can run a little higher than the official indices, because names that later left an index are not counted.</p>
+    <p>Washout = the 50-day line drops to a deeply washed-out level after it had recovered since the previous washout. Hollow ring = the deepest close of a washout that had not reset, when it came clearly later and lower. The KDJ blocks’ weekly, 2-week and monthly candles use the breadth of their last trading day.</p>
+    <p>Nasdaq-100 and Russell 2000: the same lines on today’s members of each index, updated after each close; the S&amp;P 500 also updates during the session. Today’s Russell 2000 list holds many young companies, so its early years count fewer, surviving names. The Russell 1000 is left out: it moves with the S&amp;P 500 almost exactly.</p>
     <p><b>Informational only. Not investment advice.</b> Nothing here says when to buy or sell.</p>
-    <p id="footPct">Percentile = the share of CLOSED candles of the same size since 2013 (or since 2021) whose 50-day breadth was at or below that value; the candle itself is never counted, and an open candle is ranked against the closed ones (“so far”). Low percentile = few stocks above their average, rare.</p>
+    <p id="footPct">Percentile = where a reading ranks among past candles of the same size since 2013 (or since 2021); an open candle is ranked “so far”. Low percentile = few stocks above their average, rare.</p>
     <p id="footData">Derived values only (counts of stocks; SPY, QQQ and IWM closes). Prices about 15 minutes delayed during the session. No cookies, no tracking.</p>
   </footer>
 </main>
