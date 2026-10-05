@@ -331,6 +331,7 @@
   var HUNTS = { chase: { opt: 'optChase', left: 'left the hunt' } };
   function isHunt(k) { return !!(k && HUNTS[k]); }
   if (typeof HUNTS === 'object') HUNTS.fresh = { opt: 'optFresh', left: 'left the list' };
+  if (typeof HUNTS === 'object') HUNTS.ewz = { opt: 'optEwz', left: 'left the hunt' };
   S.day = null; S.period = null;
   S.netOpen = false; S.netDir = null; S.netAll = false;
 
@@ -485,6 +486,13 @@
         var rows = fr.names.filter(function (r) { return r && typeof r.sym === 'string' && num(r.node) && num(r.price) && r.fresh && num(r.fresh.growth) && num(r.fresh.added) && inL(r.sym); });
         rows.forEach(function (r, i) { r._i = i; if (TIERS.indexOf(r.tier) < 0) r.tier = 'C'; viewName(r, full.prices_day); });
         return { names: rows, checked: num(fr.checked) ? fr.checked : null };
+      })(),
+      ewz: (function () {
+        var ez = full.ewz;
+        if (sideKey !== 'calls' || !ez || !Array.isArray(ez.names)) return null;
+        var rows = ez.names.filter(function (r) { return r && typeof r.sym === 'string' && num(r.node) && num(r.price) && r.ewz && num(r.ewz.added) && inL(r.sym); });
+        rows.forEach(function (r, i) { r._i = i; if (TIERS.indexOf(r.tier) < 0) r.tier = 'C'; viewName(r, full.prices_day); });
+        return { names: rows, checked: num(ez.checked) ? ez.checked : null };
       })(),
       tsm: sideKey === 'calls' && full.tsm_case && Array.isArray(full.tsm_case.cases) ?
         full.tsm_case.cases.filter(function (c) { return c && typeof c.sym === 'string' && num(c.node) && c.start && c.start.day && num(c.start.dist) && c.now && num(c.now.close); }) : null,
@@ -1229,6 +1237,38 @@
   }
 
 
+  function ewzNote(Hn) {
+    var n = Hn ? Hn.names.length : 0, on = Hn ? Hn.names.filter(function (x) { return x.listed; }).length : 0,
+      rolled = Hn ? Hn.names.filter(function (x) { return x.ewz && x.ewz.roll; }).length : 0;
+    return 'Hunting the EWZ pattern across ' + (P.list === 'all' ? 'all ' + (Hn && num(Hn.checked) ? int(Hn.checked) + ' ' : '') + 'names' : LISTS[P.list].label + ' names') +
+      ' with a big call pile far above the price and calls well above puts at it: fresh calls arriving at that pile over the last few sessions, however long it has been the top pile. The best-match list wants a pile that has stayed the top pile, which is why it left EWZ off. Rolled in = the top strike moved closer to the price while calls at the old top strike were cut, as EWZ’s did (45 to 43) before Brazil’s Oct 4 vote: ' +
+      (rolled ? (rolled === 1 ? 'that one comes' : 'those come') + ' first, then the most calls added' : 'none today; ranked by the most calls added') +
+      ' (the number before each name). One case so far: a hunt to watch, not a tested signal. ' +
+      (n && on === 0 ? 'None of them is on the best-match list today.' : on === n && n ? 'All of them are on the best-match list too.' : on ? on + ' of them ' + (on === 1 ? 'is' : 'are') + ' on the best-match list too.' : '');
+  }
+  function ewzWhy(n) {
+    var e = n.ewz, k = strike(n.node), ul = document.createElement('ul'); ul.className = 'why';
+    var items = [
+      ['Big pile far above', k + ' is ' + p0(n.dist) + ' above the price; ' + p0(n.share) + ' of all the upside gamma on ' + n.sym + (num(n.gex_usd) ? ' (' + usd(n.gex_usd) + ' of gamma)' : '')],
+      ['Calls, not puts', int(n.call_oi) + ' calls against ' + int(n.put_oi) + ' puts at ' + k],
+      ['Fresh calls', '+' + int(e.added) + ' open calls at ' + k + ' (' + chgTxt(e.growth) + ')' +
+        (e.from_day && e.to_day ? ' from ' + dS(e.from_day) + ' to ' + dS(e.to_day) : '') + (num(e.to_oi) ? ', ' + int(e.to_oi) + ' open now' : '')]
+    ];
+    if (e.roll && num(e.roll.from_k) && num(e.roll.from_chg)) items.push(['Rolled in', 'the top strike moved from ' + strike(e.roll.from_k) + ' to ' + k +
+      ', and calls at ' + strike(e.roll.from_k) + ' fell by ' + int(Math.abs(e.roll.from_chg)) + (e.roll.from_day && e.roll.to_day ? ' from ' + dS(e.roll.from_day) + ' to ' + dS(e.roll.to_day) : '')]);
+    items.forEach(function (x) {
+      var li = document.createElement('li');
+      li.appendChild(span('ok', '✓'));
+      li.appendChild(document.createTextNode(x[0] + ': ' + x[1]));
+      ul.appendChild(li);
+    });
+    var li2 = document.createElement('li'); li2.className = 'mut';
+    li2.appendChild(document.createTextNode('Named after EWZ: this setup came before Brazil’s first-round vote, and EWZ jumped about 11% the next morning toward its 43 pile. New calls show interest, not direction: each one has a buyer and a seller. One case so far, not tested.'));
+    ul.appendChild(li2);
+    return ul;
+  }
+
+
   var DAYS = null, PERF = {}, perLoading = {}, perPend = null, perFail = false, perCache = { k: null, v: null }, dayDocs = {};
   var PER_LABEL = { '1w': 'Last 1 week', '2w': 'Last 2 weeks', '1m': 'Last 1 month', total: 'Everything saved' };
   function isDay(s) { return typeof s === 'string' && /^\d{4}-\d\d-\d\d$/.test(s); }
@@ -1761,6 +1801,7 @@
   };
   SORTS.chase = function () { return 0; };
   SORTS.fresh = function () { return 0; };
+  SORTS.ewz = function () { return 0; };
   Object.keys(RANKS).forEach(function (k) {
     var f = RANKS[k].f;
     SORTS[k] = RANKS[k].asc
@@ -2236,6 +2277,7 @@
   function whyList(n) {
     if (n._srch) return srchWhy(n);
     if (n.hunt) return huntWhy(n);
+    if (n.ewz) return ewzWhy(n);
     if (n.fresh) return freshWhy(n);
     var w = SW(), ul = document.createElement('ul'); ul.className = 'why';
     var cp = cpOf(n), mv = n.mv, share = n.share;
