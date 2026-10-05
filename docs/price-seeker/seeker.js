@@ -328,6 +328,9 @@
   var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all', side: 'calls' };
   S.failBy = 'all'; S.failSort = 'size'; S.failAll = false; S.failOpen = {};
   S.chaseSym = 'TSM'; S.chaseParked = false;
+  var HUNTS = { chase: { opt: 'optChase', left: 'left the hunt' } };
+  function isHunt(k) { return !!(k && HUNTS[k]); }
+  if (typeof HUNTS === 'object') HUNTS.fresh = { opt: 'optFresh', left: 'left the list' };
   S.day = null; S.period = null;
   S.netOpen = false; S.netDir = null; S.netAll = false;
 
@@ -475,6 +478,13 @@
         var rows = hn.names.filter(function (r) { return r && typeof r.sym === 'string' && num(r.node) && num(r.price) && r.hunt && num(r.hunt.closed) && inL(r.sym); });
         rows.forEach(function (r, i) { r._i = i; if (TIERS.indexOf(r.tier) < 0) r.tier = 'C'; viewName(r, full.prices_day); });
         return { names: rows, checked: num(hn.checked) ? hn.checked : null };
+      })(),
+      fresh: (function () {
+        var fr = full.fresh;
+        if (sideKey !== 'calls' || !fr || !Array.isArray(fr.names)) return null;
+        var rows = fr.names.filter(function (r) { return r && typeof r.sym === 'string' && num(r.node) && num(r.price) && r.fresh && num(r.fresh.growth) && num(r.fresh.added) && inL(r.sym); });
+        rows.forEach(function (r, i) { r._i = i; if (TIERS.indexOf(r.tier) < 0) r.tier = 'C'; viewName(r, full.prices_day); });
+        return { names: rows, checked: num(fr.checked) ? fr.checked : null };
       })(),
       tsm: sideKey === 'calls' && full.tsm_case && Array.isArray(full.tsm_case.cases) ?
         full.tsm_case.cases.filter(function (c) { return c && typeof c.sym === 'string' && num(c.node) && c.start && c.start.day && num(c.start.dist) && c.now && num(c.now.close); }) : null,
@@ -880,9 +890,19 @@
       var f = $('filters'); if (f && f.scrollIntoView) f.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
     });
   }
-  function inHunt(sym) { return !!(P && P.side === 'calls' && P.chase && P.chase.names.some(function (n) { return n.sym === sym; })); }
-  function goToHuntRow(sym) {
-    if (S.sort !== 'chase') { S.sort = 'chase'; S.chaseParked = false; sset('ps.sort', 'chase'); }
+  function inHunt(sym, kind) {
+    kind = kind || S.sort;
+    return !!(P && P.side === 'calls' && isHunt(kind) && P[kind] && P[kind].names.some(function (n) { return n.sym === sym; }));
+  }
+  function huntFor(sym) {
+    if (isHunt(S.sort) && inHunt(sym, S.sort)) return S.sort;
+    if (P && P.by[sym]) return null;
+    var ks = Object.keys(HUNTS).filter(function (k) { return inHunt(sym, k); });
+    return ks.length ? ks[0] : null;
+  }
+  function goToHuntRow(sym, kind) {
+    kind = isHunt(kind) ? kind : 'chase';
+    if (S.sort !== kind) { S.sort = kind; S.chaseParked = false; sset('ps.sort', kind); }
     if (S.q && sym.indexOf(S.q.trim().toUpperCase()) !== 0) { S.q = ''; $('q').value = ''; }
     renderCounts(); renderList();
     var r = rowRefs[sym]; if (!r) return false;
@@ -891,9 +911,9 @@
     return true;
   }
   function huntUpdate(np, old) {
-    var hb = {}, ob = {};
-    (np.chase ? np.chase.names : []).forEach(function (n) { hb[n.sym] = n; });
-    (old && old.chase ? old.chase.names : []).forEach(function (n) { ob[n.sym] = 1; });
+    var hb = {}, ob = {}, kind = S.sort;
+    (np[kind] ? np[kind].names : []).forEach(function (n) { hb[n.sym] = n; });
+    (old && old[kind] ? old[kind].names : []).forEach(function (n) { ob[n.sym] = 1; });
     var nNew = Object.keys(hb).filter(function (k) { return !ob[k]; }).length, nLeft = 0;
     Object.keys(rowRefs).forEach(function (sym) { if (hb[sym]) updateRow(rowRefs[sym], hb[sym]); else nLeft++; });
     renderChaseOpt(); renderChase(); renderListBar(); renderTiles(); renderCounts(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot(); renderStatus();
@@ -901,12 +921,12 @@
     if (typeof renderFailed === 'function') renderFailed();
     if (nNew || nLeft) {
       var b = $('updateBar'); clear(b); b.hidden = false;
-      b.appendChild(span('', 'Updated ' + hm12(np.gen, NY) + ' ET · ' + nNew + ' new · ' + nLeft + ' left the hunt'));
+      b.appendChild(span('', 'Updated ' + hm12(np.gen, NY) + ' ET · ' + nNew + ' new · ' + nLeft + ' ' + HUNTS[kind].left));
       var x = btn('btn', 'Re-sort'); x.addEventListener('click', function () { b.hidden = true; setStick(); renderList(); }); b.appendChild(x);
       setStick();
     }
   }
-  function leaveHunt() { if (S.sort === 'chase') { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); return true; } return false; }
+  function leaveHunt() { if (isHunt(S.sort)) { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); return true; } return false; }
   function closeOn(ser, dn) {
     if (!ser || dn == null) return null;
     var v = null; for (var i = 0; i < ser.d.length && ser.d[i] <= dn; i++) v = ser.c[i];
@@ -939,10 +959,14 @@
     return who + when + ': ' + strike(o.node) + ' became its top call pile, ' + p0(o.start.dist) + ' above the price. Tap ' + o.sym + ' above to see it.';
   }
   function renderChaseOpt() {
-    var o = document.getElementById('optChase'), have = !!(P && P.side === 'calls' && P.chase);
-    if (o) { o.hidden = !have; o.disabled = !have; }
-    if (!have && S.sort === 'chase') { S.sort = 'best'; S.chaseParked = true; }
-    else if (have && S.chaseParked) { S.chaseParked = false; if (S.sort === 'best') S.sort = 'chase'; }
+    var calls = !!(P && P.side === 'calls');
+    Object.keys(HUNTS).forEach(function (k) {
+      var o = document.getElementById(HUNTS[k].opt), have = calls && !!P[k];
+      if (o) { o.hidden = !have; o.disabled = !have; }
+    });
+    var pk = S.chaseParked === true ? 'chase' : S.chaseParked;
+    if (isHunt(S.sort) && !(calls && P[S.sort])) { S.chaseParked = S.sort; S.sort = 'best'; }
+    else if (isHunt(pk) && calls && P[pk]) { S.chaseParked = false; if (S.sort === 'best') S.sort = pk; }
   }
   function renderChase() {
     var sec = $('chase'), cs = P && P.tsm ? P.tsm : [];
@@ -1151,20 +1175,55 @@
     if (h.opex) { var li2 = document.createElement('li'); li2.className = 'mut'; li2.appendChild(document.createTextNode('It became the top pile in the ' + dS(h.opex) + ' expiry week, when near-term piles drop out of the map: it was most likely there already.')); ul.appendChild(li2); }
     return ul;
   }
-  function renderHunt(host) {
-    var Hn = P.chase, q = S.q.trim().toUpperCase(), ql = S.q.trim().toLowerCase();
-    $('rankNote').textContent = 'Hunting the TSM pattern across ' + (P.list === 'all' ? 'all ' + (Hn && num(Hn.checked) ? int(Hn.checked) + ' ' : '') + 'names with a call pile' : LISTS[P.list].label) +
-      ': a big, mostly long-dated call pile that sat well above the price when it became the top pile, has stayed the top pile, and that the price has been closing in on without reaching it, while the calls there have not been cut back by much. Ranked by the share of the gap closed (the number before each name). Most are not on the best-match list: once the price gets close, a pile drops off it.';
+  function renderHunt(host, kind) {
+    kind = isHunt(kind) ? kind : 'chase';
+    var Hn = P[kind], q = S.q.trim().toUpperCase(), ql = S.q.trim().toLowerCase();
+    if (kind === 'chase') {
+      $('rankNote').textContent = 'Hunting the TSM pattern across ' + (P.list === 'all' ? 'all ' + (Hn && num(Hn.checked) ? int(Hn.checked) + ' ' : '') + 'names with a call pile' : LISTS[P.list].label) +
+        ': a big, mostly long-dated call pile that sat well above the price when it became the top pile, has stayed the top pile, and that the price has been closing in on without reaching it, while the calls there have not been cut back by much. Ranked by the share of the gap closed (the number before each name). Most are not on the best-match list: once the price gets close, a pile drops off it.';
+    } else if (typeof freshNote === 'function') {
+      $('rankNote').textContent = freshNote(Hn);
+    }
     $('rankNote').hidden = false;
     var rows = Hn ? Hn.names.filter(function (n) { return !q || n.sym.indexOf(q) === 0 || (ql.length >= 2 && typeof n.name === 'string' && (' ' + n.name.toLowerCase()).indexOf(' ' + ql) >= 0); }) : [];
-    if (q && rows.length) $('rankNote').textContent += ' Showing your search only; the numbers are each name’s place in the hunt.';
+    if (q && rows.length) $('rankNote').textContent += kind === 'chase' ? ' Showing your search only; the numbers are each name’s place in the hunt.' : ' Showing your search only; the numbers are each name’s place on this list.';
     if (!rows.length) {
-      host.appendChild(q ? emptyBox('No match starts with ' + q + '.') : P.list === 'all' ? emptyBox('No name shows the TSM pattern today.') :
-        emptyBox('No name on ' + LISTS[P.list].label + ' shows the TSM pattern today.', 'Whole list', function () { setList('all'); }));
+      var what = kind === 'chase' ? 'shows the TSM pattern' : 'has fresh calls arriving at its pile';
+      host.appendChild(q ? emptyBox('No match starts with ' + q + '.') : P.list === 'all' ? emptyBox('No name ' + what + ' today.') :
+        emptyBox('No name on ' + LISTS[P.list].label + ' ' + what + ' today.', 'Whole list', function () { setList('all'); }));
       return;
     }
     rows.forEach(function (n) { var r = addRow(host, n, null); r.c.stock.insertBefore(span('rk', String(n._i + 1)), r.c.stock.firstChild); });
     Object.keys(S.open).forEach(function (sym) { if (rowRefs[sym]) openRow(rowRefs[sym], false); });
+  }
+
+
+  function freshNote(Hn) {
+    var n = Hn ? Hn.names.length : 0, on = Hn ? Hn.names.filter(function (x) { return x.listed; }).length : 0;
+    return 'Fresh Calls AI Pile: AI companies' + (P.list === 'all' || P.list === 'ai' ? '' : ' on ' + LISTS[P.list].label) +
+      ' whose biggest call pile is a big one, sits above the price (at any distance), and where open calls at that pile have grown clearly over the last few sessions' +
+      (Hn && num(Hn.checked) ? ' (' + n + ' of the ' + int(Hn.checked) + ' AI companies with a big pile above the price)' : '') +
+      '. Ranked by how fast the calls grew (the number before each name). In our first look, piles where new calls kept arriving were reached more often than piles that sat still, but on only a handful of names: a watch list, not a tested signal. ' +
+      (n && on === 0 ? 'None of them is on the best-match list today.' : on === n && n ? 'All of them are on the best-match list too.' : on ? on + ' of them ' + (on === 1 ? 'is' : 'are') + ' on the best-match list too.' : '');
+  }
+  function freshWhy(n) {
+    var f = n.fresh, ul = document.createElement('ul'); ul.className = 'why';
+    [
+      ['AI company', 'on the AI companies list'],
+      ['Pile above the price', strike(n.node) + ' is ' + p0(n.dist) + ' above the price'],
+      ['Big pile', p0(n.share) + ' of all the upside gamma on ' + n.sym + (num(n.gex_usd) ? ' (' + usd(n.gex_usd) + ' of gamma)' : '')],
+      ['Fresh calls', '+' + int(f.added) + ' open calls at ' + strike(n.node) + ' (' + chgTxt(f.growth) + ')' +
+        (f.from_day && f.to_day ? ' from ' + dS(f.from_day) + ' to ' + dS(f.to_day) : '') + (num(f.to_oi) ? ', ' + int(f.to_oi) + ' open now' : '')]
+    ].forEach(function (x) {
+      var li = document.createElement('li');
+      li.appendChild(span('ok', '✓'));
+      li.appendChild(document.createTextNode(x[0] + ': ' + x[1]));
+      ul.appendChild(li);
+    });
+    var li2 = document.createElement('li'); li2.className = 'mut';
+    li2.appendChild(document.createTextNode('New calls show interest, not direction: each one has a buyer and a seller. Not tested yet: an early read from a handful of names.'));
+    ul.appendChild(li2);
+    return ul;
   }
 
 
@@ -1295,7 +1354,7 @@
   function setPeriod(k) { showPeriod(S.period === k ? null : k, null, true); }
   function showPeriod(k, sym, scroll) {
     k = PER_LABEL[k] ? k : null;
-    if (k && S.sort === 'chase') { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); }
+    if (k && typeof isHunt === 'function' && isHunt(S.sort)) { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); }
     S.period = k; perPend = sym || null; perFail = false;
     closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
     renderDayBar();
@@ -1698,6 +1757,7 @@
     combo: { f: 'combo', asc: true, note: 'All three combined: a blend of each name’s standing on $ in calls, $ per day left and the business score. Names without a business score sit at the bottom.' }
   };
   SORTS.chase = function () { return 0; };
+  SORTS.fresh = function () { return 0; };
   Object.keys(RANKS).forEach(function (k) {
     var f = RANKS[k].f;
     SORTS[k] = RANKS[k].asc
@@ -1749,11 +1809,12 @@
     if (cur && cur.c === c && cur.step === 1) { setSort('col:' + c + ':2'); return; }
     if (cur && cur.c === c && cur.step === 2) {
       var b = S.colBase && !colKey(S.colBase) && (SORTS[S.colBase] || S.colBase === 'best') ? S.colBase : 'best';
-      var huntOk = !S.period && !!(P && P.side === 'calls' && P.chase);
-      var park = b === 'chase' && !huntOk && !S.period;
-      if (b === 'chase' && !huntOk) b = 'best';
+      var hk = typeof isHunt === 'function' && isHunt(b) ? b : null;
+      var huntOk = !!hk && !S.period && !!(P && P.side === 'calls' && P[hk]);
+      var park = !!hk && !huntOk && !S.period;
+      if (hk && !huntOk) b = 'best';
       var rb = RANKS[b]; if (rb && rb.cp && !(P && P.cpHave && P.cpHave[rb.cp])) b = 'best';
-      S.colBase = null; setSort(b); if (park) S.chaseParked = true;
+      S.colBase = null; setSort(b); if (park) S.chaseParked = hk;
       return;
     }
     if (!cur) S.colBase = S.sort;
@@ -1872,8 +1933,8 @@
     }
     $('rankNote').hidden = !rk;
     if (S.period && perView()) { $('tierSeg').hidden = true; $('tierNote').hidden = true; renderPeriodList(host); return; }
-    $('tierSeg').hidden = S.sort === 'chase';
-    if (S.sort === 'chase') { $('tierNote').hidden = true; renderHunt(host); return; }
+    $('tierSeg').hidden = isHunt(S.sort);
+    if (isHunt(S.sort)) { $('tierNote').hidden = true; renderHunt(host, S.sort); return; }
     var rows = allRows();
     if (!rows.length) { host.appendChild(emptyBox('No name passes all five checks right now. That happens: we don’t lower the bar to fill the list.')); return; }
     if (S.tier !== 'all' && !P.counts[S.tier] && !rows.some(function (n) { return n.tier === S.tier; })) {
@@ -1968,7 +2029,8 @@
       if (psd && Array.isArray(psd.rows) && psd.rows.some(function (x) { return x && x.sym === sym; })) { setTimeout(function () { perLinkOpen(sym); }, 0); return; }
       S.period = null; perPend = null; S.open = {}; renderDayBar(); $('periods').hidden = true; clearHash(); renderCounts(); renderList();
     }
-    if (inHunt(sym) && (S.sort === 'chase' || !P.by[sym])) { setTimeout(function () { goToHuntRow(sym); }, 0); return; }
+    var hk = huntFor(sym);
+    if (hk) { setTimeout(function () { goToHuntRow(sym, hk); }, 0); return; }
     if (P.by[sym]) { setTimeout(function () { goToRow(sym, false); }, 0); return; }
     if (P.list !== 'all' && P.allSyms[sym]) { setList('all'); setTimeout(function () { goToRow(sym, false); }, 0); return; }
     checkTicker(sym);
@@ -1979,7 +2041,7 @@
     if (!RAW) { return; }
     closePop(); ghosts = {}; $('updateBar').hidden = true; setStick();
     P = prep(RAW, k, S.side);
-    var huntKeep = {}; if (S.sort === 'chase' && P.chase) P.chase.names.forEach(function (n) { huntKeep[n.sym] = 1; });
+    var huntKeep = {}; if (isHunt(S.sort) && P[S.sort]) P[S.sort].names.forEach(function (n) { huntKeep[n.sym] = 1; });
     Object.keys(S.open).forEach(function (sym) { if (!P.by[sym] && !(typeof huntKeep !== 'undefined' && huntKeep[sym])) delete S.open[sym]; });
     renderAll();
   }
@@ -1988,7 +2050,7 @@
     S.tier = k; if (k === 'C') { S.cOpen = true; sset('ps.cOpen', '1'); } sset('ps.tier', k); renderCounts(); renderList(); }
   function setSort(k) {
     S.chaseParked = false;
-    if (k === 'chase' && S.period) { S.period = null; S.open = {}; perPend = null; renderDayBar(); $('periods').hidden = true; clearHash(); }
+    if (typeof isHunt === 'function' && isHunt(k) && S.period) { S.period = null; S.open = {}; perPend = null; renderDayBar(); $('periods').hidden = true; clearHash(); }
     S.sort = SORTS[k] || k === 'best' ? k : 'best'; sset('ps.sort', S.sort); renderCounts(); renderList();
   }
   function setCOpen(o) { S.cOpen = o; sset('ps.cOpen', o ? '1' : '0'); renderList(); }
@@ -2046,7 +2108,7 @@
     if (S.day) a.push('d=' + S.day);
     if (S.period && (!sym || (perView() && perView().by[sym]))) a.push('p=' + S.period);
     if ((P ? P.side : S.side) === 'puts') a.push('v=puts');
-    if (sym && S.sort === 'chase' && inHunt(sym)) a.push('s=chase');
+    if (sym && isHunt(S.sort) && inHunt(sym, S.sort)) a.push('s=' + S.sort);
     return a;
   }
   function symHash(sym) { var a = viewParts(sym); return '#' + (a.length ? a.join('&') + '&o=' : '') + encodeURIComponent(sym); }
@@ -2079,6 +2141,7 @@
 
   function whyList(n) {
     if (n.hunt) return huntWhy(n);
+    if (n.fresh) return freshWhy(n);
     var w = SW(), ul = document.createElement('ul'); ul.className = 'why';
     var cp = cpOf(n), mv = n.mv, share = n.share;
     [
@@ -2890,7 +2953,7 @@
       renderAll(); return;
     }
     if (S.period) { perUpdate(); return; }
-    if (S.sort === 'chase') {
+    if (isHunt(S.sort)) {
       if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }
       if (!Object.keys(S.open).length) { renderAll(); return; }
       huntUpdate(np, old); return;
@@ -3022,7 +3085,7 @@
     if (h.v === 'puts' || h.v === 'calls') S.side = h.v;
     if (h.o && !h.v) S.side = 'calls';
     if (h.o) pendingOpen = h.o;
-    if (S.period) { perPend = h.o || null; pendingOpen = null; if (S.sort === 'chase') S.sort = 'best'; }
+    if (S.period) { perPend = h.o || null; pendingOpen = null; if (typeof isHunt === 'function' && isHunt(S.sort)) S.sort = 'best'; }
     if (S.tier === 'C') S.cOpen = true;
   })();
   initFolds();
