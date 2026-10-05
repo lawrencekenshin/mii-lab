@@ -84,7 +84,7 @@
         <div class="rg rg-pick" id="tiles1" role="group" aria-label="Pick the data series under the SMH chart"></div>
       </div>
       <div class="box">
-        <div class="box-row"><b>How to read it</b><span>Top: SMH weekly closes (log scale); the yellow dots are its lows after a 20%+ drop. Bottom: one data series, drawn as a step that moves only on the day a new number was published. The yellow ▲ (trough-turn) and ◆ (growth crossed above 0) are the study's pre-registered turn signals, placed on the day the data was public, with a small copy on the SMH line that week.<span class="box-m" id="serCap"></span></span></div>
+        <div class="box-row"><b>How to read it</b><span>Top: SMH weekly closes (log scale); the yellow dots are its lows after a deep drop. Bottom: one data series, drawn as a step that moves only on the day a new number was published. The yellow ▲ (trough-turn) and ◆ (growth crossed above 0) are the study's pre-registered turn signals, placed on the day the data was public, with a small copy on the SMH line that week.<span class="box-m" id="serCap"></span></span></div>
         <div class="box-row"><b>Right now</b><span id="rightNow"></span></div>
       </div>
     </section>
@@ -111,7 +111,7 @@
       <div class="chart" id="chart2" tabindex="0" role="group" aria-label="SMH and nine Taiwan series on one time axis. Left and right arrows move week by week, plus and minus zoom, 0 resets, F opens full screen."></div>
       <p class="legend" id="lg2"></p>
       <div class="box">
-        <div class="box-row"><b>How to read it</b><span>Taiwan data confirms the semis rally but does not lead it. Its edge is speed: company revenue and customs exports are public about 10 days after month end, against 39 days for WSTS chip sales. But the broad TWSE semis and TSMC series sit as far behind price as WSTS does.</span></div>
+        <div class="box-row"><b>How to read it</b><span>Taiwan data confirms the semis rally but does not lead it. Its edge is speed: company revenue and customs exports are public within about two weeks of month end, weeks before WSTS chip sales. But the broad TWSE semis and TSMC series sit as far behind price as WSTS does.</span></div>
         <div class="box-row"><b>Right now</b><span id="twSlow"></span></div>
       </div>
     </section>
@@ -138,7 +138,7 @@
       <div class="chart" id="chart4" tabindex="0" role="group" aria-label="SMH and six Korea series on one time axis. Left and right arrows move week by week, plus and minus zoom, 0 resets, F opens full screen."></div>
       <p class="legend" id="lg4"></p>
       <div class="box">
-        <div class="box-row"><b>How to read it</b><span>Korea data <i>confirms</i> the semis rally but does not lead it. Its edge is speed: customs counts chip exports for days 1–10 and 1–20 and publishes them at 09:00 Seoul on about the 11th and 21st, before the US open. The last three panels swing around 0: SK Hynix and Samsung against SMH in dollars, and the won (up = stronger won), each over 63 sessions.</span></div>
+        <div class="box-row"><b>How to read it</b><span>Korea data <i>confirms</i> the semis rally but does not lead it. Its edge is speed: customs counts chip exports for the first 10 and first 20 days of the month and publishes them around the 11th and 21st, before the US open. The last three panels swing around 0: SK Hynix and Samsung against SMH in dollars, and the won (up = stronger won), each over about 3 months.</span></div>
         <div class="box-row"><b>Right now</b><span id="krNow"></span></div>
         <div class="box-row"><b>What history says</b><span>Price led, even against this fastest print. At the 2022 low the 20-day print read +3%; it bottomed at −45% five months later and was back above zero in Nov 2023, with SMH already about +90%. At the 2025 low it had slowed to +12%; at the 2026 low it was +164% and accelerating, and it stayed above +150% through the June top and the July drop. Release-day moves were no bigger than usual, turn signals beat a fair test in one era only, and SK Hynix bottomed with SMH, not ahead of it, at 5 of 7 lows since 2016 (2–3 weeks early in 2016 and 2022).</span></div>
       </div>
@@ -166,7 +166,7 @@
       <div class="chart" id="chart3" tabindex="0" role="group" aria-label="SMH and six hardware series on one time axis. Left and right arrows move week by week, plus and minus zoom, 0 resets, F opens full screen."></div>
       <p class="legend" id="lg3"></p>
       <div class="box">
-        <div class="box-row"><b>How to read it</b><span>US AI-hardware imports: general imports (customs value), monthly, in 4 HS codes: servers and processing units (HS 847150), other computer units (847180), computer parts including GPU and accelerator boards (847330) and processors (854231). Memories (854232) are shown but kept out of the total. This is a slice of trade, not all US computer imports.<span class="box-m" id="censusNote"></span></span></div>
+        <div class="box-row"><b>How to read it</b><span>US AI-hardware imports: general imports, monthly, in a basket of server, computer-unit, computer-part (including GPU and accelerator boards) and processor import lines. Memory is shown but kept out of the total. This is a slice of trade, not all US computer imports.<span class="box-m" id="censusNote"></span></span></div>
         <div class="box-row"><b>Right now</b><span><span id="hwNow"></span><span class="box-p">Latest memory-price call (Sep 30): Q4 conventional DRAM +10–15% q/q, the third slowdown in a row (Q1 was called at +90–95% on Feb 2 and reported at +93–98% on Mar 31); NAND +15–20%, speeding up again. In 2018 and 2024 Micron topped <i>before</i> the first negative call; in 2021 the call came first.</span></span></div>
       </div>
     </section>
@@ -182,7 +182,7 @@
       <p class="panel-asof" id="sigAsof"><span class="chip chip-closed">STATIC</span><span>Study readings at the Oct 1 close; they do not update by themselves.</span></p>
       <div id="sigs"></div>
       <div class="box">
-        <div class="box-row"><b>How to read it</b><span>The S&amp;P KDJ meter = share of S&amp;P 500 stocks whose weekly KDJ J line is below 0. A washout day = under 25% of S&amp;P 500 stocks above their 50-day average. KDJ(9,3,3), MACD-V and OBV-MACD use closed weekly, 2-week and monthly candles; an intraday price is not a firing.</span></div>
+        <div class="box-row"><b>How to read it</b><span>The S&amp;P KDJ meter is a market-wide oversold gauge built from S&amp;P 500 members' weekly KDJ. A washout day is a day when very few S&amp;P 500 stocks are above their 50-day average. KDJ, MACD-V and OBV-MACD use closed weekly, 2-week and monthly candles; an intraday price is not a firing.</span></div>
         <div class="box-row"><b>What history says</b><span>Price and breadth signals told you <i>when</i> a market washout was happening, not <i>whether</i> the drop was over. Chart indicators fired within about 2 weeks of every low, and the same way at bounces that failed.<span class="box-m" id="macroNote"></span></span></div>
       </div>
     </section>
@@ -210,30 +210,30 @@
 
     <details class="card table-card" id="twMore">
       <summary>Taiwan data in full</summary>
-      <p class="hint">43 series measured the same way: company and industry revenue (MOPS), export orders (MOEA), customs exports (MOF), foreign flows, the TSM ADR premium and TAIEX. Growth = last 3 months vs the same 3 months a year earlier.</p>
+      <p class="hint">Several dozen series measured the same way: company and industry revenue (MOPS), export orders (MOEA), customs exports (MOF), foreign flows, the TSM ADR premium and TAIEX. Growth = last 3 months vs the same 3 months a year earlier.</p>
       <h3>Findings</h3>
       <div class="facts">
         <div class="fact"><h4>How far behind price</h4>Price was about <b>3.3 months</b> ahead of what you could read in TWSE semis and TSMC, the same as WSTS. Memory, TPEx semis and IC exports run about <b>1 month closer</b>. The AI-server chain (ODMs, Quanta, Wiwynn, King Slide) lags <b>6–12 months</b>. Japan tools, US orders and Micron sit 5.7–7.2 months behind.</div>
-        <div class="fact"><h4>2021 to now</h4>Only TWSE semis (about +8 months) and TSMC (+11) give a stable reading, and that is one cycle's phase, not a lead estimate. For the other series the 2021+ lead or lag cannot be pinned down: the plausible range spans the whole ±12-month window.</div>
+        <div class="fact"><h4>2021 to now</h4>Only TWSE semis (about +8 months) and TSMC (+11) give a stable reading, and that is one cycle's phase, not a lead estimate. For the other series the 2021+ lead or lag cannot be pinned down: the plausible range is too wide to use.</div>
         <div class="fact"><h4>At the lows</h4>2025: no TWSE semis, TSMC, ODM, export-order or customs series went negative. Only memory did (basket −8%, Nanya −28%), and it turned up 2 days after the low: one case. 2026: nothing turned down. The turn-ups before the low (ASPEED, TSMC and IC exports on Feb 10) were followed by another 10% fall. Optoelectronics bottomed in late 2025, but it is not an AI-cycle series.</div>
-        <div class="fact"><h4>Turn signals vs a fair test</h4>Pooled into independent episodes, Taiwan trough-turn and cross-above-zero signals beat a drawdown-matched benchmark only once each, in the late-2023 confirmation cluster (SMH already 45%+ off the 2022 low), and never in 2013-20.</div>
-        <div class="fact"><h4>Foreign investors</h4>They sold into every low (NT$656bn over the 13 weeks to the 2026 low). Their 4-week net turned positive with SMH already 24–28% off the low, and after the 2026 low they kept selling on balance (−NT$257bn over 13 weeks) while SMH rose about 85%. The cross-above-zero signal passes 2021-now but fails 2013-20.</div>
+        <div class="fact"><h4>Turn signals vs a fair test</h4>Pooled into independent episodes, Taiwan trough-turn and cross-above-zero signals beat the fair benchmark only once each, in the late-2023 confirmation cluster (SMH already 45%+ off the 2022 low), and never in 2013-20.</div>
+        <div class="fact"><h4>Foreign investors</h4>They sold into every low (NT$656bn over the 13 weeks to the 2026 low). Their net buying turned positive with SMH already 24–28% off the low, and after the 2026 low they kept selling on balance (−NT$257bn over 13 weeks) while SMH rose about 85%. The cross-above-zero signal passes 2021-now but fails 2013-20.</div>
         <div class="fact"><h4>TSM ADR premium</h4>Its washouts showed up at real lows and at failed bounces alike (Mar and Jul 2022). It is noisy: the two closes are 14 hours apart, so US-only news moves it by up to 18 points in a day. At the study's Oct 1 reading it was +16.6%: 87th percentile since 2013, 48th of the last 3 years (study note; it is not updated here).</div>
-        <div class="fact"><h4>TAIEX and the Taiwan dollar</h4>0 of 48 weekly lead tests pass. SMH appears to lead Taiwan by one week only because Taiwan's Monday trades on SMH's Friday: a time-zone overlap, not a signal. When the study was written, TAIEX had closed at a record 48,476 on Oct 2 (+84% over 12 months) while SMH sat 7.6% below its high. The TWD moved with the 2022 and 2025 lows but not consistently across eras.</div>
+        <div class="fact"><h4>TAIEX and the Taiwan dollar</h4>None of the weekly lead tests pass. SMH appears to lead Taiwan by one week only because Taiwan's Monday trades on SMH's Friday: a time-zone overlap, not a signal. When the study was written, TAIEX had closed at a record 48,476 on Oct 2 (+84% over 12 months) while SMH sat 7.6% below its high. The TWD moved with the 2022 and 2025 lows but not consistently across eras.</div>
         <div class="fact"><h4>A fix to the earlier study</h4>The first study's Taiwan semis series used the MOPS page total. From Apr 2018 to Apr 2019 that total counted ASE's new holding company with a year-ago value of 0, inflating growth by up to 21 points. Counted the same companies both years, Dec 2018 read +5% (not +26%), fell to −9% in Apr 2019 and turned up on 2019-07-10 (SMH +38%). This page uses the corrected series.</div>
       </div>
-      <p class="hint">Small date caveat: about 8% of MOPS signal dates (48 of 592) fall on a 10th that was a Taiwan holiday, when the real deadline rolled 1–5 days later. No headline result depends on them.</p>
+      <p class="hint">Small date caveat: a few MOPS signal dates fall on a Taiwan holiday, when the real filing deadline rolled a few days later. No headline result depends on them.</p>
 
       <h3>Every Taiwan reading, with what it has meant before</h3>
       <div id="twList"></div>
       <h3>Study charts</h3>
       <div class="figs">
         <figure>
-          <a href="img/taiwan_vs_smh.png" target="_blank" rel="noopener"><img src="img/taiwan_vs_smh_w900.png" width="900" height="1142" loading="lazy" decoding="async" alt="SMH since 2013 with every low after a 20 percent drop, above six Taiwan series drawn as known on each day: TWSE semis, TSMC, TWSE computers, ASPEED, MOEA electronics orders and foreign net buying."></a>
+          <a href="img/taiwan_vs_smh.png" target="_blank" rel="noopener"><img src="img/taiwan_vs_smh_w900.png" width="900" height="1142" loading="lazy" decoding="async" alt="SMH since 2013 with every deep low, above six Taiwan series drawn as known on each day: TWSE semis, TSMC, TWSE computers, ASPEED, MOEA electronics orders and foreign net buying."></a>
           <figcaption>Taiwan data vs SMH, 2013 to now. The dashed line in the first panel is the old, inflated Taiwan semis series. Tap to open full size.</figcaption>
         </figure>
         <figure>
-          <a href="img/taiwan_vs_smh_2025_2026.png" target="_blank" rel="noopener"><img src="img/taiwan_vs_smh_2025_2026_w900.png" width="900" height="1226" loading="lazy" decoding="async" alt="Taiwan data vs SMH from January 2025 to now, showing the April 2025 low, the March 2026 low and the July 2026 dip, with acceleration turn-ups as hollow diamonds."></a>
+          <a href="img/taiwan_vs_smh_2025_2026.png" target="_blank" rel="noopener"><img src="img/taiwan_vs_smh_2025_2026_w900.png" width="900" height="1243" loading="lazy" decoding="async" alt="Taiwan data vs SMH from January 2025 to now, showing the April 2025 low, the March 2026 low and the July 2026 dip, with acceleration turn-ups as hollow diamonds."></a>
           <figcaption>Jan 2025 to now. Hollow diamonds = growth acceleration turned up; note the Feb 10 turn-ups before the 2026 low and the Apr 10 / May 10 confirmations after it. Tap to open full size.</figcaption>
         </figure>
       </div>
@@ -241,17 +241,17 @@
 
     <details class="card table-card" id="krMore" hidden>
       <summary>Korea data in full</summary>
-      <p class="hint">Six series measured the same way as the Taiwan card: customs chip exports (KCS 10-day, 20-day and final prints), the trade ministry's monthly memory and system-chip exports, SK Hynix and Samsung against SMH (in dollars), and the won. Korea items use Seoul dates; 09:00 Seoul is 20:00 ET the previous day (19:00 in winter), before the US open. System-chip exports to Dec 2025 are UN Comtrade values dated on the ministry's 1st-of-month release (the HS-code detail came out about the 15th; dating them there changed nothing material).</p>
+      <p class="hint">Six series measured the same way as the Taiwan card: customs chip exports (KCS 10-day, 20-day and final prints), the trade ministry's monthly memory and system-chip exports, SK Hynix and Samsung against SMH (in dollars), and the won. Korea items use Seoul dates; 09:00 Seoul is 20:00 ET the previous day (19:00 in winter), before the US open. System-chip exports to Dec 2025 come from UN Comtrade.</p>
       <h3>Findings</h3>
       <p class="hint">Study notes from the Korea study of Oct 3, 2026 (2021-now first, 2013-20 for consistency). The numbers in these notes do not update; the readings below them do.</p>
       <div class="facts">
         <div class="fact"><h4>How early, how good</h4>The 20-day print is public about 9 days before month end, 10 days before the full-month first print and 25 days before the final. In 2021-now it matched the final at r 0.98 (median gap 6 points, same sign in 97% of months) and called whether the month would beat the previous one 73% of the time (79% when the final moved by more than 5 points); 2016-20 was similar (r 0.96, median gap 5 points, same sign 89%, direction 84%). The 10-day print is 10 days earlier again but noisier (2021-now r 0.95, median gap 10 points), because holidays shift the working days.</div>
-        <div class="fact"><h4>How far behind price</h4>With matched 12-month windows (no method lag), SMH's 12-month return lines up best with the 20-day print 3 months later, in 2021-now and in 2016-20 alike; SK Hynix's 3–4 months, Micron's 1 month. Month by month, past SMH moves explain later changes in the print (r 0.37) better than the print's acceleration explains SMH's next 3 months (r 0.18). Memory exports sit about 3 months behind SMH and 1 behind Micron; system chips about 8 behind SMH.</div>
-        <div class="fact"><h4>At the lows</h4>2022: the 20-day print read +3% at the low (Oct 1–10: −21%, out 3 days before it), bottomed at −45% in March 2023 (+5 months); the trough-turn signal on its 3-print average fired a year after the low, with SMH already +67%. 2025: it had slowed to +12% and bottomed in the low month (+11% on Apr 21); its acceleration turn-up came Jul 21 with SMH +61%. 2026: +164% and accelerating at the low, so nothing to turn. Memory exports read −18%, +5% and +147% at the three lows. 2013-20: in Dec 2018 the print first turned negative (−10%) one session before the low and kept falling to −29% in Jan 2019; in Feb 2020 it read +15% and rising, with SMH still to fall 30% to its Covid low.</div>
+        <div class="fact"><h4>How far behind price</h4>SMH's 12-month return lines up best with the 20-day print 3 months later, in 2021-now and in 2016-20 alike; SK Hynix's 3–4 months, Micron's 1 month. Month by month, past SMH moves explain later changes in the print (r 0.37) better than the print's acceleration explains SMH's next 3 months (r 0.18). Memory exports sit about 3 months behind SMH and 1 behind Micron; system chips about 8 behind SMH.</div>
+        <div class="fact"><h4>At the lows</h4>2022: the 20-day print read +3% at the low (Oct 1–10: −21%, out 3 days before it), bottomed at −45% in March 2023 (+5 months); its trough-turn signal fired a year after the low, with SMH already +67%. 2025: it had slowed to +12% and bottomed in the low month (+11% on Apr 21); its acceleration turn-up came Jul 21 with SMH +61%. 2026: +164% and accelerating at the low, so nothing to turn. Memory exports read −18%, +5% and +147% at the three lows. 2013-20: in Dec 2018 the print first turned negative (−10%) one session before the low and kept falling to −29% in Jan 2019; in Feb 2020 it read +15% and rising, with SMH still to fall 30% to its Covid low.</div>
         <div class="fact"><h4>The June 2026 top and the July drop</h4>The June 20-day print came out the morning of SMH's Jun 22 top: +188%, a little under May's +202%. Through the −17.6% July the prints read +193% (Jul 13) and +181% (Jul 21), and memory exports kept accelerating (3-month +250% to +271%). SK Hynix peaked with SMH and fell 52% in dollars to its Jul 30 low (SMH −25%, Micron −39%). No Korean series warned.</div>
-        <div class="fact"><h4>Turn signals vs a fair test</h4>On the average of the last three 20-day prints, acceleration turn-ups did not beat a drawdown-matched benchmark in 2021-now (1 of 3; −8 points at 63 sessions) but did in 2016-20 (2 of 2). The trough-turn (Oct 2023, SMH +67% off the low) and cross-above-zero (Dec 2023, +104%) are single 2021+ episodes; the Feb 2020 cross-above-zero came before a further 30% fall. Nothing passes in both eras, and the print's level and acceleration had no forecasting value out of sample. Memory exports: one 2021+ cross-above-zero win (Jan 2024); acceleration signals were false in 3 of 6 fires in 2013-20.</div>
+        <div class="fact"><h4>Turn signals vs a fair test</h4>Its acceleration turn-ups did not beat the fair benchmark in 2021-now (1 of 3; −8 points after about 3 months) but did in 2016-20 (2 of 2). The trough-turn (Oct 2023, SMH +67% off the low) and cross-above-zero (Dec 2023, +104%) are single 2021+ episodes; the Feb 2020 cross-above-zero came before a further 30% fall. Nothing passes in both eras, and the print's level and acceleration had no forecasting value out of sample. Memory exports: one 2021+ cross-above-zero win (Jan 2024); acceleration signals were false in 3 of 6 fires in 2013-20.</div>
         <div class="fact"><h4>Release days</h4>SMH against SPY did not move with the surprise on KCS release days (r −0.003 over 138 releases since 2021), and SK Hynix's own move on those days was no larger than on other days (2.3% on average, both). The print has not been news to prices.</div>
-        <div class="fact"><h4>SK Hynix, Samsung, KOSPI and the won</h4>SK Hynix and Samsung move with SMH and Micron within the same week (no weekly lead in either era; SMH's Friday trades into Korea's Monday, a time-zone overlap, not a lead). Their strength against SMH did not forecast SMH's next 63 sessions (exploratory, not pre-registered: r 0.06–0.34, p 0.13 or more, about 21–31 independent windows). In dollars (each stock's lowest close within ±30 sessions of SMH's low), SK Hynix bottomed within 2 sessions of SMH at 3 of 4 lows in 2021-now and 2 of 3 in 2016-20, and 2–3 weeks earlier in 2016 and 2022 (Micron too in 2022); Samsung at 3 of 4 and 1 of 3. The March 2026 low was a dip inside a rise for both (+43% and +49% over the 3 months before it). Too few and too irregular to use as a lead. KOSPI's move is confirmation, and memory-vs-logic baskets did not pass the race's bar.</div>
+        <div class="fact"><h4>SK Hynix, Samsung, KOSPI and the won</h4>SK Hynix and Samsung move with SMH and Micron within the same week (no weekly lead in either era; SMH's Friday trades into Korea's Monday, a time-zone overlap, not a lead). Their strength against SMH did not forecast SMH over the next 3 months or so (exploratory; no forecasting value found). In dollars, SK Hynix bottomed within 2 sessions of SMH at 3 of 4 lows in 2021-now and 2 of 3 in 2016-20, and 2–3 weeks earlier in 2016 and 2022 (Micron too in 2022); Samsung at 3 of 4 and 1 of 3. The March 2026 low was a dip inside a rise for both (+43% and +49% over the 3 months before it). Too few and too irregular to use as a lead. KOSPI's move is confirmation, and memory-vs-logic baskets did not pass the race's bar.</div>
         <div class="fact"><h4>A late-cycle reading, not a timing signal</h4>Very high Korea memory export growth has been followed by weaker SMH 12-month returns in both eras (r −0.46 in 2021-now, −0.57 in 2014-20; about 5–7 independent years each, picked from many correlations). The +311% reading of Oct 1 is far outside that sample. Read it as caution about the cycle's stage, not as a date.</div>
         <div class="fact"><h4>Not shown</h4>Korea's DRAM and flash price indexes (Bank of Korea ECOS) need a free API key, which has not been set up. Company filing times (OpenDART) also need a key; note only. The Korea Exchange data portal's terms restrict automated use, so Korean foreign-investor flows are not shown.</div>
       </div>
@@ -264,13 +264,13 @@
       <summary>GPU · CPU · memory in full</summary>
       <div class="prose">
         <h4>Trade flows vs SMH <span class="chip chip-done" id="tradeTag">RE-CHECKED</span></h4>
-        <p>US imports of AI hardware since 2010 (UN Comtrade, which carries the Census figures, dated on each Census release day) and Korea's memory-chip exports since 2013 (2026 from the Korea trade ministry's monthly releases), run through the same tests as the chip data. Re-checked independently on Oct 3, 2026: every series was rebuilt from the raw files and the corrections are applied below.</p>
+        <p>US imports of AI hardware since 2010 (UN Comtrade and the Census Bureau, as known on each day) and Korea's memory-chip exports since 2013 (2026 from the Korea trade ministry's monthly releases), run through the same tests as the chip data. Re-checked independently on Oct 3, 2026: every series was rebuilt from the raw files and the corrections are applied below.</p>
         <ul>
           <li><b>Price moved first, again.</b> SMH led US AI-hardware imports, GPU-board (computer-parts) imports and processor imports by about 4–6 months by reference month, about 5–6 months before the first public number. The exact lag is loose: for the total it could be anywhere from 5 months to a year.</li>
           <li><b>Korea memory exports move with Micron's share price</b> (r about 0.8, level or a month apart) and sit about 3 months behind SMH: the most in-step of the trade series, though Taiwan memory revenue and TPEx semis are closer to SMH. Neither leads.</li>
           <li><b>At the lows:</b> after the 2022 low the two main series bottomed 4.5–8.5 months later, and their first signals came 199–452 days late, with SMH already +46% to +103%. In 2025 and 2026 US AI-hardware imports never turned down (+90% and +132% at the lows). Korea memory slowed to +5% at the 2025 low (March data, out the week before the low), bottomed that month, and its turn-up signal came 54 days after the low, with SMH already +35%.</li>
           <li><b>Into the June 2026 top,</b> US AI-hardware imports' 3-month growth slowed from 127% to 107% (the 96% reading came out Jul 7, after the top). Monthly imports still set records: the slowdown came from the high Mar–May 2025 base (tariff front-loading) and flat Taiwan shipments, not from falling demand. Korea memory kept accelerating through the top and the July drop. Only 4 SMH peaks to compare; not a tested signal.</li>
-          <li><b>Fair test:</b> only "growth back above zero" beat the drawdown-matched benchmark in both 2013-20 and 2021-now for both series, on 1 episode in 2021-now (Jan 2024, with SMH already about double its 2022 low) and 3–4 in 2013-20: too few to call an edge, and no use for catching a low. Trough-turn and acceleration signals did not hold across eras. Exploratory: very high Korea memory growth came before weaker SMH 12-month returns (r −0.46 in 2021-now, −0.57 in 2014-20; 5–7 independent years per era, picked from many correlations). Today's +311% is far outside that sample.</li>
+          <li><b>Fair test:</b> only "growth back above zero" beat the fair benchmark in both 2013-20 and 2021-now for both series, on 1 episode in 2021-now (Jan 2024, with SMH already about double its 2022 low) and 3–4 in 2013-20: too few to call an edge, and no use for catching a low. Trough-turn and acceleration signals did not hold across eras. Exploratory: very high Korea memory growth came before weaker SMH 12-month returns (r −0.46 in 2021-now, −0.57 in 2014-20; 5–7 independent years per era, picked from many correlations). Today's +311% is far outside that sample.</li>
         </ul>
         <h4>Memory prices vs MU and SMH <span class="chip chip-done" id="memTag">RE-CHECKED</span></h4>
         <p>Public DRAM and NAND contract-price calls (TrendForce press headlines, 2016–2026), dated by the day they became public, tested against Micron and SMH turns. Re-checked independently on Oct 3, 2026 (11 key releases checked one by one); the corrections are applied below.</p>
@@ -296,7 +296,7 @@
 
     <details class="card table-card" id="seen">
       <summary>How could we have seen it?</summary>
-      <p class="sub">Three semis rallies since 2022. Five lines of evidence, each tested against a fair benchmark: days when SMH was just as far below its high.</p>
+      <p class="sub">Three semis rallies since 2022. Five lines of evidence, each tested against a fair benchmark.</p>
 
       <h3>The three rally starts</h3>
       <p class="hint" id="ralliesCap">SMH adjusted closes.</p>
@@ -315,33 +315,33 @@
         </tbody>
       </table></div>
       <p class="hint swipe">Swipe the table sideways for more columns.</p>
-      <p class="hint">2022 and 2025 were capitulations: every washout gauge was pegged. 2026 was a market washout while chips were not. July 2026 was the reverse: a chips-only washout with the S&amp;P 500 4% off its high. The S&amp;P KDJ meter = share of S&amp;P 500 stocks whose weekly KDJ J line is below 0.</p>
+      <p class="hint">2022 and 2025 were capitulations: every washout gauge was pegged. 2026 was a market washout while chips were not. July 2026 was the reverse: a chips-only washout with the S&amp;P 500 4% off its high. The S&amp;P KDJ meter is a market-wide oversold gauge from S&amp;P 500 members' weekly KDJ.</p>
 
       <h3>The verdict, track by track</h3>
       <div class="vds">
         <article class="vd">
           <h4>Price and breadth signals</h4>
-          <p class="vd-sub">21 rules fixed in advance: market washouts, chip breadth, trend, relative strength, momentum</p>
+          <p class="vd-sub">Rules fixed in advance: market washouts, chip breadth, trend, relative strength, momentum</p>
           <dl>
             <dt>What fired, when</dt>
-            <dd>The S&amp;P 500 breadth washout day (under 25% of stocks above their 50-day average) fired <b>20, 2 and 6 sessions</b> before the 2022, 2025 and 2026 lows. After the 2022 one, SMH fell <b>another 15%</b>. The S&amp;P KDJ meter's STRONG reading came within 11% of all three lows. Trend, relative-strength and momentum signals came <b>32–68% above the lows</b> in 2022 and 2025, and never fired in 2026 because the uptrend never broke.</dd>
+            <dd>The S&amp;P 500 breadth washout day fired <b>20, 2 and 6 sessions</b> before the 2022, 2025 and 2026 lows. After the 2022 one, SMH fell <b>another 15%</b>. The S&amp;P KDJ meter's STRONG reading came within 11% of all three lows. Trend, relative-strength and momentum signals came <b>32–68% above the lows</b> in 2022 and 2025, and never fired in 2026 because the uptrend never broke.</dd>
             <dt>False alarms</dt>
             <dd>The washout day's false-alarm rate is the same as a random day's: <b>45% vs 43%</b>. The KDJ meter also fired in Jan 2025, after which SMH fell 27% more. The breadth-thrust rule's Jul-2022 and Jan-2025 false starts cost 25–31%.</dd>
             <dt>Edge vs a fair test</dt>
-            <dd>None. Returns after a washout match any day with the same SMH drawdown (p 0.2–0.4). Random dates land "early at all three lows" only 0.7–2.6% of the time, so the washouts did locate the lows in time; they just added no return. (In 2026 “early” only means it fired in the 3 months before the low, and in 2022 it passed by 2 points.) Nothing survives a multiple-testing correction across 408 tests.</dd>
+            <dd>None. Returns after a washout match the fair benchmark (p 0.2–0.4). Random dates land "early at all three lows" only 0.7–2.6% of the time, so the washouts did locate the lows in time; they just added no return. Nothing survives a multiple-testing correction.</dd>
           </dl>
           <p class="verdict">Told you <i>when</i> a market washout was happening, not <i>whether</i> the drop was over.</p>
         </article>
         <article class="vd">
           <h4>Chart indicators on SMH</h4>
-          <p class="vd-sub">KDJ(9,3,3) on 1-week, 2-week and 1-month candles; MACD-V; OBV-MACD; Washout dots</p>
+          <p class="vd-sub">KDJ on 1-week, 2-week and 1-month candles; MACD-V; OBV-MACD; Washout dots</p>
           <dl>
             <dt>What fired, when (the 2026 low)</dt>
             <dd>Weekly J&lt;0 on <b>Mar 27</b>, one session before the low (SMH fell another 3%). Weekly coil-up Apr 2 (<b>+8%</b> off the low). Weekly golden cross Apr 10 (+21%). OBV-MACD flip Apr 17 (+28%). 2-week golden cross and MACD-V momentum-on Apr 24 (+40%). Monthly golden cross Apr 30 (+40%). Washout dots and MACD-V "cross up from LOW" never fired: weekly MACD-V never dropped below +82.</dd>
             <dt>False alarms</dt>
             <dd>The weekly golden cross also came after <b>5 of 6</b> false starts, and 4 of those 5 then broke the low. OBV flips came after 6 of 6 real starts and 6 of 6 false starts.</dd>
             <dt>Edge vs a fair test</dt>
-            <dd>None that holds up. Weekly J&lt;0's single "pass" is what chance produces (1.3 passes expected among 15 signals), it exists at only one setting, and its 2021+ edge is the 2025 and 2026 rallies themselves. From 2021 on, 46% of all SMH days were followed by a +20% gain within 6 months anyway.</dd>
+            <dd>None that holds up. Weekly J&lt;0's single "pass" is about what chance alone produces, and it holds at only one setting, and its 2021+ edge is the 2025 and 2026 rallies themselves. From 2021 on, 46% of all SMH days were followed by a +20% gain within 6 months anyway.</dd>
           </dl>
           <p class="verdict">Fired within about 2 weeks of every low, and the same way at bounces that failed.</p>
         </article>
@@ -354,7 +354,7 @@
             <dt>False alarms</dt>
             <dd>Earlier re-accelerations were false starts: Nov 2021 to Feb 2022 (SMH then fell another 35–43%) and Feb 2025 (another 28%).</dd>
             <dt>Edge vs a fair test</dt>
-            <dd>"This crash is not the chip cycle" was the right read in 2025 and 2026, but it cannot be scored: every 20%+ SMH drop since 2013 recovered anyway. Late confirmation still beat the fair test in 2016, 2019-20 and 2023, after a large part of the move. US data was revised later by up to 12 points.</dd>
+            <dd>"This crash is not the chip cycle" was the right read in 2025 and 2026, but it cannot be scored: every deep SMH drop since 2013 recovered anyway. Late confirmation still beat the fair test in 2016, 2019-20 and 2023, after a large part of the move. US data was revised later by up to 12 points.</dd>
           </dl>
           <p class="verdict">Confirmed the rallies; never forecast them.</p>
         </article>
@@ -389,12 +389,12 @@
 
       <div class="figs">
         <figure>
-          <a href="img/fundamentals_vs_smh.png" target="_blank" rel="noopener"><img src="img/fundamentals_vs_smh_w900.png" width="900" height="776" loading="lazy" decoding="async" alt="SMH since 2013 with every low after a 20 percent drop and the 6 indicator-test false starts drawn hollow, above four free data series drawn as known on each day: Korea total exports, WSTS chip sales, Micron gross margin and US computer and electronics orders."></a>
-          <figcaption>Free chip data vs SMH, 2013 to now, as known on each day. At the 2018 and 2022 lows the data turned 1–11 months after price. In 2016 and 2025 some series turned with it. Every turn could only be confirmed later. Hollow dots = the 6 false starts, including the Jul-2022 low (−38%). Tap to open full size.</figcaption>
+          <a href="img/fundamentals_vs_smh.png" target="_blank" rel="noopener"><img src="img/fundamentals_vs_smh_w900.png" width="900" height="794" loading="lazy" decoding="async" alt="SMH since 2013 with every deep low and the false starts drawn hollow, above four free data series drawn as known on each day: Korea total exports, WSTS chip sales, Micron gross margin and US computer and electronics orders."></a>
+          <figcaption>Free chip data vs SMH, 2013 to now, as known on each day. At the 2018 and 2022 lows the data turned 1–11 months after price. In 2016 and 2025 some series turned with it. Every turn could only be confirmed later. Hollow dots = the false starts, including the Jul-2022 low (−38%). Tap to open full size.</figcaption>
         </figure>
         <figure>
-          <a href="img/chart_kdj.png" target="_blank" rel="noopener"><img src="img/chart_kdj_w900.png" width="900" height="824" loading="lazy" decoding="async" alt="KDJ golden crosses, coils and J below zero on SMH weekly, 2-week and monthly candles, 2013 to Oct 1, 2026, with a zoom on the March 2026 low."></a>
-          <figcaption>KDJ on SMH: every golden cross, coil and J&lt;0 since 2013, and a zoom on the 2026 low. The crosses cluster at lows and at failed bounces alike. Tap to open full size.</figcaption>
+          <a href="img/chart_kdj.png" target="_blank" rel="noopener"><img src="img/chart_kdj_w900.png" width="900" height="824" loading="lazy" decoding="async" alt="KDJ golden crosses, coils and washouts on SMH weekly, 2-week and monthly candles, 2013 to Oct 1, 2026, with a zoom on the March 2026 low."></a>
+          <figcaption>KDJ on SMH: every golden cross, coil and washout entry since 2013, and a zoom on the 2026 low. The crosses cluster at lows and at failed bounces alike. Tap to open full size.</figcaption>
         </figure>
       </div>
 
@@ -467,10 +467,10 @@
       <summary>AI build-out names: what the price assumes</summary>
       <p class="sub">The chips, networking, hardware and power names from a "next NVIDIA / AMD / Palantir" search, with the tiers after an independent re-check. Prices as of the Oct 1, 2026 close.</p>
       <div class="prose">
-        <p><b>The yardstick.</b> A reverse DCF: today's enterprise value, a 10% discount rate, an exit at 25× 2036 free cash flow and a terminal margin set by business type. Out comes the yearly revenue growth for 10 years that the price already assumes ("price needs"). Read every figure as a band of about <b>±3 points</b>: cash earned along the way lowers the bar; stock pay and a higher discount rate raise it. The figures below are the re-check's own re-computations (the base is noted under "How"). Each card also shows the plain yardstick from trailing revenue: it reads higher for most names (NVIDIA 20%, Broadcom 21%, TSMC 19%) and lower for AMD, where the re-check counts its customer warrants.</p>
+        <p><b>The yardstick.</b> A reverse valuation: the yearly revenue growth over the next decade that today's price already assumes ("price needs"). Read every figure as a rough band, not a point.</p>
       </div>
       <div class="facts">
-        <div class="fact"><h4>What history says about this kind of search</h4>Picking fast growers (revenue +30%/yr, gross margin 40%+) beat the average stock only while growth stocks were in favour. 2012-16 picks tripled in 5 years 31.7% of the time vs 15.7% for all stocks (about 1.4× same-sector peers). 2017-20 picks did no better than average, and 2021-22 picks are within noise (3-year hit rate 17.6% vs 16.6%, about one window). Adding "accelerating" or "strong momentum" made it worse after 2016. Paying a top-quartile price-to-sales (about 13× or more) went bust about half the time (exploratory).</div>
+        <div class="fact"><h4>What history says about this kind of search</h4>Picking fast growers with high margins beat the average stock only while growth stocks were in favour. 2012-16 picks tripled in 5 years 31.7% of the time vs 15.7% for all stocks (about 1.4× same-sector peers). 2017-20 picks did no better than average, and 2021-22 picks are within noise (3-year hit rate 17.6% vs 16.6%, about one window). Adding "accelerating" or "strong momentum" made it worse after 2016. Paying the highest price-to-sales multiples went bust about half the time (exploratory).</div>
         <div class="fact"><h4>The famous winners failed the screen</h4>At their exact pre-run lows, NVIDIA (2015-16), AMD (2016), Palantir (2022), AppLovin, Tesla, Super Micro, Vertiv, Enphase and Netflix all failed the fast-grower screen: they were slow, beaten-down and cheap. (Those dates are hindsight lows; NVIDIA did pass the screen at the end of 2017, 2018, 2021 and 2022.)</div>
       </div>
       <div id="cands"></div>
@@ -486,13 +486,13 @@
         <ul>
           <li><b>Rules first.</b> Each track wrote its rules down before scoring; for the price-signal track the timing could not be verified from file times, and windows added later are labelled post hoc. A second, independent run rebuilt the four main tracks, the Taiwan layer and the hardware trade and memory studies with its own code and corrected the claims that did not hold; this page uses the corrected versions. The GPU price record is a first reading and has not been tested.</li>
           <li><b>Few episodes.</b> 3 rally starts in 2021-now (arguably 2, since the 2026 low sits inside the 2025 cycle) and 3 in 2013-20 (Feb 2016, Dec 2018, Mar 2020). These are case studies. 2021-now is about one cycle.</li>
-          <li><b>The fair test.</b> Every signal's later SMH return is compared with days when SMH was just as far below its 1-year high. A big drop alone explains most rebounds: every 20%+ SMH drop since 2013 recovered.</li>
-          <li><b>Multiple testing.</b> Hundreds of signal, era and horizon combinations were tested (408 in the price-signal track alone). After a Benjamini-Hochberg correction, nothing survives. A p-value near 0.02–0.03 is easy to find here.</li>
-          <li><b>As known on each day.</b> Data series are dated by the day they became public (conservative dates: MOPS and MOF the 10th, MOEA the 23rd). MOF, MOEA and MOPS values are today's versions, not first prints; US data was revised by up to 12 points.</li>
+          <li><b>The fair test.</b> Every signal's later SMH return is compared with a fair benchmark, not with zero. A big drop alone explains most rebounds: every deep SMH drop since 2013 recovered.</li>
+          <li><b>Multiple testing.</b> Hundreds of combinations were tested. After correcting for that, nothing survives.</li>
+          <li><b>As known on each day.</b> Data series are dated by the day they became public. MOF, MOEA and MOPS values are today's versions, not first prints; US data was revised by up to 12 points.</li>
           <li><b>Survivorship.</b> The chip-breadth universe, the S&amp;P KDJ meter and the MOPS pages use today's companies; only the S&amp;P 500 breadth line is free of it. The AI baskets (ODMs, ASPEED, King Slide, AI chip/IP) were picked today because they are winners.</li>
           <li><b>Prices.</b> SMH and SPY adjusted closes (Yahoo Finance daily bars; closed sessions only). The chart indicators use split-adjusted (not dividend-adjusted) prices, as on a TradingView chart.</li>
           <li><b>Gaps.</b> Korea chip exports via UN Comtrade stop at Dec 2025 (Korea memory exports are extended with the trade ministry's 2026 releases). TSMC's and SEAJ's own sites refused automated access and were not worked around. The MOEA open-data file runs one release behind. The hardware trade and memory studies were re-checked on Oct 3, 2026; the GPU price record is a single first reading.</li>
-          <li><b>Percentiles on this page.</b> Percentile = the share of 2013+ readings of the same series that were lower (every reading public by the build date, the latest one included). Dashed purple lines = the 90th, 95th and 99th percentile levels of those readings. A historical reading is ranked against the whole 2013+ history, later readings included. Recent peak = the highest of a series' last 6 readings. Korea card: the KCS 20-day print is ranked against every print since Aug 2016; the three price panels (SK Hynix and Samsung vs SMH, the won) against their daily readings since 2013, with dashed 5th and 95th percentile lines.</li>
+          <li><b>Percentiles on this page.</b> Percentile = where a reading ranks in the same series' own history since 2013 (the Korea 20-day print: since 2016). Dashed purple lines mark rare levels of that history; the Korea price panels show both tails. Recent peak = the highest recent reading.</li>
         </ul>
       </div>
     </details>
@@ -502,14 +502,14 @@
       <div class="prose">
         <ul>
           <li>Taiwan: MOPS monthly revenue (TWSE, TPEx); MOEA export-order open data; MOF trade statistics database; TWSE foreign-investor trading statistics.</li>
-          <li>US: Census Bureau international trade (FT-900, HS-6 imports); FRED (industrial production, new orders, PPI); SEC filings and 8-Ks (hyperscaler capex, US chip revenue, Micron margin). This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.</li>
+          <li>US: Census Bureau international trade (monthly imports by product); FRED (industrial production, new orders, PPI); SEC filings and 8-Ks (hyperscaler capex, US chip revenue, Micron margin). This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.</li>
           <li>Global: WSTS historical billings; UN Comtrade (Korea and Japan exports, US imports history); Korea trade ministry (MOTIR) monthly releases.</li>
           <li>Korea: Korea Customs Service (KCS) 10-day, 20-day and final export press releases (2016–2026) and the trade ministry (MOTIR) monthly releases (2026): public works, used under the Korea Open Government License Type 1 (KOGL, source attribution) where marked and Article 24-2 of the Korean Copyright Act; derived values only.</li>
           <li>Prices: Yahoo Finance daily bars (SMH, SPY; SK Hynix, Samsung, KOSPI and USD/KRW for the Korea card).</li>
           <li>Cloud list prices: Azure Retail Prices API; AWS Price List bulk files.</li>
           <li>Estimates and news: FactSet Earnings Insight (2023-06-09, 2023-09-29, 2024-09, 2025-06-13, 2026-03-27, 2026-06-26, 2026-09-18); company releases (NVIDIA, TSMC, Micron, Broadcom, ASML, Samsung); Federal Reserve statements; TrendForce press-release headlines; CNBC, CNN, Fortune, Forbes, Bloomberg, Axios, Al Jazeera, UBS CIO, TipRanks, 24/7 Wall St (dated where cited).</li>
           <li>Base rates: Bessembinder (2018); Mauboussin, The Base Rate Book (2016).</li>
-          <li>Market breadth: the S&amp;P 500 50-day breadth line shown on the Breadth tab; chip breadth on 66 US-listed chip names.</li>
+          <li>Market breadth: the S&amp;P 500 50-day breadth line shown on the Breadth tab; chip breadth on a basket of US-listed chip names.</li>
         </ul>
         <h4>Data as of, per source</h4>
         <dl class="asof-list" id="asofList"></dl>
@@ -527,7 +527,7 @@
   <footer class="foot">
     <p>What the chip data, the Taiwan data and the market say right now, when the next numbers land, and what history says each reading is worth. The study findings were re-checked by a second, independent run, and so were the newer hardware pieces (Oct 3); the GPU price record is a first reading.</p>
     <p><b>Informational only. Not investment advice.</b> Nothing here says when to buy or sell, or how much. Historical results rest on a handful of episodes, not a tested signal.</p>
-    <p>Growth rates are 3-month totals against the same 3 months a year earlier unless marked. Percentile = the share of 2013+ readings of the same series that were lower. "Public" = the day the number could be read; Taiwan dates are Taipei dates, Korea dates are Seoul dates.</p>
+    <p>Growth rates are 3-month totals against the same 3 months a year earlier unless marked. Percentile = where the reading ranks in the series' own history since 2013. "Public" = the day the number could be read; Taiwan dates are Taipei dates, Korea dates are Seoul dates.</p>
     <p id="built">Derived values, plus public list prices, US Census totals and SMH weekly closes for context. No cookies, no tracking.</p>
   </footer>
 </main>

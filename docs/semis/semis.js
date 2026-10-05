@@ -4,6 +4,9 @@
 
 
 
+
+
+
 (function () {
   'use strict';
 
@@ -53,31 +56,10 @@
   var FONT = getComputedStyle(document.documentElement).getPropertyValue('--font') || 'sans-serif';
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  var TILES1 = ['TW_SEMI_S', 'TSMC', 'MEMORY_TW', 'TW_COMP', 'US_AI_HW', 'KR_MEM'];
-  var STACK = { c2: ['TW_SEMI_S', 'TSMC', 'TPEX_SEMI', 'TW_COMP', 'ASPEED', 'TW_ORD_ELEC', 'TW_EXP_IC', 'TW_EXP_ADP', 'TW_FOREIGN'],
-                c3: ['US_AI_HW', 'KR_MEM', 'WSTS', 'MU_GM', 'HYPER_CAPEX', 'KR_CHIP'] };
-  var NAME = { TW_SEMI_S: 'TWSE semis 半導體業', TSMC: 'TSMC', TPEX_SEMI: 'TPEx semis (OTC)', MEMORY_TW: 'Memory: Nanya, Winbond, Macronix',
-    TW_COMP: 'TWSE computers 電腦及週邊', ASPEED: 'ASPEED (server BMC chips)', TW_ORD_ELEC: 'MOEA orders: electronics 電子產品',
-    TW_EXP_IC: 'MOF exports: ICs', TW_EXP_ADP: 'MOF exports: servers', TW_FOREIGN: 'Foreign net buying 外資',
-    WSTS: 'WSTS chip sales', MU_GM: 'Micron gross margin', HYPER_CAPEX: 'Hyperscaler capex', US_AI_HW: 'US AI-hardware imports',
-    KR_MEM: 'Korea memory exports', KR_CHIP: 'Korea chip exports',
-
-    KR20: 'KCS chip exports, days 1–20', KR_SYS: 'Korea system-chip exports',
-    HYNIX_RS63: 'SK Hynix vs SMH (in USD)', SAMSUNG_RS63: 'Samsung vs SMH (in USD)', KRW63: 'Won vs dollar (up = stronger won)' };
-  var TILE_NAME = { TW_SEMI_S: 'TWSE semis', TSMC: 'TSMC', MEMORY_TW: 'Memory (TW)', TW_COMP: 'Servers (TWSE)', US_AI_HW: 'US AI-hw imports',
-    KR_MEM: 'Korea memory', TPEX_SEMI: 'TPEx semis', ASPEED: 'ASPEED', TW_ORD_ELEC: 'MOEA orders', TW_EXP_IC: 'MOF IC exports',
-    TW_EXP_ADP: 'Server exports', TW_FOREIGN: 'Foreign flows', WSTS: 'WSTS', MU_GM: 'Micron GM', HYPER_CAPEX: 'Hyperscaler capex',
-    KR_CHIP: 'Korea chips', KR20: 'Korea 20-day', KR_SYS: 'System chips', HYNIX_RS63: 'Hynix/SMH', SAMSUNG_RS63: 'Samsung/SMH',
-    KRW63: 'Won vs $', KR_DRAM_PPI: 'DRAM / flash prices' };
-  var UNIT_SHORT = { yoy3: '3-month YoY', yoyq: 'quarter YoY', level: 'gross margin', flow: '3-month net / gross traded',
-    yoy_print: 'days 1–20, y/y as printed', rel63: 'vs SMH, both in USD', chg63: 'up = stronger won' };
   var CARD_OF = { US_AI_HW: 'CENSUS' };
-  var AXIS_WORDS = { yoy3: '% vs a year earlier', yoyq: '% vs a year earlier', level: 'gross margin %', flow: '% of gross traded',
-    yoy_print: '% vs a year earlier', rel63: '% vs SMH, 63 sessions', chg63: '% vs the dollar, 63 sessions' };
 
   var CHART_ID = { c2: 'chart2', c3: 'chart3', c4: 'chart4' }, RO_ID = { c2: 'ro2', c3: 'ro3', c4: 'ro4' }, LG_ID = { c2: 'lg2', c3: 'lg3', c4: 'lg4' };
-  function stackKeys(key) { return key === 'c4' ? (D && D.kor ? D.kor.stack : []) : STACK[key]; }
+  function stackKeys(key) { return key === 'c4' ? (D && D.kor ? D.kor.stack : []) : D.stacks[key]; }
 
   var HOVER = !!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches);
   var TAP = HOVER ? 'hover' : 'tap';
@@ -102,34 +84,34 @@
   function visIdx(arr, x0, x1) { return { i0: lowerBound(arr, x0), i1: bsearchLE(arr, x1) }; }
   function ordinal(n) { var t = n % 100, u = n % 10; return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th'); }
   function sgn(v, dp) { if (v == null || isNaN(v)) return '–'; return (v < 0 ? '−' : '+') + Math.abs(v).toFixed(dp == null ? 1 : dp); }
-  function fmtV(S, v) { return v == null ? '–' : S.unit === 'level' ? v.toFixed(1) + '%' : sgn(v, 1) + '%'; }
+  function fmtV(S, v) { return v == null ? '–' : S.level ? v.toFixed(1) + '%' : sgn(v, 1) + '%'; }
   function fmtLv(v) { return (v < 0 ? '−' : '') + Math.round(Math.abs(v)) + '%'; }
   function fmtAxis(v) { var a = Math.abs(v), s = a >= 1000 ? (a / 1000) + 'k' : (Math.round(a * 10) / 10).toString(); return (v < 0 ? '−' : '') + s; }
   function fmtPrice(v) { return v >= 1000 ? (v / 1000) + 'k' : v < 10 ? v.toFixed(1) : String(v); }
   function rnk(p) { var r = Math.round(p); if (r >= 100 && p < 100) r = 99; return r; }
 
-  function topRec(S, j) { return j === S.v.length - 1 && S.now && S.now.top && rnk(S.p[j]) < 99; }
+  function topRec(S, j) { return j === S.v.length - 1 && S.V.top_shown; }
 
 
   function printWord(S, j) { return MON[+S.ref[j].slice(5, 7) - 1] + ' 1–20'; }
   function refHead(S, j) {
     var pub = fmtDay(S.t[j], false);
-    if (S.daily) return '63 sessions to ' + pub;
-    if (S.unit === 'yoy_print') return printWord(S, j) + ' print · public ' + pub;
+    if (S.daily) return S.V.window_word + ' ' + pub;
+    if (S.print) return printWord(S, j) + ' print · public ' + pub;
     return refWord(S.ref[j]) + ' data · public ' + pub;
   }
   function refCol(S, j) {
     var pub = fmtDay(S.t[j], false);
-    if (S.daily) return ['63 sessions to ' + pub, 'to ' + pub];
-    if (S.unit === 'yoy_print') return [printWord(S, j) + ' print, public ' + pub, printWord(S, j) + ' · public ' + pub, 'public ' + pub];
+    if (S.daily) return [S.V.window_word + ' ' + pub, 'to ' + pub];
+    if (S.print) return [printWord(S, j) + ' print, public ' + pub, printWord(S, j) + ' · public ' + pub, 'public ' + pub];
     return [refWord(S.ref[j]) + ' data, public ' + pub, refWord(S.ref[j]) + ' · public ' + pub, MON[+S.ref[j].slice(5, 7) - 1] + ' · public ' + pub];
   }
   function dataWord(S, j) {
-    if (S.daily) return '63 sessions to ' + fmtDay(S.t[j], true);
-    if (S.unit === 'yoy_print') return printWord(S, j) + ', ' + S.ref[j].slice(0, 4);
+    if (S.daily) return S.V.window_word + ' ' + fmtDay(S.t[j], true);
+    if (S.print) return printWord(S, j) + ', ' + S.ref[j].slice(0, 4);
     return refWord(S.ref[j]);
   }
-  function lvCell(S, q) { return S.lv[q] == null ? '–' : fmtLv(S.lv[q]); }
+  function lvCell(v) { return v == null ? '–' : fmtLv(v); }
   function setAttr(n, k, v) { if (n.getAttribute(k) !== v) n.setAttribute(k, v); }
 
 
@@ -297,7 +279,7 @@
   }
 
 
-  var J = null, D = null, sel = 'TW_SEMI_S';
+  var J = null, D = null, sel = 'TW_SEMI_S', wantSel = null;
   var hover = { c1: null, c2: null, c3: null, c4: null };
   var GEO = { c1: null, c2: null, c3: null, c4: null };
 
@@ -306,38 +288,53 @@
     fails: 0, lastOk: 0, lastPoll: 0, older: false };
 
 
-  function validate(d) {
-    if (!d || typeof d !== 'object') return 'not JSON';
-    if (!Array.isArray(d.smh) || d.smh.length < 100) return 'SMH series missing';
-    if (!Array.isArray(d.series) || !d.series.length) return 'data series missing';
-    for (var i = 0; i < d.series.length; i++) {
-      var s = d.series[i];
-      if (!s.pts || !s.pts.length || !s.now || !s.lv || s.pts[0].length < 4) return 'series ' + s.key + ' incomplete';
+
+  var BAD_FORMAT = 'the data format changed', BAD_DATA = 'the data looked broken';
+  function isArr(a) { return Array.isArray(a); }
+
+
+  function pageKey(d, k) { var km = d.korea && d.korea.key_map; return km && Object.prototype.hasOwnProperty.call(km, k) ? km[k] : k; }
+  function seriesBad(d, list) {
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      if (!s || !s.key || !isArr(s.pts) || !s.pts.length || !isArr(s.pts[0]) || s.pts[0].length < 4 || !s.now || !isArr(s.ev)) return true;
+      var V = d.page.series[pageKey(d, s.key)];
+      if (!V || typeof V !== 'object' || !isArr(V.lines) || !isArr(V.table)) return true;
     }
-    if (!d.smh_last || !Array.isArray(d.lows) || !Array.isArray(d.now)) return 'readings missing';
+    return false;
+  }
+  function validate(d) {
+    if (!d || typeof d !== 'object') return BAD_DATA;
+    var P = d.page;
+    if (!P || typeof P !== 'object' || !P.series || typeof P.series !== 'object' || !P.stacks || !isArr(P.stacks.tiles1) ||
+      !isArr(P.stacks.c2) || !isArr(P.stacks.c3) || !isArr(P.now) || !P.text || !P.candidates || !isArr(P.candidates.rows)) return BAD_FORMAT;
+    if (!isArr(d.smh) || d.smh.length < 100) return BAD_DATA;
+    if (!isArr(d.series) || !d.series.length || seriesBad(d, d.series)) return BAD_DATA;
+    if (!d.smh_last || !isArr(d.lows) || !isArr(d.eps)) return BAD_DATA;
     return null;
   }
 
   function validateLive(d) {
     var bad = validate(d);
     if (bad) return bad;
-    if (d.schema !== 1) return 'unknown schema ' + d.schema;
-    if (d.state !== 'LIVE' && d.state !== 'CLOSED') return 'unknown state ' + d.state;
-    if (typeof d.generated_at !== 'number' || !isFinite(d.generated_at)) return 'build time missing';
-    if (!d.as_of || !/^\d{4}-\d\d-\d\d$/.test(d.as_of.session || '')) return 'session missing';
-    if (!d.live || !d.live.smh || typeof d.live.smh.price !== 'number') return 'live block missing';
+    if (d.schema !== 1 || (d.state !== 'LIVE' && d.state !== 'CLOSED')) return BAD_FORMAT;
+    if (typeof d.generated_at !== 'number' || !isFinite(d.generated_at)) return BAD_DATA;
+    if (!d.as_of || !/^\d{4}-\d\d-\d\d$/.test(d.as_of.session || '')) return BAD_DATA;
+    if (!d.live || !d.live.smh || typeof d.live.smh.price !== 'number') return BAD_DATA;
     return null;
   }
   function validateManifest(m) {
-    if (!m || typeof m !== 'object') return 'not JSON';
-    if (m.schema !== 1) return 'unknown schema ' + m.schema;
-    if (typeof m.generated_at !== 'number' || !isFinite(m.generated_at)) return 'build time missing';
+    if (!m || typeof m !== 'object') return BAD_DATA;
+    if (m.schema !== 1) return BAD_FORMAT;
+    if (typeof m.generated_at !== 'number' || !isFinite(m.generated_at)) return BAD_DATA;
     var f = m.files && m.files['semis.json'];
-    if (!f || !/^[0-9a-f]{64}$/.test(f.sha256 || '')) return 'semis.json entry missing';
+    if (!f || !/^[0-9a-f]{64}$/.test(f.sha256 || '')) return BAD_DATA;
     return null;
   }
   function prepare(d) {
-    var P = { ser: {}, cards: {} }, pts = d.smh.map(function (p) { return { t: dayNum(p[0]), c: p[1], dd: p[2] }; }), have = {};
+    var PG = d.page, P = { ser: {}, cards: {}, stacks: PG.stacks, now: PG.now, text: PG.text, tiles: PG.tiles || {}, gpuAsof: PG.gpu_asof,
+      cand: PG.candidates, cenRows: PG.census_rows, cenHs: PG.census_hs, cenNext: PG.census_next };
+    var pts = d.smh.map(function (p) { return { t: dayNum(p[0]), c: p[1], dd: p[2] }; }), have = {};
     pts.forEach(function (p) { have[p.t] = 1; });
     P.lows = d.lows.map(function (l) { return { t: dayNum(l.d), c: l.c, dd: l.dd, name: l.name, kind: l.kind }; });
     P.lows.forEach(function (l) { if (!have[l.t]) pts.push({ t: l.t, c: l.c, dd: l.dd, low: true }); });
@@ -348,65 +345,70 @@
     P.first = P.xs[0]; P.last = P.xs[P.xs.length - 1];
     P.lowAt = {}; P.lows.forEach(function (l) { P.lowAt[l.t] = l; });
     P.eps = d.eps.map(function (e) { return { t: dayNum(e.d), name: e.name }; });
-    d.series.forEach(function (s) { P.ser[s.key] = prepSeries(s, P.last); });
-    d.now.forEach(function (g) { g.cards.forEach(function (c) { P.cards[c.key] = c; }); });
-    P.kor = prepKorea(d.korea, P, 'doc', d.built);
+    d.series.forEach(function (s) { var k = pageKey(d, s.key); P.ser[k] = prepSeries(s, k, PG.series[k]); });
+    PG.now.forEach(function (g) { g.cards.forEach(function (c) { P.cards[c.key] = c; }); });
+    P.kor = prepKorea(d, P);
+
+
+    P.cal = overlayNotes(d.calendar, PG.calendar_notes, function (e) { return e.d0 + '\n' + e.what; }, 'note');
+    P.asof = overlayNotes(d.asof, PG.asof_notes, function (a) { return a.k; }, 'v');
     return P;
   }
-  function prepSeries(s, last) {
-    var S = { key: s.key, short: s.short, label: s.label, unit: s.unit, unitText: s.unit_text, src: s.src, group: s.group,
-      t: [], v: [], ref: [], p: [], lv: s.lv, now: s.now };
+  function overlayNotes(rows, notes, keyOf, field) {
+    if (!isArr(rows)) return [];
+    var by = {};
+    if (isArr(notes)) notes.forEach(function (n) { if (n && typeof n[field] === 'string') by[keyOf(n)] = n[field]; });
+    return rows.map(function (r) {
+      var k = r && keyOf(r);
+      if (!r || !Object.prototype.hasOwnProperty.call(by, k)) return r;
+      var o = {}; for (var f in r) o[f] = r[f];
+      o[field] = by[k];
+      return o;
+    });
+  }
+  function prepSeries(s, k, V) {
+    var S = { key: k, short: s.short, V: V, t: [], v: [], ref: [], p: [], now: s.now,
+      osc: !!V.osc, daily: !!V.daily, level: !!V.level, print: !!V.print, since: V.since };
     s.pts.forEach(function (p) { S.t.push(dayNum(p[0])); S.v.push(p[1]); S.ref.push(p[2]); S.p.push(p[3]); });
     S.ev = s.ev.map(function (e) { return { t: dayNum(e[0]), type: e[1], v: e[2] }; });
 
-    S.osc = S.daily = s.unit === 'rel63' || s.unit === 'chg63';
-    S.since = s.unit === 'yoy_print' ? '2016' : '2013';
-
-    var q = S.unit === 'yoyq' || S.unit === 'level', lp = S.t[S.t.length - 1];
-    if (S.daily) S.staleAt = lp < last - 14 ? lp + 7 : null;
-    else S.staleAt = lp < last - (q ? 120 : 60) ? lp + (q ? 100 : 45) : null;
+    S.staleAt = V.stale_from ? dayNum(V.stale_from) : null;
     return S;
   }
 
 
-
-  function koreaBad(K) {
-    if (typeof K !== 'object') return 'not an object';
-    if (!Array.isArray(K.stack) || !Array.isArray(K.series) || !Array.isArray(K.cards)) return 'stack, series or cards missing';
+  function koreaBad(d, K, PK) {
+    if (typeof K !== 'object' || typeof PK !== 'object') return true;
+    if (!isArr(K.series) || !isArr(PK.cards) || !isArr(d.page.stacks.c4)) return true;
+    if (seriesBad(d, K.series)) return true;
     for (var i = 0; i < K.series.length; i++) {
       var s = K.series[i];
-      if (!s || !s.key || !Array.isArray(s.pts) || !s.pts.length || s.pts[0].length < 4 || !s.now || !s.lv || !Array.isArray(s.ev)) return 'series ' + (s && s.key) + ' incomplete';
       for (var j = 0; j < s.pts.length; j++) {
         var p = s.pts[j];
-        if (!p || typeof p[0] !== 'string' || (p[1] !== null && typeof p[1] !== 'number') || typeof p[2] !== 'string' || typeof p[3] !== 'number') return 'series ' + s.key + ' has a bad reading';
+        if (!p || typeof p[0] !== 'string' || (p[1] !== null && typeof p[1] !== 'number') || typeof p[2] !== 'string' || typeof p[3] !== 'number') return true;
       }
     }
-    return null;
+    return false;
   }
-  function prepKorea(K, P, how, built) {
-    if (K == null) return null;
-    var bad = koreaBad(K);
-    if (bad) { if (window.console) console.warn('Korea block not shown: ' + bad); return null; }
+  function prepKorea(d, P) {
+    var K = d.korea, PK = d.page.korea;
+    if (K == null || PK == null) return null;
+    if (koreaBad(d, K, PK)) { if (window.console) console.warn('Korea card not shown: ' + BAD_DATA); return null; }
     var ser = {};
-    try { K.series.forEach(function (s) { ser[s.key] = prepSeries(s, P.last); ser[s.key].kr = true; }); }
-    catch (e) { if (window.console) console.warn('Korea block not shown: ' + e.message); return null; }
+    try { K.series.forEach(function (s) { var k = pageKey(d, s.key); ser[k] = prepSeries(s, k, d.page.series[k]); ser[k].kr = true; }); }
+    catch (e) { if (window.console) console.warn('Korea card not shown: ' + BAD_DATA); return null; }
     for (var k in ser) if (!P.ser[k]) P.ser[k] = ser[k];
-    var stack = K.stack.filter(function (k) { return !!P.ser[k]; });
+    var stack = d.page.stacks.c4.filter(function (k) { return !!P.ser[k]; });
     if (!stack.length) return null;
-    var cards = {}, nk = [];
-    K.cards.forEach(function (c) { if (!c || !c.key) return; cards[c.key] = c; if (c.status === 'needs_key') nk.push(c); });
-    return { K: K, stack: stack, cards: cards, nk: nk, how: how, built: built || '' };
+    var nk = [];
+    PK.cards.forEach(function (c) { if (c && c.key && c.status === 'needs_key') nk.push(c); });
+    return { K: K, PK: PK, stack: stack, nk: nk };
   }
   function serAt(S, dn) {
     var j = bsearchLE(S.t, dn);
     return { j: j, gone: S.staleAt != null && dn > S.staleAt };
   }
   function cardFor(key) { return D.cards[CARD_OF[key] || key] || null; }
-  function recentPeak(S) {
-    var n = S.v.length, best = -1;
-    for (var j = Math.max(0, n - 6); j < n; j++) if (best < 0 || S.v[j] > S.v[best]) best = j;
-    return best;
-  }
 
 
   var RANGE_MONTHS = { '1Y': 12, '2Y': 24, '5Y': 60, '10Y': 120, 'All': 0 };
@@ -497,13 +499,13 @@
   function tickUnit(pw) { return timeTicks(view.x0, view.x1, lin(view.x0, view.x1, 0, pw), 11).unit; }
 
 
-  var PL = { 90: { c: '#A99CC8', op: 0.7, w: 1 }, 95: { c: '#B98AF2', op: 0.85, w: 1.15 }, 99: { c: '#D17BFF', op: 1, w: 1.4 } };
-  PL[5] = PL[95];
-  var PL_DASH = '6 4', PLDBG = {};
+  var PL0 = { 90: { c: '#A99CC8', op: 0.7, w: 1 }, 95: { c: '#B98AF2', op: 0.85, w: 1.15 }, 99: { c: '#D17BFF', op: 1, w: 1.4 } };
+  function plStyle(q) { return PL0[q] || PL0[100 - q] || PL0[95]; }
+  var PL_DASH = '6 4';
   function pctLines(g, S, Y, L, pw, top, bot, lineTop, zeroY, small) {
     var out = { g: g, L: L, pw: pw, lines: [], above: [], ys: zeroY != null ? [zeroY] : [] };
-    (S.osc ? [5, 95] : [90, 95, 99]).forEach(function (q) {
-      var v = S.lv[q]; if (v == null) return;
+    S.V.lines.forEach(function (qv) {
+      var q = qv[0], v = qv[1]; if (v == null) return;
       var y = Y(v), s = ordinal(q) + ' · ' + fmtLv(v);
       if (y < lineTop) { out.above.push({ q: q, v: v, s: s }); return; }
       if (y > bot - 1) return;
@@ -516,7 +518,7 @@
   }
   function pctDraw(P, boxes) {
     P.lines.forEach(function (ln) {
-      var hw = PL[ln.q].w / 2 + 0.5, cuts = [];
+      var hw = plStyle(ln.q).w / 2 + 0.5, cuts = [];
       (boxes || []).forEach(function (b) { if (b.y < ln.y + hw && b.y + b.h > ln.y - hw && b.x < P.L + P.pw && b.x + b.w > P.L) cuts.push([b.x - 1, b.x + b.w + 1]); });
       cuts.sort(function (a, b) { return a[0] - b[0]; });
       var x = P.L, segs = [];
@@ -524,8 +526,8 @@
       if (x < P.L + P.pw) segs.push([x, P.L + P.pw]);
       segs.forEach(function (sg) {
         if (sg[1] - sg[0] < 2) return;
-        el('line', { x1: sg[0].toFixed(1), x2: sg[1].toFixed(1), y1: ln.y.toFixed(1), y2: ln.y.toFixed(1), stroke: PL[ln.q].c, 'stroke-opacity': PL[ln.q].op,
-          'stroke-width': PL[ln.q].w, 'stroke-dasharray': PL_DASH, 'data-pl': ln.q }, P.g);
+        el('line', { x1: sg[0].toFixed(1), x2: sg[1].toFixed(1), y1: ln.y.toFixed(1), y2: ln.y.toFixed(1), stroke: plStyle(ln.q).c, 'stroke-opacity': plStyle(ln.q).op,
+          'stroke-width': plStyle(ln.q).w, 'stroke-dasharray': PL_DASH, 'data-pl': ln.q }, P.g);
       });
     });
   }
@@ -562,7 +564,7 @@
     }
     function draw(b, s, q, qs) {
       el('rect', { x: b.x.toFixed(1), y: b.y.toFixed(1), width: b.w.toFixed(1), height: b.h, rx: 2, fill: C.panel, 'fill-opacity': 0.88, 'data-pll': qs || q }, g);
-      tx(g, b.x + b.w / 2, b.y + b.h / 2 + 3.8, s, { fill: PL[q].c, 'font-size': fs, 'font-weight': 600, 'text-anchor': 'middle' });
+      tx(g, b.x + b.w / 2, b.y + b.h / 2 + 3.8, s, { fill: plStyle(q).c, 'font-size': fs, 'font-weight': 600, 'text-anchor': 'middle' });
       placed.push(b);
     }
     var res = P.lines.filter(function (ln) { return !ln.nolab; }).map(function (ln) { var b = find(ln.s, ln.y); if (b) placed.push(b); return { ln: ln, b: b, s: ln.s }; });
@@ -605,7 +607,6 @@
       got.forEach(function (o) { var s = o.s || '↑ ' + o.ln.s; draw(o.b, s, o.ln.q); dbg.above.push({ q: o.ln.q, s: s }); });
       if (!got.length) P.above.forEach(function (ln) { dbg.above.push({ q: ln.q, s: '↑ ' + ln.s, box: null }); });
     }
-    if (tag) PLDBG[tag] = dbg;
     return placed;
   }
 
@@ -762,8 +763,8 @@
     var mTop = smhH + gap, H = mTop + mH + 24, x0 = view.x0, x1 = view.x1, X = lin(x0, x1, L, L + pw);
     var svg = svgFor(holder, W, H), ticks = timeTicks(x0, x1, X, 11, tu), S = D.ser[sel];
     var sm = smhStrip(svg, X, x0, x1, L, 0, pw, smhH, ticks, { narrow: narrow });
-    var title = S.short + ' · ' + UNIT_SHORT[S.unit] + (S.unit === 'level' ? ' %' : ' %');
-    if (!narrow && textW(AXIS_WORDS[S.unit], 11.5) < mH - 30) tx(svg, 12, mTop + mH / 2, AXIS_WORDS[S.unit], { fill: C.muted, 'font-size': 11.5, 'text-anchor': 'middle', transform: 'rotate(-90 12 ' + (mTop + mH / 2) + ')' });
+    var title = S.short + ' · ' + S.V.unit_label + ' %', axisW = S.V.axis;
+    if (!narrow && textW(axisW, 11.5) < mH - 30) tx(svg, 12, mTop + mH / 2, axisW, { fill: C.muted, 'font-size': 11.5, 'text-anchor': 'middle', transform: 'rotate(-90 12 ' + (mTop + mH / 2) + ')' });
     var pane = seriesPane(svg, S, X, x0, x1, L, mTop, pw, mH, { ticks: ticks, title: title, titleSize: narrow ? 12.5 : 13, titleRoom: 20,
       lw: narrow ? 1.5 : 1.8, rPk: narrow ? 4 : 4.6, rNow: narrow ? 5 : 6, minPx: narrow ? 28 : 34, tag: 'c1' });
 
@@ -801,7 +802,7 @@
     });
     keys.forEach(function (k) {
       var S = D.ser[k];
-      S.ev.forEach(function (e) { if (e.t >= wk0 && e.t <= dn) out.push((keys.length > 1 ? TILE_NAME[k] + ' ' : '') + (e.type === 'TT' ? 'trough-turn ' : 'crossed above 0 ') + fmtDay(e.t, false)); });
+      S.ev.forEach(function (e) { if (e.t >= wk0 && e.t <= dn) out.push((keys.length > 1 ? S.V.tile + ' ' : '') + (e.type === 'TT' ? 'trough-turn ' : 'crossed above 0 ') + fmtDay(e.t, false)); });
     });
     return out;
   }
@@ -835,7 +836,7 @@
   function stackHead(S, L, pw, RA) {
 
     var j = S.t.length - 1, right = L + pw + RA, rows = [], val = fmtV(S, S.v[j]), vW = textW(val, 22, 700), stale = S.staleAt != null;
-    var name = NAME[S.key];
+    var name = S.V.name;
     var o = ordinal(rnk(S.p[j])), pcs = topRec(S, j) ? ['highest since ' + S.since, 'highest', o] : [o + ' percentile', o + ' pct', o];
     if (L + 2 + textW(name, 14, 700) + 10 + textW(pcs[2], 11.5) > right - vW - 8) name = S.short;
     var nameR = L + 2 + textW(name, 14, 700) + 10, pc = pcs[2];
@@ -845,9 +846,9 @@
     rows.push({ x: right - vW - 8, y: 19, s: pc, fill: C.text, fs: 11.5, a: 'end', tag: 'pc' });
     var l2 = refHead(S, j) + (stale ? ' · no update since' : '');
     rows.push({ x: L + 2, y: 33, s: l2, fill: C.muted, fs: 11 });
-    var acc = S.now.acc, r2 = acc != null && !stale ? (acc >= 0 ? 'accel ' : 'slowing ') + sgn(acc, 0) + ' pp' : topRec(S, j) ? o + ': ' + S.now.n_lo + ' of ' + S.now.n + ' lower' :
-      S.unit === 'yoy_print' && S.now.top && !stale ? 'record of ' + S.now.n + ' prints' : '';
-    if (r2 && L + 2 + textW(l2, 11) + 10 + textW(r2, 11) <= right) rows.push({ x: right, y: 33, s: r2, fill: acc != null && acc < 0 && !stale ? '#E8C547' : C.muted, fs: 11, a: 'end' });
+    var aw = S.V.acc_words, r2 = aw && !stale ? aw[aw.length - 1] : topRec(S, j) ? o + ': ' + S.now.n_lo + ' of ' + S.now.n + ' lower' :
+      S.print && S.now.top && !stale ? 'record of ' + S.now.n + ' prints' : '';
+    if (r2 && L + 2 + textW(l2, 11) + 10 + textW(r2, 11) <= right) rows.push({ x: right, y: 33, s: r2, fill: aw && S.V.acc_neg && !stale ? '#E8C547' : C.muted, fs: 11, a: 'end' });
     return { h: 42, rows: rows };
   }
   function drawStack(key, Wraw, tu, hFs) {
@@ -874,19 +875,19 @@
         hd.rows.forEach(function (r) { tx(gh, r.x, y + r.y, r.s, { fill: r.fill, 'font-size': r.fs, 'font-weight': r.fw || 400, 'text-anchor': r.a || 'start', 'data-th': r.tag || null }); });
         y += hd.h;
       }
-      var pane = seriesPane(svg, S, X, x0, x1, L, y, pw, panH, { ticks: ticks, title: wide ? NAME[k] : null, titleSize: 12.5, titleRoom: wide ? 18 : 3,
+      var pane = seriesPane(svg, S, X, x0, x1, L, y, pw, panH, { ticks: ticks, title: wide ? S.V.name : null, titleSize: 12.5, titleRoom: wide ? 18 : 3,
         lw: wide ? 1.4 : 1.2, rPk: wide ? 3.8 : 3.2, rNow: wide ? 4.5 : 3.8, minPx: wide ? 24 : 20, tag: key + k });
       snap = snap.concat(pane.snap);
       if (wide) {
         var cx = L + pw + RA + 14, cw = RC - 18, j = S.t.length - 1, stale = S.staleAt != null, yy = y + Math.min(30, panH * 0.36);
         var big = Math.max(17, Math.min(26, Math.round(panH * 0.27)));
         tx(svg, cx, yy, fmtV(S, S.v[j]), { fill: stale ? C.muted : C.light, 'font-size': big, 'font-weight': 700 });
-        var o13 = ordinal(rnk(S.p[j])), acc = S.now.acc;
+        var o13 = ordinal(rnk(S.p[j])), aw = S.V.acc_words;
         var tr = topRec(S, j), sy = S.since, lines = [[tr ? ['highest since ' + sy + ' (' + o13 + ': ' + S.now.n_lo + ' of ' + S.now.n + ' lower)', 'highest since ' + sy + ' (' + o13 + ')', 'highest since ' + sy] : [o13 + ' percentile since ' + sy, o13 + ' percentile', o13 + ' pctl'], 12.5, C.text, 'pc'],
           [refCol(S, j), 11.5, C.muted],
-          [stale ? ['no update since ' + fmtDay(S.t[j], true), 'no update since'] : acc != null ? [(acc >= 0 ? 'accel ' : 'slowing ') + sgn(acc, 0) + ' pp vs 3 months earlier', (acc >= 0 ? 'accel ' : 'slowing ') + sgn(acc, 0) + ' pp (3 months)', (acc >= 0 ? 'accel ' : 'slowing ') + sgn(acc, 0) + ' pp'] :
-            S.unit === 'yoy_print' && S.now.top ? ['a record: highest of ' + S.now.n + ' prints', 'a record (' + S.now.n + ' prints)', 'a record'] : [UNIT_SHORT[S.unit], S.unit],
-            11.5, acc != null && acc < 0 && !stale ? '#E8C547' : C.muted]];
+          [stale ? ['no update since ' + fmtDay(S.t[j], true), 'no update since'] : aw ? aw :
+            S.print && S.now.top ? ['a record: highest of ' + S.now.n + ' prints', 'a record (' + S.now.n + ' prints)', 'a record'] : [S.V.unit_label],
+            11.5, aw && S.V.acc_neg && !stale ? '#E8C547' : C.muted]];
         lines.forEach(function (r) {
           if (yy + r[1] + 4 > y + panH - 2) return;
           var s = r[0].filter(function (t0) { return textW(t0, r[1]) <= cw; })[0];
@@ -924,7 +925,7 @@
 
   function tile(S, j, gone) {
     var c = document.createElement('div');
-    c.appendChild(span('k', TILE_NAME[S.key]));
+    c.appendChild(span('k', S.V.tile));
     if (j < 0) { c.appendChild(span('v', '–')); c.appendChild(span('s', 'no data yet')); c.appendChild(miniBar(null)); return c; }
     if (gone) c.className = 'gone';
     c.appendChild(span('v', fmtV(S, S.v[j])));
@@ -933,15 +934,15 @@
     c.appendChild(span('s', gone ? 'no update since ' + (S.daily ? fmtDay(S.t[j], false) + yr : refWord(S.ref[j]).slice(0, 3) + ' ’' + S.ref[j].slice(2, 4)) :
       (S.daily ? 'to ' : 'public ') + fmtDay(S.t[j], false) + yr));
     c.appendChild(miniBar(S.p[j]));
-    c.title = NAME[S.key] + ': ' + fmtV(S, S.v[j]) + ' (' + UNIT_SHORT[S.unit] + '), ' + (S.daily ? '63 sessions to ' + fmtDay(S.t[j], true) :
-      (S.unit === 'yoy_print' ? printWord(S, j) + ' ' + S.ref[j].slice(0, 4) + ' print' : refWord(S.ref[j]) + ' data') + ', public ' + fmtDay(S.t[j], true)) +
+    c.title = S.V.name + ': ' + fmtV(S, S.v[j]) + ' (' + S.V.unit_label + '), ' + (S.daily ? S.V.window_word + ' ' + fmtDay(S.t[j], true) :
+      (S.print ? printWord(S, j) + ' ' + S.ref[j].slice(0, 4) + ' print' : refWord(S.ref[j]) + ' data') + ', public ' + fmtDay(S.t[j], true)) +
       ', ' + ordinal(rnk(S.p[j])) + ' percentile since ' + S.since;
     return c;
   }
 
   function nkTile(c) {
     var t = node('div', 'nk');
-    t.appendChild(span('k', TILE_NAME[c.key] || c.title)); t.appendChild(span('v', c.val)); t.appendChild(span('s', c.unit || ''));
+    t.appendChild(span('k', D.tiles[c.key] || (D.ser[c.key] && D.ser[c.key].V.tile) || c.title)); t.appendChild(span('v', c.val)); t.appendChild(span('s', c.unit || ''));
     t.title = c.title + ': ' + (c.hist || c.val);
     return t;
   }
@@ -963,7 +964,6 @@
   var GAUGE_BANDS = [[0, 50, '#262B3D'], [50, 80, '#30335A'], [80, 90, '#41346E'], [90, 95, '#57408F'], [95, 99, '#7552BC'], [99, 100, '#A070F0']];
   var GAUGE_TICKS = [0, 50, 80, 90, 95, 99], GAUGE_TICK_PRIO = [0, 50, 90, 99, 80, 95];
   var heroNow = null, heroPk = null, gaugeKey = '';
-  var PEAK_WORDS = 'Recent peak = the highest of the series’ last 6 readings, the latest one included.';
   function bandsInto(bar) {
     GAUGE_BANDS.forEach(function (b) {
       var s = document.createElement('span'); s.className = 'g-band';
@@ -976,21 +976,20 @@
     if (p != null) { var m = document.createElement('i'); m.className = 'mb-m'; m.style.left = Math.max(0, Math.min(100, p)).toFixed(2) + '%'; b.appendChild(m); }
     return b;
   }
-  function zoneWord(r) { return r >= 95 ? 'Very high' : r >= 80 ? 'High' : r >= 20 ? 'Middle of its range' : r >= 5 ? 'Low' : 'Very low'; }
   function renderHero() {
-    var sm = J.smh_last, S = D.ser[sel], n = S.t.length, j = n - 1, pk = recentPeak(S), same = pk === j, r = rnk(S.p[j]);
+    var sm = J.smh_last, S = D.ser[sel], n = S.t.length, j = n - 1, pk = S.V.peak, same = !pk, r = rnk(S.p[j]);
 
-    $('heroK').textContent = TILE_NAME[S.key] || S.short; $('heroV').textContent = fmtV(S, S.v[j]);
+    $('heroK').textContent = S.V.tile || S.short; $('heroV').textContent = fmtV(S, S.v[j]);
     var hd = $('heroDate'); clear(hd);
     hd.textContent = refWord(S.ref[j]) + ' data · public ' + fmtDay(S.t[j], true);
     var hp = $('heroPct'); clear(hp);
-    var acc = S.now.acc;
+    var aw = S.V.acc_words;
     if (topRec(S, j)) { hp.appendChild(span('hp-b', 'highest since 2013')); hp.appendChild(document.createTextNode(' (' + ordinal(r) + ' percentile: ' + S.now.n_lo + ' of ' + S.now.n + ' readings lower)')); }
     else { var h1 = span('hp-1', ''); h1.appendChild(span('hp-b', ordinal(r) + ' percentile')); h1.appendChild(document.createTextNode(' since 2013')); hp.appendChild(h1); }
-    if (acc != null) {
+    if (aw) {
       hp.appendChild(document.createTextNode(' '));
-      var h2 = span('hp-2', '· ' + (acc >= 0 ? 'accel ' : 'slowing ') + sgn(acc, 0) + ' pp'); h2.title = 'growth now vs 3 months earlier, in percentage points';
-      h2.appendChild(span('hp-3', ' vs 3 months earlier')); hp.appendChild(h2);
+      var h2 = span('hp-2', '· ' + aw[aw.length - 1]); h2.title = D.text.acc_tip;
+      hp.appendChild(h2);
     }
     var pe = $('heroPeak'); clear(pe);
     pe.appendChild(span('', 'SMH $' + sm.close.toFixed(2) + ' (' + fmtDay(dayNum(sm.date), false) + (liveIntraday() ? ', ' + asofEt() + ' ET' : '') + ') · '));
@@ -998,10 +997,10 @@
     pe.appendChild(span('', ' (' + fmtDay(dayNum(sm.high_date), false) + ')'));
     if (!same) {
       pe.appendChild(span('', ' · '));
-      var pkt = span('hp-rule', 'recent peak ' + fmtV(S, S.v[pk]) + ' (' + refWord(S.ref[pk]).slice(0, 3) + ') = ' + ordinal(rnk(S.p[pk])));
-      pkt.title = PEAK_WORDS; pe.appendChild(pkt);
+      var pkt = span('hp-rule', 'recent peak ' + fmtV(S, pk.v) + ' (' + refWord(pk.ref).slice(0, 3) + ') = ' + ordinal(rnk(pk.p)));
+      pkt.title = D.text.peak_words; pe.appendChild(pkt);
     }
-    heroNow = { p: S.p[j], r: r }; heroPk = same ? null : { p: S.p[pk], r: rnk(S.p[pk]), ref: S.ref[pk] };
+    heroNow = { p: S.p[j], r: r }; heroPk = same ? null : { p: pk.p, r: rnk(pk.p), ref: pk.ref };
     var g = $('gauge1'); clear(g);
     g.setAttribute('aria-label', 'Percentile gauge since 2013 for ' + S.short + ': now ' + ordinal(r) + (heroPk ? ', recent peak ' + ordinal(heroPk.r) : ''));
     var labs = node('div', 'g-labs'); g.appendChild(labs);
@@ -1016,11 +1015,11 @@
     g.appendChild(span('g-cap', 'percentile since 2013 · deeper purple = rarer'));
     gaugeKey = ''; layoutGauge();
     var zl = $('zoneLine'); clear(zl);
-    zl.appendChild(span('zw', zoneWord(r)));
-    zl.appendChild(span('', ' — ' + S.short + (S.unit === 'level' ? ' at ' : ' growth at ') + fmtV(S, S.v[j]) + ' is higher than ' + r + '% of its readings since 2013.'));
+    zl.appendChild(span('zw', S.V.zone));
+    zl.appendChild(span('', ' — ' + S.short + (S.level ? ' at ' : ' growth at ') + fmtV(S, S.v[j]) + ' is higher than ' + r + '% of its readings since 2013.'));
     var sc0 = $('serCap'); clear(sc0);
-    sc0.appendChild(node('b', '', S.label));
-    sc0.appendChild(document.createTextNode(' · ' + S.unitText + ' · ' + S.src + (S.staleAt != null ? ' · no update after ' + fmtDay(S.t[n - 1], true) : '')));
+    sc0.appendChild(node('b', '', S.V.label));
+    sc0.appendChild(document.createTextNode(' · ' + S.V.unit_label + ' · ' + S.V.source + (S.staleAt != null ? ' · no update after ' + fmtDay(S.t[n - 1], true) : '')));
     var rn2 = $('rightNow'); clear(rn2);
     var sc = cardFor(S.key);
     if (sc) { var b = document.createElement('b'); b.textContent = (S.key === 'US_AI_HW' ? 'US AI-hardware imports' : sc.title) + ': '; rn2.appendChild(b); rn2.appendChild(document.createTextNode(sc.hist)); }
@@ -1056,13 +1055,13 @@
 
   function renderTiles1() {
     var box = $('tiles1'); clear(box);
-    TILES1.forEach(function (k) {
+    D.stacks.tiles1.forEach(function (k) {
       var S = D.ser[k]; if (!S) return;
       var j = S.t.length - 1, b = document.createElement('button');
       b.type = 'button'; b.setAttribute('data-k', k); b.setAttribute('aria-pressed', String(k === sel));
       var t = tile(S, j, false);
       while (t.firstChild) b.appendChild(t.firstChild);
-      b.setAttribute('aria-label', 'Chart ' + NAME[k] + ': ' + fmtV(S, S.v[j]) + ', ' + ordinal(rnk(S.p[j])) + ' percentile since 2013, ' + refWord(S.ref[j]) + ' data, public ' + fmtDay(S.t[j], true));
+      b.setAttribute('aria-label', 'Chart ' + S.V.name + ': ' + fmtV(S, S.v[j]) + ', ' + ordinal(rnk(S.p[j])) + ' percentile since 2013, ' + refWord(S.ref[j]) + ' data, public ' + fmtDay(S.t[j], true));
       b.addEventListener('click', function () { pickSeries(k); });
       box.appendChild(b);
     });
@@ -1087,8 +1086,8 @@
     var f = {};
     seens.forEach(function (o) { for (var k in o) if (o[k]) f[k] = 1; });
     var items = [];
-    if (f.low) items.push(['lg-pk', 'SMH low after a 20%+ drop']);
-    if (f.ring) items.push(['lg-ring', long ? 'false start (the 6 in the indicator test)' : 'false start']);
+    if (f.low) items.push(['lg-pk', D.text.legend_low]);
+    if (f.ring) items.push(['lg-ring', long ? D.text.legend_false : 'false start']);
     if (f.e) items.push(['lg-e', 'E1–E3 rally starts']);
     if (f.ser) items.push(['lg-ser', 'data as known that day']);
     if (f.tt) items.push(['lg-tt', 'trough-turn' + (sameWk && !f.c0 ? ' (small: same week on SMH)' : '')]);
@@ -1223,7 +1222,7 @@
     if (/HTTP 404/.test(w)) return 'it is not published yet';
     if (/timed out|network error/.test(w)) return 'no connection to the feed';
     if (/HTTP \d/.test(w)) return 'the feed answered ' + /HTTP \d+/.exec(w)[0];
-    if (/looked broken|not valid JSON|does not match|older than its manifest|could not be drawn/.test(w)) return 'the latest file failed its checks';
+    if (/looked broken|format changed|not valid JSON|does not match|older than its manifest|could not be drawn/.test(w)) return 'the latest file failed its checks';
     return w ? 'it could not be used' : 'not loaded yet';
   }
 
@@ -1266,7 +1265,7 @@
     });
     $('asof').textContent = 'Latest public data: ' + parts.join(' · ');
     var nx = $('nextLine'); clear(nx);
-    var up = (J.calendar || []).filter(function (e) { return calState(e) !== 'past'; }).slice(0, 1);
+    var up = ((D && D.cal) || []).filter(function (e) { return calState(e) !== 'past'; }).slice(0, 1);
     if (up.length) {
       nx.appendChild(span('', 'Next: '));
       up.forEach(function (e) {
@@ -1309,7 +1308,7 @@
   var CAL_SHOW = 6;
   function renderCal() {
     var ul = $('cal'), ul2 = $('cal2'); clear(ul); clear(ul2);
-    var now = taipeiToday(), main = [], more = [], old = 0, cal = J.calendar || [];
+    var now = taipeiToday(), main = [], more = [], old = 0, cal = D.cal;
 
 
     var ahead = cal.filter(function (e) { return calState(e) !== 'past'; });
@@ -1336,7 +1335,7 @@
   function readingsList(target, groups, only) {
     var box = $(target); clear(box);
     groups.forEach(function (gid) {
-      var g = J.now.filter(function (x) { return x.id === gid; })[0]; if (!g) return;
+      var g = D.now.filter(function (x) { return x.id === gid; })[0]; if (!g) return;
       var cards = g.cards.filter(function (c) { return !only || only(c, gid); }); if (!cards.length) return;
       var wrap = node('div', 'rl-g'); wrap.appendChild(node('h4', '', g.title));
       if (g.note) wrap.appendChild(node('p', 'rl-note', g.note));
@@ -1362,40 +1361,35 @@
     var on = koreaOn();
     $('korea').hidden = !on; $('krMore').hidden = !on;
     if (!on) return;
-    var K = D.kor.K, a = K.asof || {}, pa = $('asof4'); clear(pa);
-    if (D.kor.how === 'graft') {
-      pa.appendChild(span('chip chip-snap', 'SNAPSHOT'));
-      pa.appendChild(span('', 'Korea numbers from the snapshot bundled with the page' + (D.kor.built ? ' (built ' + D.kor.built + ')' : '') +
-        '; the live feed does not carry them yet.'));
-    }
+    var K = D.kor.K, PK = D.kor.PK, a = K.asof || {}, pa = $('asof4'); clear(pa);
     var parts = [], d = function (x) { return fmtDay(dayNum(x), false); };
     if (a.kcs) parts.push('KCS ' + d(a.kcs));
     if (a.motir) parts.push('MOTIR ' + d(a.motir));
     if (a.prices) parts.push('Seoul close ' + d(a.prices));
-    var np = K.next_print;
+    var np = PK.next_print;
     if (np && np.d && /^\d{4}-\d\d-\d\d$/.test(np.d)) parts.push('next KCS print ' + fmtDay(dayNum(np.d), false, true) + (np.est ? ' (est.)' : ''));
     pa.appendChild(span('', (parts.length ? 'Latest: ' + parts.join(' · ') + ' · ' : '') + 'Seoul dates, each reading on its public date'));
     var rn = $('krNow'); clear(rn);
-    (K.right_now || []).forEach(function (t, i) { if (t) rn.appendChild(node('span', i ? 'box-p' : '', t)); });
+    (PK.right_now || []).forEach(function (t, i) { if (t) rn.appendChild(node('span', i ? 'box-p' : '', t)); });
     if (!rn.firstChild) rn.textContent = 'No Korea reading in this build.';
     var box = $('krList'); clear(box);
     var wrap = node('div', 'rl-g');
-    K.cards.forEach(function (c) { if (c && c.title) wrap.appendChild(rlCard(c)); });
+    PK.cards.forEach(function (c) { if (c && c.title) wrap.appendChild(rlCard(c)); });
     box.appendChild(wrap);
-    $('krAttr').textContent = K.attribution || '';
+    $('krAttr').textContent = PK.attribution || '';
   }
-  function koreaFailed(e) {
-    if (window.console) console.warn('Korea card hidden: ' + (e && e.message));
+  function koreaFailed() {
+    if (window.console) console.warn('Korea card hidden: ' + BAD_DATA);
     if (D) D.kor = null;
     $('korea').hidden = true; $('krMore').hidden = true;
   }
   function renderTaiwanText() {
-    var A = {}; (J.asof || []).forEach(function (a) { A[a.k] = a.v; });
+    var A = {}; D.asof.forEach(function (a) { A[a.k] = a.v; });
     var pa = $('asof2'); clear(pa);
     pa.appendChild(span('', 'Monthly data · each reading on its public date'));
     var sl = $('twSlow'); clear(sl);
     var warns = [];
-    J.now.forEach(function (g) { if (g.id === 'tw-chip' || g.id === 'tw-server') g.cards.forEach(function (c) { if (c.warn) warns.push(c); }); });
+    D.now.forEach(function (g) { if (g.id === 'tw-chip' || g.id === 'tw-server') g.cards.forEach(function (c) { if (c.warn) warns.push(c); }); });
     warns.forEach(function (c, i) {
       var p = node('span', i ? 'box-p' : '');
       var b = document.createElement('b'); b.textContent = c.title; p.appendChild(b);
@@ -1407,9 +1401,8 @@
   }
 
   function gpuDay(col) {
-    if (col.asof && /^\d{4}-\d\d-\d\d$/.test(col.asof)) return col.asof;
-    var g = J.sources && J.sources.GPU && J.sources.GPU.last_public;
-    return g && /^\d{4}-\d\d-\d\d/.test(g.public || '') ? g.public.slice(0, 10) : col.first;
+    var g = D.gpuAsof;
+    return g && /^\d{4}-\d\d-\d\d$/.test(g) ? g : col.first;
   }
   function renderHardwareText() {
     var hw = J.hardware || {}, pa = $('asof3'); clear(pa);
@@ -1448,25 +1441,24 @@
       var ct = $('censusTable'); clear(ct);
       var cap = document.createElement('caption'); cap.textContent = 'AI-hardware imports, $ billions a month'; ct.appendChild(cap);
       var hr = ct.insertRow(); ['Month', 'Total', 'y/y', '3-month y/y'].forEach(function (h) { var th = document.createElement('th'); th.textContent = h; hr.appendChild(th); });
-      cen.rows.forEach(function (r) {
+      (D.cenRows || []).forEach(function (r) {
         var tr = ct.insertRow();
         tr.insertCell().textContent = refWord(r.m);
         tr.insertCell().textContent = '$' + r.tot.toFixed(1) + 'B';
         var c2 = tr.insertCell(); c2.textContent = r.yoy == null ? '–' : sgn(r.yoy, 0) + '%'; c2.className = r.yoy >= 0 ? 'up' : 'dn';
-        tr.insertCell().textContent = r.yoy3 == null ? '–' : sgn(r.yoy3, 0) + '%';
+        tr.insertCell().textContent = r.yoy_3m == null ? '–' : sgn(r.yoy_3m, 0) + '%';
       });
       var hs = $('censusHs'); clear(hs);
-      cap = document.createElement('caption'); cap.textContent = refWord(cen.last) + ' by product (HS-6 code)'; hs.appendChild(cap);
-      hr = hs.insertRow(); [['HS', ''], ['What', 'l'], ['$B', ''], ['y/y', '']].forEach(function (h) { var th = document.createElement('th'); th.textContent = h[0]; if (h[1]) th.className = h[1]; hr.appendChild(th); });
-      cen.hs.forEach(function (r) {
+      cap = document.createElement('caption'); cap.textContent = refWord(cen.last) + ' by product'; hs.appendChild(cap);
+      hr = hs.insertRow(); [['What', 'l'], ['$B', ''], ['y/y', '']].forEach(function (h) { var th = document.createElement('th'); th.textContent = h[0]; if (h[1]) th.className = h[1]; hr.appendChild(th); });
+      (D.cenHs || []).forEach(function (r) {
         var tr = hs.insertRow();
-        tr.insertCell().textContent = r.hs;
         var w = tr.insertCell(); w.textContent = r.name; w.className = 'l tw';
         tr.insertCell().textContent = r.v.toFixed(2);
         tr.insertCell().textContent = r.yoy == null ? '–' : sgn(r.yoy, 0) + '%';
       });
       note = 'Source: US Census Bureau international trade data (general imports, monthly value). ' + refWord(cen.last) + ' data was public ' +
-        (cen.public ? fmtDay(dayNum(cen.public), true) : 'about 35 days after month end') + '. Next: ' + cen.next + '.' +
+        (cen.public ? fmtDay(dayNum(cen.public), true) : 'on a date not yet known') + '.' + (D.cenNext ? ' Next: ' + D.cenNext + '.' : '') +
         ' This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.';
     }
     $('censusNote').textContent = 'Source: US Census Bureau international trade data (general imports, monthly value). This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.';
@@ -1500,7 +1492,7 @@
 
     var box = $('sigs'), hl = $('sigHist'); clear(box); clear(hl);
     ['market', 'chart', 'macro'].forEach(function (gid) {
-      var g = J.now.filter(function (x) { return x.id === gid; })[0]; if (!g) return;
+      var g = D.now.filter(function (x) { return x.id === gid; })[0]; if (!g) return;
       box.appendChild(node('p', 'sig-h', g.title));
       if (g.note && gid === 'chart') box.appendChild(node('p', 'sig-note', g.note));
       var grid = node('div', 'sig-grid');
@@ -1515,7 +1507,7 @@
       });
       box.appendChild(grid);
     });
-    var mg = J.now.filter(function (x) { return x.id === 'macro'; })[0];
+    var mg = D.now.filter(function (x) { return x.id === 'macro'; })[0];
     $('macroNote').textContent = mg && mg.note ? 'Macro: ' + mg.note : '';
   }
   function renderRallies() {
@@ -1545,7 +1537,7 @@
     };
     var box = $('cands'); clear(box);
     var cur = null, grid = null;
-    J.candidates.rows.forEach(function (r) {
+    D.cand.rows.forEach(function (r) {
       if (r.tier !== cur) {
         cur = r.tier;
         var h = node('p', 'tier-h', desc[cur][0]); h.appendChild(node('small', '', desc[cur][1])); box.appendChild(h);
@@ -1557,8 +1549,6 @@
       a.appendChild(hd);
       var nd = node('div', 'nd'); nd.appendChild(document.createTextNode('Price needs ')); nd.appendChild(node('b', '', r.needs)); a.appendChild(nd);
       var row = function (lab, txt) { var d = node('div', 'row'); d.appendChild(span('', lab)); d.appendChild(document.createTextNode(txt)); a.appendChild(d); };
-      row('How: ', r.needs_long);
-      if (r.yard != null) row('Plain yardstick (trailing revenue): ', r.yard.toFixed(1) + '%/yr');
       row('Growing now: ', r.growing);
       row('Main risk: ', r.risk);
       grid.appendChild(a);
@@ -1574,13 +1564,14 @@
     cols.forEach(function (c) { var th = document.createElement('th'); th.textContent = c[0]; th.className = c[1].replace('w', 'wide-only'); hr.appendChild(th); });
     Object.keys(D.ser).forEach(function (k) {
       var S = D.ser[k], j = S.t.length - 1, vals;
-      try { vals = [S.label, fmtV(S, S.v[j]), dataWord(S, j), fmtDay(S.t[j], true), ordinal(rnk(S.p[j])) + (S.since !== '2013' ? ' (' + S.since + '+)' : ''), S.osc ? '5th: ' + lvCell(S, 5) : lvCell(S, 90), lvCell(S, 95), lvCell(S, 99), S.unitText, S.src]; }
+      var tb = S.V.table;
+      try { vals = [S.V.label, fmtV(S, S.v[j]), dataWord(S, j), fmtDay(S.t[j], true), ordinal(rnk(S.p[j])) + (S.since !== '2013' ? ' (' + S.since + '+)' : ''), (tb[0][0] !== 90 ? ordinal(tb[0][0]) + ': ' : '') + lvCell(tb[0][1]), lvCell(tb[1][1]), lvCell(tb[2][1]), S.V.unit_label, S.V.source]; }
       catch (e) { if (S.kr) return; throw e; }
       var r = t.insertRow();
       vals.forEach(function (v, i) { var c = r.insertCell(); c.textContent = v; c.className = (i === 0 ? 'l tw ' : '') + cols[i][1].replace('w', 'wide-only').replace(/^l$/, ''); });
     });
     var lt = $('lowTable'); clear(lt);
-    cap = document.createElement('caption'); cap.textContent = 'SMH lows after a 20%+ drop, the E3 dip and the 6 false starts of the indicator test'; lt.appendChild(cap);
+    cap = document.createElement('caption'); cap.textContent = D.text.low_table_caption; lt.appendChild(cap);
     hr = lt.insertRow(); ['Low', 'Date', 'SMH close', 'Off 1-yr high', 'Kind'].forEach(function (h) { var th = document.createElement('th'); th.textContent = h; hr.appendChild(th); });
     D.lows.forEach(function (l) {
       var r = lt.insertRow();
@@ -1595,15 +1586,10 @@
       [fmtDay(D.xs[i], true, true), D.c[i].toFixed(2), sgn(D.dd[i], 1) + '%'].forEach(function (v) { r.insertCell().textContent = v; });
     }
     var al = $('asofList'); clear(al);
-    (J.asof || []).forEach(function (a) { al.appendChild(node('dt', '', a.k)); al.appendChild(node('dd', '', a.v)); });
-    if (koreaOn()) try {
-      var K = D.kor.K, pr = K.prints || {}, ka = K.asof || {}, rows = [], f = function (x) { return fmtDay(dayNum(x), false); };
-      var kp = [pr.p10, pr.p20].filter(function (x) { return x && x.public && x.ref; }).sort(function (x, y) { return x.public < y.public ? 1 : -1; })[0];
-      if (kp) rows.push(['Korea customs (KCS)', MON[+kp.ref.slice(5, 7) - 1] + ' 1–' + (kp === pr.p20 ? '20' : '10') + ', ' + kp.ref.slice(0, 4) + ' print (public ' + f(kp.public) + ')']);
-      if (pr.first && pr.first.ref && pr.first.public) rows.push(['Korea trade ministry (MOTIR)', refWord(pr.first.ref) + ' (public ' + f(pr.first.public) + ')']);
-      if (ka.prices) rows.push(['Korean prices', 'Seoul close ' + f(ka.prices) + (ka.fx ? '; USD/KRW ' + f(ka.fx) : '') + (D.kor.how === 'graft' ? ' (bundled snapshot)' : '')]);
-      rows.forEach(function (r) { al.appendChild(node('dt', '', r[0])); al.appendChild(node('dd', '', r[1])); });
-    } catch (e) { if (window.console) console.warn('Korea sources line skipped: ' + e.message); }
+    D.asof.forEach(function (a) { al.appendChild(node('dt', '', a.k)); al.appendChild(node('dd', '', a.v)); });
+    if (koreaOn() && isArr(D.kor.PK.asof_rows)) D.kor.PK.asof_rows.forEach(function (r) {
+      if (isArr(r) && typeof r[0] === 'string' && typeof r[1] === 'string') { al.appendChild(node('dt', '', r[0])); al.appendChild(node('dd', '', r[1])); }
+    });
   }
   function renderText() {
     renderStatus(); renderTiles1(); renderHero(); renderTaiwanText();
@@ -1833,7 +1819,7 @@
   }
   function fsMinH(key) { var short = window.innerHeight <= 540; return key === 'c1' ? (short ? 180 : 220) : stackMinH(key); }
   function fsSize() { if (FS.key) { var m = fsMinH(FS.key) + 'px'; if (fsSlot('chart').style.flexBasis !== m) fsSlot('chart').style.flexBasis = m; } }
-  function fsDraw(now) { if (!FS.key || !D) return; if (now) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); } } else requestRender(); }
+  function fsDraw(now) { if (!FS.key || !D) return; if (now) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn.'); } } else requestRender(); }
   function fsHint() {
     $('fsHint').textContent = HOVER ? 'Pinch or ' + (IS_MAC ? '⌘' : 'Ctrl') + '-scroll to zoom · drag to move · double-click or Esc to close'
       : 'Pinch to zoom · drag sideways to move · tap to read · double-tap or ✕ to close';
@@ -1883,7 +1869,7 @@
     FS.nodes = []; FS.key = null;
     $('fs').hidden = true; fsSlot('chart').style.flexBasis = '';
     setInert(false);
-    if (J && D) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); } }
+    if (J && D) { try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn.'); } }
     var turned = window.innerWidth !== FS.vw || Math.abs(window.innerHeight - FS.vh) > 120;
     var docTop = turned ? chart.getBoundingClientRect().top + FS.y : 0;
     document.documentElement.classList.remove('fs-open');
@@ -1968,7 +1954,7 @@
     if (!J) return null;
     $('content').hidden = false;
     try { renderText(); } catch (e) { if (strict) return e; if (window.console) console.error(e); }
-    try { drawCharts(); } catch (e) { if (strict) return e; showFatal('The charts could not be drawn (' + e.message + ').'); }
+    try { drawCharts(); } catch (e) { if (strict) return e; showFatal('The charts could not be drawn.'); }
     return null;
   }
   function requestRender() {
@@ -1977,7 +1963,7 @@
     requestAnimationFrame(function () {
       rafPending = false;
       if (!J) return;
-      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn (' + e.message + ').'); }
+      try { drawCharts(); } catch (e) { showFatal('The charts could not be drawn.'); }
     });
   }
   function showFatal(msg) {
@@ -2013,6 +1999,10 @@
         throw (e && e.name === 'AbortError') ? new Error(name + ' timed out') : e;
       });
   }
+
+
+  function msgOf(e) { return e && e.name === 'Error' && e.message ? e.message : BAD_DATA; }
+  function prepareSafe(d, name) { try { return prepare(d); } catch (e) { throw new Error(name + ': ' + BAD_DATA); } }
   function parseJSON(buf, name) {
     try { return JSON.parse(new TextDecoder('utf-8').decode(buf)); } catch (e) { throw new Error(name + ' is not valid JSON'); }
   }
@@ -2027,7 +2017,7 @@
     var bust = Math.floor(Date.now() / 60000);
     return getBytes(base + 'manifest.json?m=' + bust, 'manifest.json').then(function (buf) {
       var m = parseJSON(buf, 'manifest.json'), bad = validateManifest(m);
-      if (bad) throw new Error('manifest.json looked broken: ' + bad);
+      if (bad) throw new Error('manifest.json: ' + bad);
       return m;
     });
   }
@@ -2039,7 +2029,7 @@
       SRC.docs++;
       return getBytes(base + 'semis.json?v=' + f.sha256.slice(0, 16), 'semis.json').then(function (buf) {
         var d = parseJSON(buf, 'semis.json'), bad = validateLive(d);
-        if (bad) throw new Error('semis.json looked broken: ' + bad);
+        if (bad) throw new Error('semis.json: ' + bad);
         return sha256hex(buf).then(function (h) {
 
 
@@ -2051,7 +2041,7 @@
           }
           SRC.older = older;
           if (older) setTimeout(poll, 60000);
-          return { d: d, P: prepare(d), sha: h || f.sha256 };
+          return { d: d, P: prepareSafe(d, 'semis.json'), sha: h || f.sha256 };
         });
       });
     });
@@ -2064,7 +2054,8 @@
     var hadView = !!D, wasLatest = hadView ? atLatest(view) : true;
     J = d; D = P; SRC.kind = kind;
     if (prev.D) ['c1', 'c2', 'c3', 'c4'].forEach(function (k) { if (hover[k] === prev.D.last && D.xs.indexOf(prev.D.last) < 0) hover[k] = D.last; });
-    if (!D.ser[sel]) sel = TILES1.filter(function (k) { return D.ser[k]; })[0] || d.series[0].key;
+    if (!hadView && wantSel) { sel = wantSel.filter(function (k) { return D.stacks.tiles1.indexOf(k) >= 0 && D.ser[k]; })[0] || sel; wantSel = null; }
+    if (!D.ser[sel]) sel = D.stacks.tiles1.filter(function (k) { return D.ser[k]; })[0] || pageKey(d, d.series[0].key);
 
     if (!hadView || !view.custom) view = rangeView(view.chip);
     else view = wasLatest ? toLatest(view, view.x0) : clampView(view);
@@ -2074,7 +2065,7 @@
       document.activeElement.getAttribute('data-k') : null;
     var err = keepPlace(function () { return renderAll(kind === 'live'); });
     if (err) {
-      var msg = 'the live data could not be drawn: ' + err.message;
+      var msg = 'the live data could not be drawn';
       SRC.badSha = sha || null; SRC.badWhy = msg;
       J = prev.J; D = prev.D; SRC.kind = prev.kind; view = prev.view; sel = prev.sel;
       hover.c1 = prev.hover.c1; hover.c2 = prev.hover.c2; hover.c3 = prev.hover.c3; hover.c4 = prev.hover.c4;
@@ -2093,26 +2084,17 @@
   function getBundled() {
     if (!bundledP) bundledP = getBytes(BUNDLED, 'the bundled semis.json', 'no-cache').then(function (buf) {
       var d = parseJSON(buf, 'the bundled semis.json'), bad = validate(d);
-      if (bad) throw new Error('the bundled data looked broken: ' + bad);
+      if (bad) throw new Error('the bundled semis.json: ' + bad);
       return d;
     }).catch(function (e) { bundledP = null; throw e; });
     return bundledP;
   }
   function loadBundled() {
-    return getBundled().then(function (d) { if (!(J && isLive())) apply(d, prepare(d), 'snapshot'); });
-  }
-
-
-  function withKorea(x) {
-    if (!x.d || x.d.korea !== undefined || x.P.kor) return Promise.resolve(x);
-    return getBundled().then(function (b) {
-      if (b && b.korea) x.P.kor = prepKorea(b.korea, x.P, 'graft', b.built);
-      return x;
-    }, function () { return x; });
+    return getBundled().then(function (d) { if (!(J && isLive())) apply(d, prepareSafe(d, 'the bundled semis.json'), 'snapshot'); });
   }
   function liveError(e) {
     SRC.fails++;
-    SRC.lastErr = { at: nowMs(), msg: e.message };
+    SRC.lastErr = { at: nowMs(), msg: msgOf(e) };
   }
   var loading = false;
   function load(initial, m) {
@@ -2121,16 +2103,16 @@
 
 
     var snapT = initial && !J ? setTimeout(function () { if (!J) loadBundled().catch(function () { }); }, FIRST_SNAPSHOT_MS) : 0;
-    getLive(m).then(withKorea).then(function (x) {
+    getLive(m).then(function (x) {
       if (J && isLive() && x.d.generated_at < J.generated_at) return;
       if (apply(x.d, x.P, 'live', x.sha) === 'fallback') return loadBundled();
     }, function (e) {
       if (J && isLive()) { liveError(e); keepPlace(renderStatus); return; }
-      SRC.why = e.message;
+      SRC.why = msgOf(e);
       if (J) { keepPlace(renderStatus); return; }
       return loadBundled();
     }).catch(function (e) {
-      if (!J) showFatal('Could not load the data (' + (SRC.why ? 'live feed: ' + SRC.why + '; ' : '') + e.message + ').');
+      if (!J) showFatal('Could not load the data (' + (SRC.why ? 'live feed: ' + SRC.why + '; ' : '') + msgOf(e) + ').');
       else if (window.console) console.error(e);
     }).then(function () { clearTimeout(snapT); loading = false; if (J) keepPlace(renderStatus); });
   }
@@ -2152,8 +2134,8 @@
     try { r = normRange(localStorage.getItem('semisRange')); s = localStorage.getItem('semisSeries'); } catch (e) { }
     var params = new URLSearchParams(location.search);
     view.chip = normRange(params.get('range')) || r || '5Y';
-    var ps = params.get('series');
-    if (ps && TILES1.indexOf(ps) >= 0) sel = ps; else if (s && TILES1.indexOf(s) >= 0) sel = s;
+
+    wantSel = [params.get('series'), s].filter(function (k) { return !!k; });
     renderViewUiChips();
   })();
   Array.prototype.forEach.call(document.querySelectorAll('[data-range]'), function (b) { b.addEventListener('click', function () { chooseRange(b.getAttribute('data-range')); }); });
@@ -2166,27 +2148,6 @@
   attachGestures($('chart2'), 'c2');
   attachGestures($('chart3'), 'c3');
   attachGestures($('chart4'), 'c4');
-  try {
-    Object.defineProperty(window, '__semisView', { configurable: true, get: function () {
-      if (!D) return null;
-      return { chip: view.chip, custom: view.custom, x0: view.x0, x1: view.x1, from: isoOf(Math.floor(view.x0)), to: isoOf(Math.floor(view.x1)),
-        span: view.x1 - view.x0, atLatest: atLatest(view), latest: isoOf(D.last), first: isoOf(D.first), limits: spanLimits(), renders: renders,
-        title: spanWords(), sel: sel, fs: FS.key, hover: { c1: hover.c1 == null ? null : isoOf(hover.c1), c2: hover.c2 == null ? null : isoOf(hover.c2), c3: hover.c3 == null ? null : isoOf(hover.c3), c4: hover.c4 == null ? null : isoOf(hover.c4) },
-        korea: D.kor ? { how: D.kor.how, stack: D.kor.stack.slice(), built: D.kor.built } : null };
-    } });
-    Object.defineProperty(window, '__semisPct', { configurable: true, get: function () { return D ? JSON.parse(JSON.stringify(PLDBG)) : null; } });
-
-    Object.defineProperty(window, '__semisLive', { configurable: true, get: function () {
-      var s = J ? status() : null;
-      return { source: SRC.kind, why: SRC.why, lastErr: SRC.lastErr ? SRC.lastErr.msg : null, fails: SRC.fails, older: SRC.older,
-        loading: loading, base: base, preview: preview, pollMs: pollMs,
-        loads: SRC.loads, polls: SRC.polls, manifests: SRC.manifests, docs: SRC.docs, hidden: document.hidden,
-        chip: s ? s.chip : null, cls: s ? s.cls : null, line: s ? s.line : null,
-        state: J ? J.state || null : null, kind: J && J.as_of ? J.as_of.kind : null, session: J && J.as_of ? J.as_of.session : null,
-        generated_at: J ? J.generated_at || null : null, smh: J ? J.smh_last.close : null, smhDate: J ? J.smh_last.date : null,
-        last: D ? isoOf(D.last) : null };
-    } });
-  } catch (e) { }
   if ('ResizeObserver' in window) {
     var lastW = 0;
     new ResizeObserver(function (ents) {
