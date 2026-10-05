@@ -632,3 +632,14 @@ html.dlg-open,html.dlg-open body{overflow:hidden}
 @media (max-width:719px){
   .dp{margin-left:0;width:100%}
 }
+
+
+.lhead .hs{position:relative;display:inline-flex;align-items:center;font:inherit;color:inherit;background:none;border:0;padding:2px 0;margin:0;cursor:pointer;text-align:left;letter-spacing:inherit;white-space:inherit;flex-wrap:inherit;border-radius:3px}
+.lhead .hs.on{color:var(--white);text-decoration:underline;text-decoration-color:var(--amber);text-decoration-thickness:2px;text-underline-offset:3px}
+@media (hover:hover){.lhead .hs:hover{color:var(--white)}.cpl-sort:hover .cpl-t{color:var(--text)}}
+.lhead .hs:focus-visible,.cpl-sort:focus-visible{outline:2px solid var(--fear);outline-offset:2px}
+.hs-a{font-style:normal;font-size:9px;line-height:1;color:var(--amber)}
+.hs-a:empty{display:none}
+.lhead .hs-a{position:absolute;left:50%;top:-9px;transform:translateX(-50%);font-size:8px}
+.cpl-sort{cursor:pointer;border-radius:6px}
+.cpl-sort.on .cpl-t{color:var(--text)}

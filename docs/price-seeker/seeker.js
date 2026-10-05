@@ -1406,7 +1406,7 @@
     var rows = V.rows.filter(match);
     var note = PER_LABEL[S.period] + ', ' + opt + 's: ';
     if (S.sort === 'best') note += 'ranked by tier, then the days on the list, then how much of the gap to its pile the price closed. The number before each name is its place in this window.';
-    else if (rk) note += rk.note.charAt(0).toLowerCase() + rk.note.slice(1) + ' Ranked within this window.';
+    else if (rk) note += rkNote(rk).charAt(0).toLowerCase() + rkNote(rk).slice(1) + ' Ranked within this window.';
     else note += 'sorted as on today’s table.';
     if (q) note += ' Showing your search only.';
     $('rankNote').textContent = note; $('rankNote').hidden = false;
@@ -1425,7 +1425,7 @@
       });
     } else {
       var rankOf = {}, hideC = !S.cOpen && !q && !rk, f = SORTS[S.sort] || SORTS.odds, nC = 0;
-      if (rk) V.rows.filter(function (n) { return num(n[rk.f]); }).sort(function (a, b) { return SORTS[S.sort](a, b) || a._i - b._i; }).forEach(function (n, i) { rankOf[n.sym] = i + 1; });
+      if (rk) V.rows.filter(function (n) { return rkHas(rk, n); }).sort(function (a, b) { return SORTS[S.sort](a, b) || a._i - b._i; }).forEach(function (n, i) { rankOf[n.sym] = i + 1; });
       rows.filter(function (n) { if (hideC && n.tier === 'C') { nC++; return false; } return true; })
         .sort(function (a, b) { return f(a, b) || a._i - b._i; })
         .forEach(function (n) { put(n, rk ? rankOf[n.sym] : null); });
@@ -1704,6 +1704,110 @@
       ? function (a, b) { return (num(a[f]) ? a[f] : 1e15) - (num(b[f]) ? b[f] : 1e15); }
       : function (a, b) { return (num(b[f]) ? b[f] : -1) - (num(a[f]) ? a[f] : -1); };
   });
+  function rkHas(rk, n) { var v = rk.val ? rk.val(n) : n[rk.f]; return num(v) || (typeof v === 'string' && v !== ''); }
+  function rkNote(rk) { return typeof rk.note === 'function' ? rk.note() : rk.note; }
+
+
+
+  var COLS = {
+    tier: { t: function () { return 'Tier'; }, v: function (n) { return { AB: 4, A: 3, B: 2, C: 1 }[n.tier] || null; } },
+    stock: { t: function () { return 'Stock'; }, v: function (n) { return n.sym; }, text: true },
+    price: { t: function () { return 'Price'; }, v: function (n) { return n.price; } },
+    togo: { t: function () { return 'To go'; }, v: function (n) { return num(n.dist) ? n.dist * SW().sign : null; } },
+    trip: { t: function () { return 'Trip'; }, v: function (n) { return n._trip && !n._trip.above && num(n._trip.t) ? n._trip.t : null; } },
+    spark: { t: function () { return 'Last 60 days'; }, v: function (n) { var c = n._spk && n._spk.c; return c && c.length > 1 && c[0] > 0 ? c[c.length - 1] / c[0] - 1 : null; } },
+    odds: { t: function () { return 'Odds'; }, v: function (n) { return n.odds; } },
+    nc: { t: function () { return 'New ' + SW().opts; }, v: function (n) { return n._nc ? n._nc.pct : null; } },
+    bet: { t: function () { return '$ in ' + SW().opts; }, v: function (n) { return n.prem_usd; } },
+    biz: { t: function () { return 'Business'; }, v: function (n) { return n.score; } },
+    r20: { t: function () { return '20 days'; }, v: function (n) { return n.ret20; } },
+    held: { t: function () { return 'Held'; }, v: function (n) { return n._persist != null && n._win ? n._persist / n._win : null; } },
+    cpday: { t: function () { return 'Calls : puts traded on the latest day'; }, s: 'Calls : puts, today', v: function (n) { return n._cpDay; }, cp: 'day' },
+    cpwk: { t: function () { return 'Calls : puts traded over the past week'; }, s: 'Calls : puts, week', v: function (n) { return n._cpWk; }, cp: 'wk' },
+    cpall: { t: function () { return 'Calls : puts held'; }, s: 'Calls : puts, held', v: function (n) { return n._cpAll; }, cp: 'all' }
+  };
+  Object.keys(COLS).forEach(function (c) {
+    var C = COLS[c];
+    [1, 2].forEach(function (step) {
+      var k = 'col:' + c + ':' + step;
+      SORTS[k] = function (a, b) {
+        var x = C.v(a), y = C.v(b), hx = num(x) || (C.text && !!x), hy = num(y) || (C.text && !!y);
+        if (!hx || !hy) return hx === hy ? 0 : hx ? -1 : 1;
+        var r = C.text ? String(x).localeCompare(String(y)) : y - x;
+        return step === 2 ? -r : r;
+      };
+      RANKS[k] = { val: C.v, cp: C.cp, col: c, step: step, note: function () {
+        var t = C.t(), first = C.text ? 'A to Z' : 'highest first', second = C.text ? 'Z to A' : 'lowest first';
+        return 'Sorted by ' + t + ', ' + (step === 1 ? first : second) + '. Click it again for ' + (step === 1 ? second : 'the ranking you had before') + '.' +
+          (C.text ? '' : ' Names without a number for it sit at the bottom.');
+      } };
+    });
+  });
+  function colKey(s) { var m = /^col:([a-z0-9]+):([12])$/.exec(s || ''); return m && COLS[m[1]] ? { c: m[1], step: +m[2] } : null; }
+  function colClick(c) {
+    var cur = colKey(S.sort);
+    if (cur && cur.c === c && cur.step === 1) { setSort('col:' + c + ':2'); return; }
+    if (cur && cur.c === c && cur.step === 2) {
+      var b = S.colBase && !colKey(S.colBase) && (SORTS[S.colBase] || S.colBase === 'best') ? S.colBase : 'best';
+      var huntOk = !S.period && !!(P && P.side === 'calls' && P.chase);
+      var park = b === 'chase' && !huntOk && !S.period;
+      if (b === 'chase' && !huntOk) b = 'best';
+      var rb = RANKS[b]; if (rb && rb.cp && !(P && P.cpHave && P.cpHave[rb.cp])) b = 'best';
+      S.colBase = null; setSort(b); if (park) S.chaseParked = true;
+      return;
+    }
+    if (!cur) S.colBase = S.sort;
+    setSort('col:' + c + ':1');
+  }
+  function renderColHeads() {
+    var cur = colKey(S.sort);
+    function stateTxt(C) { return C.text ? (cur.step === 1 ? 'A to Z' : 'Z to A') : (cur.step === 1 ? 'highest first' : 'lowest first'); }
+    function mark(el, on, C) {
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var a = el.querySelector('.hs-a'); if (a) a.textContent = on ? (cur.step === 1 ? '▼' : '▲') : '';
+      var v = el.querySelector('.hs-s'); if (v) v.textContent = on ? ', sorted ' + stateTxt(C) : '';
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('#lhead .hs'), function (b) {
+      var c = b.getAttribute('data-col'), on = !!cur && cur.c === c;
+      mark(b, on, COLS[c]);
+      b.title = on && cur.step === 1 ? 'Click for ' + (COLS[c].text ? 'Z to A' : 'lowest first') : on ? 'Click to go back to the ranking you had' : 'Sort by ' + COLS[c].t() + ': click once for ' + (COLS[c].text ? 'A to Z' : 'highest first') + ', twice for ' + (COLS[c].text ? 'Z to A' : 'lowest first') + ', three times to go back';
+    });
+    var lg = $('cpLegend');
+    if (lg) { var onL = !!cur && !!COLS[cur.c].cp; mark(lg, onL, COLS.cpday); lg.setAttribute('aria-label', 'Sort by calls : puts' + (onL ? ', sorted ' + stateTxt(COLS.cpday) : '')); }
+    var o = $('optCol');
+    if (o) {
+      o.hidden = o.disabled = !cur;
+      o.textContent = cur ? (COLS[cur.c].s || COLS[cur.c].t()) + (COLS[cur.c].text ? (cur.step === 1 ? ' A–Z' : ' Z–A') : (cur.step === 1 ? ' ↓' : ' ↑')) : '';
+      if (cur) { o.value = S.sort; $('sort').value = S.sort; }
+    }
+  }
+  function initCols() {
+    $('rankNote').setAttribute('aria-live', 'polite');
+    Array.prototype.forEach.call(document.querySelectorAll('#lhead [data-col]'), function (cell) {
+      var b = btn('hs', null), c = cell.getAttribute('data-col');
+      b.setAttribute('data-col', c);
+      Array.prototype.slice.call(cell.childNodes).forEach(function (x) {
+        if (x.nodeType === 1 && x.classList.contains('ib')) return;
+        if (x.nodeType === 3) { var tx = x.textContent.trim(); cell.removeChild(x); if (tx) b.appendChild(document.createTextNode(tx)); return; }
+        b.appendChild(x);
+      });
+      b.appendChild(span('hs-a', '')).setAttribute('aria-hidden', 'true');
+      b.appendChild(span('vh hs-s', ''));
+      cell.insertBefore(b, cell.firstChild);
+      b.addEventListener('click', function () { colClick(c); });
+    });
+    var lg = $('cpLegend');
+    if (lg) {
+      lg.setAttribute('role', 'button'); lg.tabIndex = 0; lg.classList.add('cpl-sort');
+      var lt = lg.querySelector('.cpl-t'); if (lt) { lt.id = 'cplT'; lg.setAttribute('aria-describedby', 'cplT'); }
+      lg.appendChild(span('hs-a', '')).setAttribute('aria-hidden', 'true');
+      lg.title = 'Sort by calls : puts: click once for highest first, twice for lowest first, three times to go back';
+      var go = function () { colClick('cp' + cpWin()); };
+      lg.addEventListener('click', go);
+      lg.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    }
+  }
   function allRows() {
     var out = P.names.slice();
     Object.keys(ghosts).forEach(function (k) { if (!P.by[k]) out.push(ghosts[k].n); });
@@ -1728,6 +1832,7 @@
     $('sort').value = S.sort;
     if (S.sort === 'new' && P && P.side === 'puts') $('sort').value = 'newputs';
     Array.prototype.forEach.call(document.querySelectorAll('#rankBar button[data-sort]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sort') === S.sort ? 'true' : 'false'); });
+    renderColHeads();
   }
   var CP_LEGEND = {
     day: ['traded on the latest day across all of the stock’s options (2.6 : 1 = 2.6 calls traded for every put). Volume shows activity, not direction. Tap a row for the past week and the open interest.'],
@@ -1759,11 +1864,11 @@
     $('backBest').hidden = S.sort === 'best';
     var rk = RANKS[S.sort], rankOf = {};
     if (rk) {
-      P.names.filter(function (n) { return num(n[rk.f]); }).sort(function (a, b) { return SORTS[S.sort](a, b) || a._i - b._i; })
+      P.names.filter(function (n) { return rkHas(rk, n); }).sort(function (a, b) { return SORTS[S.sort](a, b) || a._i - b._i; })
         .forEach(function (n, i) { rankOf[n.sym] = i + 1; });
       var filt = S.tier !== 'all' || !!S.q.trim();
       var among = P.list === 'all' ? 'all ' + P.names.length : 'the ' + P.names.length + ' names on ' + LISTS[P.list].label;
-      $('rankNote').textContent = rk.note + (filt ? ' Showing ' + (S.tier !== 'all' ? 'tier ' + tierName(S.tier) : 'your search') + ' only; the numbers are each name’s place among ' + among + '.' : ' All tiers are ranked together' + (P.list === 'all' ? '.' : ', within ' + LISTS[P.list].label + '.'));
+      $('rankNote').textContent = rkNote(rk) + (filt ? ' Showing ' + (S.tier !== 'all' ? 'tier ' + tierName(S.tier) : 'your search') + ' only; the numbers are each name’s place among ' + among + '.' : ' All tiers are ranked together' + (P.list === 'all' ? '.' : ', within ' + LISTS[P.list].label + '.'));
     }
     $('rankNote').hidden = !rk;
     if (S.period && perView()) { $('tierSeg').hidden = true; $('tierNote').hidden = true; renderPeriodList(host); return; }
@@ -2923,6 +3028,7 @@
   initFolds();
   initChaseFold();
   initDays();
+  initCols();
   renderCounts();
   renderBanners();
   Array.prototype.forEach.call(document.querySelectorAll('#tierSeg button'), function (b) { b.addEventListener('click', function () { setTier(b.getAttribute('data-tier')); }); });

@@ -10,7 +10,7 @@
 <meta name="description" content="Big call-option piles parked far above the price, today's look-alikes of the META pattern, and an honest record of hits and misses.">
 <title>Price Seeker · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="seeker.css?v=20261005p">
+<link rel="stylesheet" href="seeker.css?v=20261005q">
 </head>
 <body>
 <a class="skip" href="#list">Skip to the list</a>
@@ -184,6 +184,7 @@
               <option value="cpwk" id="optCpWk">Highest Call / Puts Skew Weekly</option>
               <option value="cpday" id="optCpDay">Highest Call / Puts Skew Today</option>
             </optgroup>
+            <option value="" id="optCol" hidden disabled></option>
           </select>
         </label>
       </div>
@@ -210,18 +211,18 @@
 
     <section class="list" id="list" aria-label="Today's list" tabindex="-1">
       <div class="lhead" id="lhead">
-        <span class="c-tier">Tier <button type="button" class="ib" data-pop="1" aria-expanded="false" aria-label="About the tier">i</button></span>
-        <span class="c-stock">Stock</span>
-        <span class="c-price">Price → Pile <button type="button" class="ib" data-pop="2" aria-expanded="false" aria-label="About price, pile and to go">i</button></span>
-        <span class="c-togo">To go</span>
-        <span class="c-trip">Trip · 20 days <button type="button" class="ib" data-pop="3" aria-expanded="false" aria-label="About the trip bar">i</button></span>
-        <span class="c-spark">Last 60 days <button type="button" class="ib" data-pop="4" aria-expanded="false" aria-label="About the last 60 days">i</button></span>
-        <span class="c-odds">Odds <button type="button" class="ib" data-pop="5" aria-expanded="false" aria-label="About the odds">i</button></span>
-        <span class="c-new" title="Calls added at this strike over the last 1, 3 or 5 sessions. Changes once a day."><span id="hdNew">New calls</span> <button type="button" class="ib" data-pop="6" aria-expanded="false" aria-label="About new calls and held">i</button></span>
-        <span class="c-bet"><span class="hl-long" id="hdBet">$ in calls</span><span class="hl-short" id="hdBetS">$ calls · Biz</span> <button type="button" class="ib" data-pop="7" aria-expanded="false" aria-label="About $ in calls">i</button></span>
-        <span class="c-biz"><span class="hl-long">Business</span><span class="hl-short">Biz</span> <button type="button" class="ib" data-pop="8" aria-expanded="false" aria-label="About the business score">i</button></span>
-        <span class="c-r20">20 days</span>
-        <span class="c-held">Held</span>
+        <span class="c-tier" data-col="tier">Tier <button type="button" class="ib" data-pop="1" aria-expanded="false" aria-label="About the tier">i</button></span>
+        <span class="c-stock" data-col="stock">Stock</span>
+        <span class="c-price" data-col="price">Price → Pile <button type="button" class="ib" data-pop="2" aria-expanded="false" aria-label="About price, pile and to go">i</button></span>
+        <span class="c-togo" data-col="togo">To go</span>
+        <span class="c-trip" data-col="trip">Trip · 20 days <button type="button" class="ib" data-pop="3" aria-expanded="false" aria-label="About the trip bar">i</button></span>
+        <span class="c-spark" data-col="spark">Last 60 days <button type="button" class="ib" data-pop="4" aria-expanded="false" aria-label="About the last 60 days">i</button></span>
+        <span class="c-odds" data-col="odds">Odds <button type="button" class="ib" data-pop="5" aria-expanded="false" aria-label="About the odds">i</button></span>
+        <span class="c-new" data-col="nc" title="Calls added at this strike over the last 1, 3 or 5 sessions. Changes once a day."><span id="hdNew">New calls</span> <button type="button" class="ib" data-pop="6" aria-expanded="false" aria-label="About new calls and held">i</button></span>
+        <span class="c-bet" data-col="bet"><span class="hl-long" id="hdBet">$ in calls</span><span class="hl-short" id="hdBetS">$ calls · Biz</span> <button type="button" class="ib" data-pop="7" aria-expanded="false" aria-label="About $ in calls">i</button></span>
+        <span class="c-biz" data-col="biz"><span class="hl-long">Business</span><span class="hl-short">Biz</span> <button type="button" class="ib" data-pop="8" aria-expanded="false" aria-label="About the business score">i</button></span>
+        <span class="c-r20" data-col="r20">20 days</span>
+        <span class="c-held" data-col="held">Held</span>
         <span class="c-chev"></span>
       </div>
       <p class="cp-legend" id="cpLegend"><span class="cpb-bar cpb-demo" aria-hidden="true"><i class="cpb-c" style="width:70%"></i><i class="cpb-p" style="width:30%"></i></span> <span class="cpl-t">Bar under each pile: <b class="cpl-c">calls</b> against <b class="cpl-p">puts</b> traded on the latest day across all of the stock’s options (2.6 : 1 = 2.6 calls traded for every put). Volume shows activity, not direction. Tap a row for the past week and the open interest.</span></p>
@@ -353,6 +354,6 @@
 </div>
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the list.</p></noscript>
-<script src="seeker.js?v=20261005p" defer></script>
+<script src="seeker.js?v=20261005q" defer></script>
 </body>
 </html>
