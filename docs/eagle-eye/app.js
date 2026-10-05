@@ -170,6 +170,9 @@ function setTf(t) {
 }
 
 
+
+
+const TOUCH_SCROLL = { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false };
 function makeChart() {
   if (chart) chart.remove();
   if (dchart) dchart.remove();
@@ -181,6 +184,7 @@ function makeChart() {
     rightPriceScale: { borderColor: '#2a2e39' },
     timeScale: { borderColor: '#2a2e39', timeVisible: INTRADAY.has(tf), secondsVisible: false, barSpacing: bs, rightOffset: ro },
     crosshair: { mode: LW.CrosshairMode.Normal },
+    handleScroll: TOUCH_SCROLL,
   });
 
   dchart = LW.createChart($('dchart'), base(7, 3));
@@ -193,6 +197,7 @@ function makeChart() {
     rightPriceScale: { borderColor: '#2a2e39' },
     timeScale: { borderColor: '#2a2e39', timeVisible: INTRADAY.has(tf), secondsVisible: false, barSpacing: 7 },
     crosshair: { mode: LW.CrosshairMode.Normal },
+    handleScroll: TOUCH_SCROLL,
   });
   candles = chart.addSeries(LW.CandlestickSeries, {
     upColor: C.up, downColor: C.dn, borderVisible: false, wickUpColor: C.up, wickDownColor: C.dn,
