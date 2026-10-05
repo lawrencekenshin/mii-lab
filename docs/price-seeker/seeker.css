@@ -645,3 +645,9 @@ html.dlg-open,html.dlg-open body{overflow:hidden}
 .lhead .hs-a{position:absolute;left:50%;top:-9px;transform:translateX(-50%);font-size:8px}
 .cpl-sort{cursor:pointer;border-radius:6px}
 .cpl-sort.on .cpl-t{color:var(--text)}
+
+
+.srch-h{color:var(--light)}
+.srch-wait{margin:10px 8px 0}
+.off-why li.first-fail{color:var(--white);font-weight:700}
+p.off-why{margin:0}

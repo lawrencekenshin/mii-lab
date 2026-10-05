@@ -915,7 +915,7 @@
     (np[kind] ? np[kind].names : []).forEach(function (n) { hb[n.sym] = n; });
     (old && old[kind] ? old[kind].names : []).forEach(function (n) { ob[n.sym] = 1; });
     var nNew = Object.keys(hb).filter(function (k) { return !ob[k]; }).length, nLeft = 0;
-    Object.keys(rowRefs).forEach(function (sym) { if (hb[sym]) updateRow(rowRefs[sym], hb[sym]); else nLeft++; });
+    Object.keys(rowRefs).forEach(function (sym) { if (rowRefs[sym].n._srch) return; if (hb[sym]) updateRow(rowRefs[sym], hb[sym]); else nLeft++; });
     renderChaseOpt(); renderChase(); renderListBar(); renderTiles(); renderCounts(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot(); renderStatus();
     if (typeof renderNet === 'function') renderNet();
     if (typeof renderFailed === 'function') renderFailed();
@@ -1181,14 +1181,16 @@
     if (kind === 'chase') {
       $('rankNote').textContent = 'Hunting the TSM pattern across ' + (P.list === 'all' ? 'all ' + (Hn && num(Hn.checked) ? int(Hn.checked) + ' ' : '') + 'names with a call pile' : LISTS[P.list].label) +
         ': a big, mostly long-dated call pile that sat well above the price when it became the top pile, has stayed the top pile, and that the price has been closing in on without reaching it, while the calls there have not been cut back by much. Ranked by the share of the gap closed (the number before each name). Most are not on the best-match list: once the price gets close, a pile drops off it.';
-    } else if (typeof freshNote === 'function') {
+    } else if (kind === 'fresh' && typeof freshNote === 'function') {
       $('rankNote').textContent = freshNote(Hn);
+    } else if (kind === 'ewz' && typeof ewzNote === 'function') {
+      $('rankNote').textContent = ewzNote(Hn);
     }
     $('rankNote').hidden = false;
     var rows = Hn ? Hn.names.filter(function (n) { return !q || n.sym.indexOf(q) === 0 || (ql.length >= 2 && typeof n.name === 'string' && (' ' + n.name.toLowerCase()).indexOf(' ' + ql) >= 0); }) : [];
-    if (q && rows.length) $('rankNote').textContent += kind === 'chase' ? ' Showing your search only; the numbers are each name’s place in the hunt.' : ' Showing your search only; the numbers are each name’s place on this list.';
+    if (q && rows.length) $('rankNote').textContent += kind !== 'fresh' ? ' Showing your search only; the numbers are each name’s place in the hunt.' : ' Showing your search only; the numbers are each name’s place on this list.';
     if (!rows.length) {
-      var what = kind === 'chase' ? 'shows the TSM pattern' : 'has fresh calls arriving at its pile';
+      var what = kind === 'chase' ? 'shows the TSM pattern' : kind === 'ewz' ? 'shows the EWZ pattern' : 'has fresh calls arriving at its pile';
       host.appendChild(q ? emptyBox('No match starts with ' + q + '.') : P.list === 'all' ? emptyBox('No name ' + what + ' today.') :
         emptyBox('No name on ' + LISTS[P.list].label + ' ' + what + ' today.', 'Whole list', function () { setList('all'); }));
       return;
@@ -1595,6 +1597,7 @@
     var n = r.n, P0 = r.pills; clear(P0);
     function pill(t, cls, title) { var s = span('pill ' + cls, t); if (title) s.title = title; P0.appendChild(s); }
     if (n.new === true && !n.per) pill('NEW', 'p-new', 'New since the previous close’s list.');
+    if (n._srch) pill('Not on the list', 'p-left', 'Not on today’s list. Open the row to see which check it misses.');
     if (n.per) perPills(n, pill);
     if (BORDERS[n.border] === 1) pill('Borderline', 'p-bord', borderTitle(n));
     if (num(n.fuse)) pill('Short fuse', 'p-fuse', 'The main expiry is ' + n.fuse + ' days away' + (num(n.main_share) ? ' (' + p0(n.main_share) + ' of these ' + SW().opts + ').' : '.'));
@@ -2010,6 +2013,97 @@
     if (helpBuilt) helpBuilt = false;
     renderAll();
   }
+
+
+
+
+
+
+  var SRCH = { gen: null, rows: null, loading: null, failedAt: 0, triedGen: null, lastQ: '' };
+  var searchUrl = dataUrl.replace(/[^/]*$/, 'search.json');
+  function prepSrch(list, d) {
+    var by = {}, out = [];
+    (Array.isArray(list) ? list : []).forEach(function (n, i) {
+      if (!n || typeof n.sym !== 'string' || !num(n.price) || !num(n.node) || by[n.sym]) return;
+      n._srch = true; n._i = 1e5 + i;
+      if (TIERS.indexOf(n.tier) < 0) n.tier = 'C';
+      n._cpAll = skewOf(n.chain_call_oi, n.chain_put_oi, CP_MIN.all); n._cpWk = skewOf(n.wk_c, n.wk_p, CP_MIN.wk); n._cpDay = skewOf(n.vol_c, n.vol_p, CP_MIN.day);
+      viewName(n, d.prices_day);
+      by[n.sym] = n; out.push(n);
+    });
+    return { list: out, by: by };
+  }
+  function loadSearch(cb) {
+    if (SRCH.loading) { if (cb) SRCH.loading.push(cb); return; }
+    SRCH.loading = cb ? [cb] : [];
+    getJSON(searchUrl).then(function (d) {
+      if (!d || !Array.isArray(d.names)) throw new Error('shape');
+      SRCH.gen = d.generated;
+      SRCH.rows = { calls: prepSrch(d.names, d), puts: prepSrch(d.puts && d.puts.names, d) };
+      return true;
+    }).catch(function () { SRCH.failedAt = Date.now(); return false; }).then(function (ok) {
+      var f = SRCH.loading; SRCH.loading = null;
+      if (ok && S.q.trim() && P) renderList();
+      f.forEach(function (g) { g(ok); });
+    });
+  }
+  function srchRow(sym) { return SRCH.rows && P ? SRCH.rows[P.side === 'puts' ? 'puts' : 'calls'].by[sym] || null : null; }
+  function searchOpen(sym) {
+    if (S.day || !P) return false;
+    if (!SRCH.rows) {
+      if (Date.now() - SRCH.failedAt < 60e3) return false;
+      loadSearch(function (ok) { if (ok && srchRow(sym)) searchOpen(sym); else checkTicker(sym, true); });
+      return true;
+    }
+    if (!srchRow(sym)) return false;
+    hideCheck();
+    if (S.q.trim().toUpperCase() !== sym) { S.q = sym; $('q').value = sym; }
+    renderList();
+    var r = rowRefs[sym]; if (!r) return false;
+    if (!S.open[sym]) openRow(r, true); else setHash(sym);
+    scrollToEl(r.art); flashRow(r);
+    return true;
+  }
+  function srchWhy(n) {
+    var ix = P && P.idx ? P.idx[n.sym] : null, el = ix ? offChecks(n.sym, ix) : para('', n.sym + ' isn’t on today’s list.');
+    el.classList.add('why'); el.classList.add('off-why');
+    return el;
+  }
+  function renderSearchRows(keepOpen) {
+    var host = $('rows'), raw = S.q.trim(), q = raw.toUpperCase(), ql = raw.toLowerCase();
+    if (raw !== SRCH.lastQ) { SRCH.lastQ = raw; S.srchAll = false; }
+    if (!q || !P || S.day) return;
+    if (!SRCH.rows) {
+      if (!SRCH.loading && Date.now() - SRCH.failedAt >= 60e3) loadSearch();
+      if (SRCH.loading) host.appendChild(para('src srch-wait', 'Looking through the other names we track…'));
+      return;
+    }
+    if (SRCH.gen !== P.doc.generated && SRCH.triedGen !== P.doc.generated && !SRCH.loading) { SRCH.triedGen = P.doc.generated; loadSearch(); }
+    var pool = SRCH.rows[P.side === 'puts' ? 'puts' : 'calls'].list.concat(P.names);
+    var seen = {}, hits = [];
+    pool.forEach(function (n) {
+      if (rowRefs[n.sym] || seen[n.sym]) return;
+      var m = n.sym === q ? 0 : n.sym.indexOf(q) === 0 ? 1 : ql.length >= 2 && typeof n.name === 'string' && (' ' + n.name.toLowerCase()).indexOf(' ' + ql) >= 0 ? 2 : -1;
+      if (m < 0) return;
+      seen[n.sym] = 1; hits.push({ n: n, m: m });
+    });
+    if (!hits.length) return;
+    hits.sort(function (a, b) { return a.m - b.m || a.n.sym.localeCompare(b.n.sym); });
+    var emp = host.querySelector('.empty'); if (emp) host.removeChild(emp);
+    var cap = S.srchAll ? hits.length : 12;
+    var head = div('grp srch-h'), t = span('gtx', null);
+    t.appendChild(document.createTextNode('Other names we track' + (S.period ? ', today' : '') + ' '));
+    t.appendChild(span('gn', '(' + hits.length + ')'));
+    head.appendChild(t); host.appendChild(head);
+    hits.slice(0, cap).forEach(function (h) { addRow(host, h.n, null); });
+    if (hits.length > cap) {
+      var pm = para('c-hidden', (hits.length - cap) + ' more ' + (hits.length - cap === 1 ? 'match' : 'matches') + '. '), bm = btn('linkbtn', 'Show all ' + hits.length);
+      bm.addEventListener('click', function () { S.srchAll = true; renderList(); }); pm.appendChild(bm); host.appendChild(pm);
+    }
+    (keepOpen || []).forEach(function (sym) { var r = rowRefs[sym]; if (r && !S.open[sym]) { S.open[sym] = 1; openRow(r, false); } });
+  }
+  var renderTable = renderList;
+  renderList = function () { var keep = Object.keys(S.open); renderTable(); renderSearchRows(keep); };
   function renderListBar() {
     var bar = $('listBar'), have = P && Object.keys(P.lists || {}).length;
     bar.hidden = !have;
@@ -2140,6 +2234,7 @@
   }
 
   function whyList(n) {
+    if (n._srch) return srchWhy(n);
     if (n.hunt) return huntWhy(n);
     if (n.fresh) return freshWhy(n);
     var w = SW(), ul = document.createElement('ul'); ul.className = 'why';
@@ -2251,7 +2346,7 @@
     ch.setAttribute('aria-label', n.sym + ' runway chart. Left and right arrows move through days.');
     left.appendChild(ch);
     var cap = para('cap', captionFor(n)); left.appendChild(cap);
-    right.appendChild(kick('Why it’s here'));
+    right.appendChild(kick(n._srch ? 'Why it’s not on the list' : 'Why it’s here'));
     if (n.per) right.appendChild(perWhy(n));
     right.appendChild(whyList(n)); right.appendChild(tierLine(n));
     right.appendChild(kick('The facts')); right.appendChild(factsGrid(n));
@@ -2395,10 +2490,41 @@
 
   var CHECK_ORDER = ['far', 'big', 'persist', 'calls', 'reach'];
   function hideCheck() { var c = $('checkCard'); c.hidden = true; clear(c); }
-  function checkTicker(raw) {
+
+
+  function offChecks(sym, ix) {
+    var w = SW(), fail = ix[1], node = ix[2], dist = ix[3], share = ix[4], val = ix[5];
+    if (fail === 'below' || fail === 'above') return para('', sym + '’s biggest ' + w.opt + ' pile is at or ' + w.away + ' the price, so there’s nothing to seek ' + w.seek + '.');
+    if (fail === 'nopile') return para('', sym + ' has no strike where ' + w.opts + ' outweigh ' + w.other + ' today, so there’s no ' + w.opt + ' pile to seek.');
+    if (fail === 'nochain') return para('', sym + ' has no usable option chain or price history today, so it can’t be checked.');
+    var ul = document.createElement('ul'), fi = CHECK_ORDER.indexOf(fail);
+    var PASS = {
+      far: '✓ Far: its biggest ' + w.opt + ' pile (' + strike(node) + ') is ' + a1(dist) + ' ' + w.dir + ' the price.',
+      big: '✓ Big: the pile holds ' + p0(share) + ' of ' + w.gam + ' gamma.',
+      persist: '✓ Stays put.', calls: '✓ ' + w.mostly + '.', reach: '✓ Reachable.'
+    };
+    var FAIL = {
+      far: '✗ Far: its biggest ' + w.opt + ' pile (' + strike(node) + ') is only ' + a1(dist) + ' ' + w.dir + ' the price: not far enough.',
+      big: '✗ Big: the pile holds ' + p0(share) + ' of ' + w.gam + ' gamma: not big enough.',
+      persist: '✗ Stays put: the top strike was the same in only ' + (num(val) ? val : '–') + ' of the last 10 sessions: hasn’t stayed put.',
+      calls: '✗ ' + w.mostly + ': ' + (num(val) ? ratioTxt(val) : '–') + ' ' + w.opts + ' per ' + w.other.replace(/s$/, '') + ' at that strike: not ' + w.mostly.toLowerCase() + '.',
+      reach: '✗ Reachable: ' + (num(val) ? val.toFixed(1) : '–') + ' typical moves away: out of reach.'
+    };
+    var LABEL = { far: 'Far', big: 'Big', persist: 'Stays put', calls: w.mostly, reach: 'Reachable' };
+    CHECK_ORDER.forEach(function (k, i) {
+      var li = document.createElement('li');
+      if (fi < 0 || i < fi) li.textContent = PASS[k];
+      else if (i === fi) { li.className = 'first-fail'; li.textContent = FAIL[k]; }
+      else li.textContent = '– ' + LABEL[k] + ': not evaluated.';
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+  function checkTicker(raw, noSearch) {
     var sym = String(raw || '').trim().toUpperCase();
     if (!sym || !P) return;
     if (P.by[sym]) { hideCheck(); goToRow(sym, true); return; }
+    if (!noSearch && searchOpen(sym)) return;
     var card = $('checkCard'); clear(card); card.hidden = false;
     if (P.list !== 'all' && P.allSyms[sym]) {
       var h0 = div('cc-h'), x0 = btn('x-btn', '✕'); x0.setAttribute('aria-label', 'Close the check'); x0.addEventListener('click', hideCheck);
@@ -2418,37 +2544,8 @@
       head.appendChild(x); card.appendChild(head); return;
     }
     head.appendChild(add(document.createElement('b'), sym + ' isn’t on today’s list.')); head.appendChild(x); card.appendChild(head);
-    if (ix) {
-
-      var fail = ix[1], node = ix[2], dist = ix[3], share = ix[4], val = ix[5];
-      if (fail === 'below' || fail === 'above') card.appendChild(para('', sym + '’s biggest ' + w.opt + ' pile is at or ' + w.away + ' the price, so there’s nothing to seek ' + w.seek + '.'));
-      else if (fail === 'nopile') card.appendChild(para('', sym + ' has no strike where ' + w.opts + ' outweigh ' + w.other + ' today, so there’s no ' + w.opt + ' pile to seek.'));
-      else if (fail === 'nochain') card.appendChild(para('', sym + ' has no usable option chain or price history today, so it can’t be checked.'));
-      else {
-        var ul = document.createElement('ul'), fi = CHECK_ORDER.indexOf(fail);
-        var PASS = {
-          far: '✓ Far: its biggest ' + w.opt + ' pile (' + strike(node) + ') is ' + a1(dist) + ' ' + w.dir + ' the price.',
-          big: '✓ Big: the pile holds ' + p0(share) + ' of ' + w.gam + ' gamma.',
-          persist: '✓ Stays put.', calls: '✓ ' + w.mostly + '.', reach: '✓ Reachable.'
-        };
-        var FAIL = {
-          far: '✗ Far: its biggest ' + w.opt + ' pile (' + strike(node) + ') is only ' + a1(dist) + ' ' + w.dir + ' the price: not far enough.',
-          big: '✗ Big: the pile holds ' + p0(share) + ' of ' + w.gam + ' gamma: not big enough.',
-          persist: '✗ Stays put: the top strike was the same in only ' + (num(val) ? val : '–') + ' of the last 10 sessions: hasn’t stayed put.',
-          calls: '✗ ' + w.mostly + ': ' + (num(val) ? ratioTxt(val) : '–') + ' ' + w.opts + ' per ' + w.other.replace(/s$/, '') + ' at that strike: not ' + w.mostly.toLowerCase() + '.',
-          reach: '✗ Reachable: ' + (num(val) ? val.toFixed(1) : '–') + ' typical moves away: out of reach.'
-        };
-        var LABEL = { far: 'Far', big: 'Big', persist: 'Stays put', calls: w.mostly, reach: 'Reachable' };
-        CHECK_ORDER.forEach(function (k, i) {
-          var li = document.createElement('li');
-          if (fi < 0 || i < fi) li.textContent = PASS[k];
-          else if (i === fi) { li.className = 'first-fail'; li.textContent = FAIL[k]; }
-          else li.textContent = '– ' + LABEL[k] + ': not evaluated.';
-          ul.appendChild(li);
-        });
-        card.appendChild(ul);
-      }
-    } else if (!P.idx) card.appendChild(para('mut', 'The 5-check detail for names off the list comes with the next version of the data file.'));
+    if (ix) card.appendChild(offChecks(sym, ix));
+    else if (!P.idx) card.appendChild(para('mut', 'The 5-check detail for names off the list comes with the next version of the data file.'));
     if (inCl || hit) {
       var lk = para('cc-links', null);
       if (inCl) { var b1 = btn('linkbtn', 'It’s in Closing in.'); b1.addEventListener('click', function () { goToClosing(sym); }); lk.appendChild(b1); }
@@ -2963,6 +3060,7 @@
     np.names.forEach(function (n) { if (!old.by[n.sym]) nNew++; });
     Object.keys(rowRefs).forEach(function (sym) {
       var r = rowRefs[sym], nn = np.by[sym];
+      if (r.n._srch) return;
       if (nn) { if (r.leftAt) { r.leftAt = null; r.leftWhy = null; r.art.classList.remove('left'); delete ghosts[sym]; } updateRow(r, nn); }
       else if (!r.leftAt) {
         r.leftAt = t; r.leftWhy = whyLeft(sym, np); ghosts[sym] = { n: r.n, at: t, why: r.leftWhy };
