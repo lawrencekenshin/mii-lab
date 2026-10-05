@@ -10,7 +10,7 @@
 <meta name="description" content="Big call-option piles parked far above the price, today's look-alikes of the META pattern, and an honest record of hits and misses.">
 <title>Price Seeker · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="seeker.css?v=20261005i">
+<link rel="stylesheet" href="seeker.css?v=20261005p">
 </head>
 <body>
 <a class="skip" href="#list">Skip to the list</a>
@@ -32,6 +32,16 @@
     <div class="status-row">
       <span class="chip chip-wait" id="chip">LOADING</span>
       <span class="asof" id="asof">Fetching the latest numbers…</span>
+      <span class="dp" id="dayBar" hidden>
+        <span class="seg seg-sm dp-per" role="group" aria-label="Period summary" id="perSeg">
+          <button type="button" data-per="1w" aria-pressed="false">1W</button>
+          <button type="button" data-per="2w" aria-pressed="false">2W</button>
+          <button type="button" data-per="1m" aria-pressed="false">1M</button>
+          <button type="button" data-per="total" aria-pressed="false">Total</button>
+        </span>
+        <button type="button" class="dp-b" id="dayBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="dayMenu"><span class="dp-k">Day</span> <b id="dayLbl">today</b> ▾</button>
+        <span class="dp-m" id="dayMenu" role="listbox" aria-label="Saved days" hidden></span>
+      </span>
     </div>
     <p class="status-line" id="statusLine"></p>
     <p class="status-line muted" id="pilesLine"></p>
@@ -131,6 +141,13 @@
       </div>
     </section>
 
+
+    <section class="card per" id="periods" aria-labelledby="perH" hidden>
+      <div class="per-top"><h2 id="perH"></h2><button type="button" class="x-btn" id="perClose" aria-label="Back to the day's table">✕</button></div>
+      <p class="sub" id="perSub"></p>
+      <div class="ftally" id="perTally"></div>
+      <p class="src" id="perReached"></p>
+    </section>
 
     <div class="filters" id="filters">
       <div class="seg seg-tier" role="group" aria-label="Tier" id="tierSeg">
@@ -336,6 +353,6 @@
 </div>
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the list.</p></noscript>
-<script src="seeker.js?v=20261005i" defer></script>
+<script src="seeker.js?v=20261005p" defer></script>
 </body>
 </html>

@@ -129,6 +129,7 @@
       previewHost = location.host;
     }
   })();
+  var daysBase = dataUrl === LIVE_URL ? 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/seeker-days/days/' : dataUrl.replace(/[^/]*$/, '') + 'days/';
   var nowOverride = null;
   if (params.get('now')) { var t0 = Date.parse(params.get('now')); if (!isNaN(t0)) nowOverride = t0 - Date.now(); }
   function now() { return Date.now() + (nowOverride || 0); }
@@ -320,12 +321,14 @@
 
   var P = null;
   var lastErr = null, fatal = null, loading = false, lastFetchAt = 0, pollTimer = null, uid = 0, bannerSig = '';
+  var loadGen = 0;
   var rowRefs = {}, ghosts = {}, pendingOpen = null, helpBuilt = false, lastFocus = null, pop = null, popBtn = null;
   var GEO = { mode: geoNow(), spk: 0 };
   GEO.spk = spkW();
   var S = { tier: 'all', sort: 'best', q: '', cOpen: false, open: {}, closingAll: false, scoreBy: 'odds', clOpen: {}, hitOpen: {}, list: 'all', side: 'calls' };
   S.failBy = 'all'; S.failSort = 'size'; S.failAll = false; S.failOpen = {};
   S.chaseSym = 'TSM'; S.chaseParked = false;
+  S.day = null; S.period = null;
   S.netOpen = false; S.netDir = null; S.netAll = false;
 
   var LISTS = {
@@ -537,6 +540,7 @@
     if (P.nOlder) older = ' (' + P.nOlder + (P.nOlder === 1 ? ' name' : ' names') + ' still on ' + (P.olderDates.length === 1 ? dS(P.olderDates[0]) : 'older chains') + ')';
     segText(pl, ['Option piles: ' + (P.newest ? dS(P.newest) : '–') + ' settle' + older, 'open interest changes once a day',
       (P.universeAll != null ? int(P.universeAll) : '–') + ' names checked']);
+    savedStatus();
   }
   function banner(kind, title, text, button, inline) {
     var d = document.createElement('div'); d.className = 'banner banner-' + kind;
@@ -552,9 +556,12 @@
     if (PREVIEW_PAGE) list.push(['info', 'PREVIEW:', 'not linked from the other pages yet.', null, true]);
     if (nowOverride) list.push(['info', 'Clock override:', 'the page is pretending it is ' + etAndTpe(now()) + '.', null, true]);
     if (dayNum(CAL_END) - etDayNum(now()) < 60) list.push(['warn', 'Market calendar ends ' + CAL_END, 'After that the page assumes every weekday is a trading day, so the CLOSED / LATE labels can be wrong on holidays until the calendar is extended.']);
+    if (S.day) list.push(['saved', 'You’re looking at ' + wS(S.day) + (dayInfo(S.day) && dayInfo(S.day).rebuilt ? ' (rebuilt)' : '') + ',',
+      'as it was at that day’s close: the same list, piles, odds and records' + (dayInfo(S.day) && dayInfo(S.day).rebuilt ? ', rebuilt from the option archive.' : ' the page showed then.'),
+      { label: 'Back to today →', fn: function () { setDay(null); } }, true]);
     if (P) {
       var s = status();
-      if (s.cls === 'stale') list.push(['bad', 'These numbers are old.', 'Last update ' + etAndTpe(P.gen) + ' (' + ago(s.age) + '). Don’t read them as current.', null, true]);
+      if (s.cls === 'stale' && !S.day) list.push(['bad', 'These numbers are old.', 'Last update ' + etAndTpe(P.gen) + ' (' + ago(s.age) + '). Don’t read them as current.', null, true]);
       if (lastErr) list.push(['warn', 'Refresh failed', 'at ' + hm12(lastErr.at, TPE) + ' ' + tzParts(lastErr.at, TPE).wd + ' Taipei (' + lastErr.msg + '). The numbers below are still from ' + fullTz(P.gen, NY, 'ET') + '.', null, true]);
       var pdn = P.doc.prices_day ? dayNum(P.doc.prices_day) : null;
       if (pdn && P.newest && dayNum(P.newest) < prevSession(pdn))
@@ -1161,6 +1168,310 @@
   }
 
 
+  var DAYS = null, PERF = {}, perLoading = {}, perPend = null, perFail = false, perCache = { k: null, v: null }, dayDocs = {};
+  var PER_LABEL = { '1w': 'Last 1 week', '2w': 'Last 2 weeks', '1m': 'Last 1 month', total: 'Everything saved' };
+  function isDay(s) { return typeof s === 'string' && /^\d{4}-\d\d-\d\d$/.test(s); }
+  function dayInfo(d) { return (DAYS || []).filter(function (e) { return e.day === d; })[0] || null; }
+  var daysLoading = false, daysAt = 0, daysSig = null, daysTop = null;
+  function loadDays() {
+    if (daysLoading) return;
+    daysLoading = true; daysAt = Date.now();
+    getJSON(daysBase + 'index.json').then(function (ix) {
+      daysLoading = false;
+      var nd = ix && Array.isArray(ix.days) ? ix.days.filter(function (e) { return e && isDay(e.day); }) : null;
+      var top = nd && nd.length ? nd.map(function (e) { return e.day; }).sort().pop() : null;
+      DAYS = nd;
+      if (daysTop && top && top !== daysTop) perRefresh();
+      daysTop = top || daysTop;
+      if (S.day && !dayInfo(S.day) && !perHasDay(S.day)) {
+        if (!P) { S.day = null; loadGen++; dayFallbackHash(); renderDayBar(); load(true); return; }
+        setDay(null); return;
+      }
+      renderDayBar();
+      if (S.day && P) { bannerSig = ''; renderStatus(); }
+    }, function () { daysLoading = false; if (!DAYS) renderDayBar(); });
+  }
+  function dayFallbackHash() {
+    var o = S.period ? perPend : pendingOpen, b = baseHash();
+    try { history.replaceState(null, '', location.pathname + location.search + (o ? (b ? b + '&o=' : '#') + encodeURIComponent(o) : b)); } catch (e) { }
+  }
+  function daysCheck(d) {
+    if (S.day) return;
+    var sig = (d.prices_day || '') + '|' + (d.state || '');
+    if (!DAYS || sig !== daysSig || Date.now() - daysAt > 30 * 6e4) { daysSig = sig; loadDays(); }
+  }
+  function perRefresh() {
+    var k = S.period, keep = k ? PERF[k] : null;
+    PERF = {}; perCache = { k: null, v: null };
+    if (keep) PERF[k] = keep;
+    if (!k || !P) return;
+    getJSON(daysBase + 'period_' + k + '.json').then(function (p) {
+      if (!(p && p.calls && Array.isArray(p.calls.rows))) return;
+      PERF[k] = p; perCache = { k: null, v: null };
+      if (S.period === k && P) { renderPeriods(); renderCounts(); renderList(); }
+    }, function () {  });
+  }
+  function renderDayBar() {
+    var bar = $('dayBar'), have = !!(DAYS && DAYS.length);
+    bar.hidden = !have;
+    if (!have) return;
+    var info = S.day ? dayInfo(S.day) : null;
+    $('dayLbl').textContent = S.day ? wS(S.day) + (info && info.rebuilt ? ' (rebuilt)' : '') : 'today';
+    $('dayBtn').classList.toggle('on', !!S.day);
+    Array.prototype.forEach.call(document.querySelectorAll('#perSeg button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-per') === S.period ? 'true' : 'false'); });
+  }
+  function openDayMenu(open) {
+    var m = $('dayMenu'), b = $('dayBtn');
+    if (!open) { m.hidden = true; b.setAttribute('aria-expanded', 'false'); return; }
+    clear(m);
+    m.appendChild(div('dp-h')).textContent = 'PICK A DAY';
+    var items = [[null, 'Today', 'the live page']].concat((DAYS || []).map(function (e) { return [e.day, wS(e.day), e.rebuilt ? 'rebuilt from the option archive' : 'saved at the close']; }));
+    items.forEach(function (x) {
+      var it = btn('dp-i' + ((x[0] || null) === (S.day || null) ? ' sel' : ''), null);
+      it.setAttribute('role', 'option'); it.setAttribute('aria-selected', (x[0] || null) === (S.day || null) ? 'true' : 'false');
+      it.appendChild(span('', x[1])); it.appendChild(add(document.createElement('small'), x[2]));
+      it.addEventListener('click', function () { openDayMenu(false); setDay(x[0]); });
+      m.appendChild(it);
+    });
+    m.appendChild(para('dp-n', 'Each trading day is kept as the page looked after that day’s close, open interest settled overnight. Saving began Fri Oct 2; Sep 28 – Oct 1 were rebuilt from the option archive, close to but not exactly what the page showed.'));
+    m.hidden = false; b.setAttribute('aria-expanded', 'true');
+    var f = m.querySelector('.dp-i.sel') || m.querySelector('.dp-i'); if (f) f.focus();
+  }
+  function perHasDay(d) { return Object.keys(PERF).some(function (k) { return PERF[k] && (PERF[k].days || []).indexOf(d) >= 0; }); }
+  function setDay(d, sym) {
+    d = isDay(d) && (dayInfo(d) || perHasDay(d)) ? d : null;
+    if (d === (S.day || null) && !sym) return;
+    S.day = d;
+    if (S.period) { S.period = null; perPend = null; $('periods').hidden = true; }
+    closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
+    if (sym) pendingOpen = sym;
+    P = null; RAW = null; fatal = { msg: 'loading' }; bannerSig = ''; loadGen++;
+    try { history.replaceState(null, '', location.pathname + location.search + (sym ? symHash(sym) : baseHash())); } catch (e) { }
+    renderDayBar();
+    load(true);
+    scrollToEl($('status'));
+  }
+  function savedStatus() {
+    if (!S.day || !P) return;
+    var info = dayInfo(S.day);
+    var chip = $('chip'); chip.className = 'chip chip-saved'; chip.textContent = info && info.rebuilt ? 'REBUILT DAY' : 'SAVED DAY';
+    var a = $('asof'); clear(a);
+    segText(a, ['Close of ' + wS(S.day), info && info.rebuilt ? 'rebuilt from the option archive' : 'as the page looked that evening']);
+    $('statusLine').textContent = 'Live updates are off while you look at a saved day.';
+  }
+
+
+
+
+
+  function withPeriod(k, fn) {
+    if (PERF[k]) { fn(PERF[k]); return; }
+    if (perLoading[k]) { perLoading[k].push(fn); return; }
+    perLoading[k] = [fn];
+    getJSON(daysBase + 'period_' + k + '.json').then(function (p) { return p && p.calls && Array.isArray(p.calls.rows) ? p : null; }, function () { return null; })
+      .then(function (p) { if (p) PERF[k] = p; var f = perLoading[k]; delete perLoading[k]; f.forEach(function (g) { g(p); }); });
+  }
+  function perView() {
+    var w = S.period && PERF[S.period];
+    if (!w || !P) return null;
+    var side = P.side === 'puts' ? 'puts' : 'calls', sd = w[side];
+    if (!sd || !Array.isArray(sd.rows)) return null;
+    var ck = S.period + '|' + side + '|' + P.list + '|' + (P.lists && P.list !== 'all' ? Object.keys(P.lists[P.list] || {}).length : 0);
+    if (perCache.k === ck) return perCache.v;
+    var rows = sd.rows.filter(function (n) { return n && typeof n.sym === 'string' && n.per && isDay(n.per.day) && inListNow(n.sym); });
+    var by = {}, counts = { AB: 0, A: 0, B: 0, C: 0 };
+    rows.forEach(function (n, i) {
+      if (!n._pv) {
+        if (TIERS.indexOf(n.tier) < 0) n.tier = 'C';
+        n._cpAll = skewOf(n.chain_call_oi, n.chain_put_oi, CP_MIN.all); n._cpWk = skewOf(n.wk_c, n.wk_p, CP_MIN.wk); n._cpDay = skewOf(n.vol_c, n.vol_p, CP_MIN.day);
+        viewName(n, n.per.day); n._pv = 1;
+      }
+      n._i = i; by[n.sym] = n; counts[n.tier]++;
+    });
+    perCache = { k: ck, v: { w: w, sd: sd, side: side, rows: rows, by: by, counts: counts, nd: (w.days || []).length, cut: num(sd.all) && sd.all > sd.rows.length } };
+    return perCache.v;
+  }
+  function inListNow(sym) { return !P || P.list === 'all' || !!(P.lists && P.lists[P.list] && P.lists[P.list][sym]); }
+  function setPeriod(k) { showPeriod(S.period === k ? null : k, null, true); }
+  function showPeriod(k, sym, scroll) {
+    k = PER_LABEL[k] ? k : null;
+    if (k && S.sort === 'chase') { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); }
+    S.period = k; perPend = sym || null; perFail = false;
+    closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
+    renderDayBar();
+    if (!k) { S.open = {}; $('periods').hidden = true; clearHash(); if (P) { renderCounts(); renderList(); } return; }
+    if (!sym) clearHash();
+    if (!PERF[k]) perMsg(k, 'Loading…');
+    withPeriod(k, function (p) {
+      if (S.period !== k) return;
+      S.open = {};
+      if (!p) {
+        var o = perPend;
+        S.period = null; perPend = null; renderDayBar(); clearHash();
+        if ($('dayBar').hidden) { perFail = false; $('periods').hidden = true; }
+        else {
+          perFail = true;
+          var b = document.querySelector('#perSeg button[data-per="' + k + '"]');
+          perMsg(k, 'Couldn’t load it just now. Tap ' + (b ? b.textContent : 'the button') + ' again to try again.');
+        }
+        if (P) { renderCounts(); renderList(); if (o) openLinked(o); }
+        else if (o) pendingOpen = o;
+        return;
+      }
+      if (!P) return;
+      renderPeriods(); renderCounts(); renderList();
+      if (perPend) { var o = perPend; perPend = null; perLinkOpen(o); }
+      else if (scroll) scrollToEl($('periods'));
+    });
+  }
+  function perMsg(k, text) {
+    $('periods').hidden = false; $('perH').textContent = PER_LABEL[k]; $('perSub').textContent = text;
+    clear($('perTally')); clear($('perReached'));
+  }
+  function renderPeriods() {
+    var sec = $('periods');
+    if (!S.period) { if (!perFail) sec.hidden = true; return; }
+    if (!PERF[S.period]) { if (!perLoading[S.period]) showPeriod(S.period, perPend, false); return; }
+    var V = perView();
+    if (!V) { sec.hidden = true; return; }
+    var w = V.w, sd = V.sd, opt = V.side === 'puts' ? 'put' : 'call';
+    sec.hidden = false;
+    $('perH').textContent = PER_LABEL[S.period] + ' · ' + dS(w.start) + ' – ' + dS(w.end);
+    var nr = (w.rebuilt || []).length;
+    $('perSub').textContent = 'The table below is every name that was on the ' + opt + ' list on a saved day in this window' + (P.list !== 'all' ? ', within ' + LISTS[P.list].label : '') +
+      ', each with its row from the last saved day it was on the list. ' + V.nd + ' saved ' + (V.nd === 1 ? 'day' : 'days') +
+      (nr ? ', ' + nr + ' of them rebuilt from the option archive (close to, not exactly, what the page showed)' : '') + '.';
+    var reached = (sd.reached || []).filter(function (r) { return r && inListNow(r.sym); }), ran = (sd.ran_out || []).filter(function (r) { return r && inListNow(r.sym); });
+    var all = P.list === 'all' && sd.totals, tl = $('perTally'); clear(tl);
+    [[all ? sd.totals.names : V.rows.length, 'On the list'], [all ? sd.totals.joined : V.rows.filter(function (n) { return n.per.joined; }).length, 'Joined'],
+      [all ? sd.totals.left : V.rows.filter(function (n) { return n.per.left; }).length, 'Left'], [reached.length, 'Reached'], [ran.length, 'Ran out of time']].forEach(function (x) {
+      var t = div('ft'); t.appendChild(span('ft-v', num(x[0]) ? String(x[0]) : '–')); t.appendChild(span('ft-k', x[1])); tl.appendChild(t);
+    });
+    var rc = $('perReached'); clear(rc);
+    if (reached.length) rc.appendChild(document.createTextNode('Reached in this window: ' + reached.map(function (h) { return h.sym + ' ' + strike(h.node) + ' (' + dS(h.day) + ')'; }).join(', ') + '. '));
+    if (ran.length) rc.appendChild(document.createTextNode('Ran out of time: ' + ran.map(function (m) { return m.sym + ' ' + strike(m.node) + ' (' + dS(m.main_exp) + ')'; }).join(', ') + '.'));
+    if (V.cut) rc.appendChild(document.createTextNode(' The table shows the ' + sd.rows.length + ' longest stayers of ' + sd.all + '.'));
+  }
+  function perPills(n, pill) {
+    var p = n.per, V = perView(), nd = V ? V.nd : null;
+    if (num(nd)) pill(p.days + ' of ' + nd + (nd === 1 ? ' day' : ' days'), 'p-per', 'On the list on ' + p.days + ' of the ' + nd + ' saved days in this window.');
+    if (p.joined) pill('Joined ' + dS(p.joined), 'p-new', 'Not on the list on the saved day before ' + wS(p.joined) + '.');
+    if (p.left) pill('Left ' + dS(p.left), 'p-left', 'Not on the list from ' + wS(p.left) + '. This row is ' + wS(p.day) + ', its last day on it in this window.');
+  }
+  function perWhy(n) {
+    var p = n.per, V = perView(), ul = document.createElement('ul'); ul.className = 'why per-why';
+    var items = [
+      ['In this window', 'on the list ' + p.days + ' of ' + (V ? V.nd : '–') + ' saved days' + (p.joined ? ', joined ' + wS(p.joined) : '') + (p.left ? ', left ' + wS(p.left) : '')],
+      ['Price', num(p.p0) && num(p.p1) ? px(p.p0) + ' on ' + dS(p.first) + (p.first !== p.day ? ' → ' + px(p.p1) + ' on ' + dS(p.day) : '') : '–']
+    ];
+    if (num(p.gap) && p.first !== p.day) items.push(['Toward the pile', p.gap < 0 ? 'moved away from the ' + strike(p.node0) + ' pile (' + p0(-p.gap) + ' of the gap)' : p0(p.gap) + ' of the gap to the ' + strike(p.node0) + ' pile closed']);
+    if (num(p.node0) && p.node0 !== n.node) items.push(['The pile moved', 'from ' + strike(p.node0) + ' to ' + strike(n.node)]);
+    items.forEach(function (x) {
+      var li = document.createElement('li');
+      li.appendChild(span('pw', '•'));
+      li.appendChild(document.createTextNode(x[0] + ': ' + x[1]));
+      ul.appendChild(li);
+    });
+    var li2 = document.createElement('li'); li2.className = 'mut';
+    li2.appendChild(document.createTextNode('On ' + wS(p.day) + ' it passed all five checks:'));
+    ul.appendChild(li2);
+    return ul;
+  }
+  function perHead(n) {
+    var info = dayInfo(n.per.day), d = para('d-per', null);
+    d.appendChild(document.createTextNode(n.sym + ' as the page showed it on ' + wS(n.per.day) + (info && info.rebuilt ? ' (rebuilt from the option archive)' : '') +
+      (n.per.left ? ', its last day on the list in this window. ' : '. ')));
+    var b = btn('linkbtn', 'Open ' + wS(n.per.day) + ' →');
+    b.addEventListener('click', function () { setDay(n.per.day, n.sym); });
+    d.appendChild(b);
+    return d;
+  }
+  function perFull(r) {
+    var n = r.n, d = n.per.day, side = P && P.side === 'puts' ? 'puts' : 'calls';
+    clear(r.det); r.det.appendChild(para('src d-load', 'Loading ' + wS(d) + '…'));
+    var got = dayDocs[d] ? Promise.resolve(dayDocs[d]) : getJSON(daysBase + d + '.json').then(function (doc) { dayDocs[d] = doc; return doc; });
+    got.then(function (doc) {
+      var sd = side === 'puts' ? (doc && doc.puts) || {} : doc || {};
+      var full = (Array.isArray(sd.names) ? sd.names : []).filter(function (x) { return x && x.sym === n.sym; })[0];
+      if (full) Object.keys(full).forEach(function (k) { if (!(k in n)) n[k] = full[k]; });
+      n._settleRef = (doc && doc.oi_settle) || (Array.isArray(sd.names) ? sd.names.map(function (x) { return x && x.oi_settle; }).filter(Boolean).sort().pop() : null) || null;
+      n._full = true;
+    }, function () {  }).then(function () {
+      if (rowRefs[n.sym] === r && S.open[n.sym]) buildDetail(r);
+    });
+  }
+  function renderPeriodList(host) {
+    var V = perView(), q = S.q.trim().toUpperCase(), ql = S.q.trim().toLowerCase(), rk = RANKS[S.sort], opt = V.side === 'puts' ? 'put' : 'call';
+    var match = function (n) { return !q || n.sym.indexOf(q) === 0 || (ql.length >= 2 && typeof n.name === 'string' && (' ' + n.name.toLowerCase()).indexOf(' ' + ql) >= 0); };
+    var rows = V.rows.filter(match);
+    var note = PER_LABEL[S.period] + ', ' + opt + 's: ';
+    if (S.sort === 'best') note += 'ranked by tier, then the days on the list, then how much of the gap to its pile the price closed. The number before each name is its place in this window.';
+    else if (rk) note += rk.note.charAt(0).toLowerCase() + rk.note.slice(1) + ' Ranked within this window.';
+    else note += 'sorted as on today’s table.';
+    if (q) note += ' Showing your search only.';
+    $('rankNote').textContent = note; $('rankNote').hidden = false;
+    if (!rows.length) {
+      host.appendChild(q ? emptyBox('No name in this window starts with ' + q + '.') : P.list === 'all' ? emptyBox('No name was on the list in this window.') :
+        emptyBox('No name on ' + LISTS[P.list].label + ' was on the list in this window.', 'Whole list', function () { setList('all'); }));
+      return;
+    }
+    function put(n, rank) { var r = addRow(host, n, null); if (rank) r.c.stock.insertBefore(span('rk', String(rank)), r.c.stock.firstChild); }
+    if (S.sort === 'best') {
+      TIERS.forEach(function (t) {
+        var grp = rows.filter(function (n) { return n.tier === t; }), showRows = t !== 'C' || S.cOpen || !!q;
+        if (!grp.length) return;
+        host.appendChild(groupHead(t, grp.length, showRows));
+        if (showRows) grp.forEach(function (n) { put(n, n._i + 1); });
+      });
+    } else {
+      var rankOf = {}, hideC = !S.cOpen && !q && !rk, f = SORTS[S.sort] || SORTS.odds, nC = 0;
+      if (rk) V.rows.filter(function (n) { return num(n[rk.f]); }).sort(function (a, b) { return SORTS[S.sort](a, b) || a._i - b._i; }).forEach(function (n, i) { rankOf[n.sym] = i + 1; });
+      rows.filter(function (n) { if (hideC && n.tier === 'C') { nC++; return false; } return true; })
+        .sort(function (a, b) { return f(a, b) || a._i - b._i; })
+        .forEach(function (n) { put(n, rk ? rankOf[n.sym] : null); });
+      if (nC) {
+        var pc = para('c-hidden', nC + ' tier C names hidden (old piles). '), bc = btn('linkbtn', 'Show ' + nC);
+        bc.addEventListener('click', function () { setCOpen(true); }); pc.appendChild(bc); host.appendChild(pc);
+      }
+    }
+    Object.keys(S.open).forEach(function (sym) { if (rowRefs[sym]) openRow(rowRefs[sym], false); else delete S.open[sym]; });
+    if (perPend) { var o = perPend; perPend = null; setTimeout(function () { perLinkOpen(o); }, 0); }
+  }
+  function perLinkOpen(o) {
+    if (goToPerRow(o)) return;
+    if (S.period) { S.period = null; perPend = null; S.open = {}; renderDayBar(); $('periods').hidden = true; clearHash(); renderCounts(); renderList(); }
+    openLinked(o);
+  }
+  function goToPerRow(sym) {
+    var V = perView(), n = V && V.by[sym];
+    if (!n && V && P && P.list !== 'all' && V.sd.rows.some(function (x) { return x && x.sym === sym; })) {
+      setList('all');
+      V = perView(); n = V && V.by[sym];
+    }
+    if (!n) return false;
+    if (S.q && !(sym.indexOf(S.q.trim().toUpperCase()) === 0)) { S.q = ''; $('q').value = ''; }
+    if (n.tier === 'C' && !S.cOpen) { S.cOpen = true; sset('ps.cOpen', '1'); }
+    renderList();
+    var r = rowRefs[sym]; if (!r) return false;
+    if (!S.open[sym]) openRow(r, true); else setHash(sym);
+    scrollToEl(r.art); flashRow(r);
+    return true;
+  }
+  function perUpdate() {
+    renderSideBar(); renderNet(); renderFailed(); renderChaseOpt(); renderChase();
+    renderListBar(); renderTiles(); renderCounts(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot(); renderStatus(); renderPeriods();
+    if ($('numbers').open) renderNumTable();
+  }
+  function initDays() {
+    $('dayBtn').addEventListener('click', function (e) { e.stopPropagation(); openDayMenu($('dayMenu').hidden); });
+    document.addEventListener('click', function (e) { if (!$('dayMenu').hidden && !$('dayBar').contains(e.target)) openDayMenu(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('dayMenu').hidden) { openDayMenu(false); $('dayBtn').focus(); } });
+    Array.prototype.forEach.call(document.querySelectorAll('#perSeg button'), function (b) { b.addEventListener('click', function () { setPeriod(b.getAttribute('data-per')); }); });
+    $('perClose').addEventListener('click', function () { showPeriod(null); scrollToEl($('filters')); });
+    loadDays();
+  }
+
+
 
   function attachReader(holder, api) {
     holder._rd = api;
@@ -1224,10 +1535,11 @@
   function fillPills(r) {
     var n = r.n, P0 = r.pills; clear(P0);
     function pill(t, cls, title) { var s = span('pill ' + cls, t); if (title) s.title = title; P0.appendChild(s); }
-    if (n.new === true) pill('NEW', 'p-new', 'New since the previous close’s list.');
+    if (n.new === true && !n.per) pill('NEW', 'p-new', 'New since the previous close’s list.');
+    if (n.per) perPills(n, pill);
     if (BORDERS[n.border] === 1) pill('Borderline', 'p-bord', borderTitle(n));
     if (num(n.fuse)) pill('Short fuse', 'p-fuse', 'The main expiry is ' + n.fuse + ' days away' + (num(n.main_share) ? ' (' + p0(n.main_share) + ' of these ' + SW().opts + ').' : '.'));
-    if (n.touched === true) pill('TOUCHED today', 'p-touch', 'The price traded at or ' + SW().dir + ' the pile today (' + SW().ext + ' ' + px(sideExt(n)) + ').');
+    if (n.touched === true) pill(n.per ? 'Touched ' + dS(n.per.day) : 'TOUCHED today', 'p-touch', 'The price traded at or ' + SW().dir + ' the pile ' + (n.per ? 'on ' + wS(n.per.day) : 'today') + ' (' + SW().ext + ' ' + px(sideExt(n)) + ').');
     if (n.puts_below) pill('Puts below too', 'p-other', 'A big put pile also sits ' + a1(n.puts_below.dist) + ' below the price, at ' + strike(n.puts_below.node) + ' (' + usd(n.puts_below.prem_usd) + ' in puts).');
     if (n.calls_above) pill('Calls above too', 'p-other', 'A big call pile also sits ' + a1(n.calls_above.dist) + ' above the price, at ' + strike(n.calls_above.node) + ' (' + usd(n.calls_above.prem_usd) + ' in calls).');
     if (r.leftAt) pill('Left the list ' + r.leftAt, 'p-left', r.leftWhy || '');
@@ -1236,7 +1548,7 @@
   function fillPrice(r) {
     var n = r.n, c = r.c.price; clear(c);
     var p = span('px', px(n.price));
-    if (num(n.prev_close) && num(n.price) && n.price !== n.prev_close) { p.className += n.price > n.prev_close ? ' dup' : ' ddn'; p.title = 'Today ' + sp1(n.price / n.prev_close - 1); }
+    if (num(n.prev_close) && num(n.price) && n.price !== n.prev_close) { p.className += n.price > n.prev_close ? ' dup' : ' ddn'; p.title = (n.per ? wS(n.per.day) : 'Today') + ' ' + sp1(n.price / n.prev_close - 1); }
     add(c, p, ' ', add(span('nd-w', null), span('ar', '→ '), span('nd', strike(n.node))));
     var cb = cpBar(n); if (cb) c.appendChild(cb);
   }
@@ -1454,6 +1766,7 @@
       $('rankNote').textContent = rk.note + (filt ? ' Showing ' + (S.tier !== 'all' ? 'tier ' + tierName(S.tier) : 'your search') + ' only; the numbers are each name’s place among ' + among + '.' : ' All tiers are ranked together' + (P.list === 'all' ? '.' : ', within ' + LISTS[P.list].label + '.'));
     }
     $('rankNote').hidden = !rk;
+    if (S.period && perView()) { $('tierSeg').hidden = true; $('tierNote').hidden = true; renderPeriodList(host); return; }
     $('tierSeg').hidden = S.sort === 'chase';
     if (S.sort === 'chase') { $('tierNote').hidden = true; renderHunt(host); return; }
     var rows = allRows();
@@ -1522,11 +1835,11 @@
   function setSide(k, fromHash) {
     k = k === 'puts' ? 'puts' : 'calls';
     S.side = k; sset('ps.side', k);
-    if (!fromHash) clearHash();
-    if (!RAW) return;
+    if (!RAW) { if (!fromHash) clearHash(); return; }
     closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
     S.open = {}; S.clOpen = {}; S.hitOpen = {}; S.failOpen = {};
     P = prep(RAW, S.list, k);
+    if (!fromHash) clearHash();
     sideCopy();
     if (helpBuilt) helpBuilt = false;
     renderAll();
@@ -1544,6 +1857,12 @@
     });
   }
   function openLinked(sym) {
+    if (S.period) {
+      var pw = PERF[S.period], psd = pw && pw[P && P.side === 'puts' ? 'puts' : 'calls'];
+      if (!pw && perLoading[S.period]) { perPend = sym; return; }
+      if (psd && Array.isArray(psd.rows) && psd.rows.some(function (x) { return x && x.sym === sym; })) { setTimeout(function () { perLinkOpen(sym); }, 0); return; }
+      S.period = null; perPend = null; S.open = {}; renderDayBar(); $('periods').hidden = true; clearHash(); renderCounts(); renderList();
+    }
     if (inHunt(sym) && (S.sort === 'chase' || !P.by[sym])) { setTimeout(function () { goToHuntRow(sym); }, 0); return; }
     if (P.by[sym]) { setTimeout(function () { goToRow(sym, false); }, 0); return; }
     if (P.list !== 'all' && P.allSyms[sym]) { setList('all'); setTimeout(function () { goToRow(sym, false); }, 0); return; }
@@ -1564,6 +1883,7 @@
     S.tier = k; if (k === 'C') { S.cOpen = true; sset('ps.cOpen', '1'); } sset('ps.tier', k); renderCounts(); renderList(); }
   function setSort(k) {
     S.chaseParked = false;
+    if (k === 'chase' && S.period) { S.period = null; S.open = {}; perPend = null; renderDayBar(); $('periods').hidden = true; clearHash(); }
     S.sort = SORTS[k] || k === 'best' ? k : 'best'; sset('ps.sort', S.sort); renderCounts(); renderList();
   }
   function setCOpen(o) { S.cOpen = o; sset('ps.cOpen', o ? '1' : '0'); renderList(); }
@@ -1574,6 +1894,7 @@
     if (user && GEO.mode === 'card') Object.keys(S.open).forEach(function (k) { if (k !== sym && rowRefs[k]) closeRow(rowRefs[k], false); });
     S.open[sym] = 1;
     r.art.classList.add('open'); r.b.setAttribute('aria-expanded', 'true'); r.det.hidden = false;
+    if (r.n.per && !r.n._full) perFull(r); else
     buildDetail(r);
     if (user) { setHash(sym); if (GEO.mode === 'card') scrollToEl(r.art); }
   }
@@ -1596,6 +1917,7 @@
     var n = P && P.by[sym]; if (!n) return false;
     var re = false;
     if (leaveHunt()) re = true;
+    if (S.period) { S.period = null; perPend = null; renderDayBar(); $('periods').hidden = true; clearHash(); re = true; }
     if (S.tier !== 'all' && S.tier !== n.tier) { S.tier = 'all'; sset('ps.tier', 'all'); re = true; }
     if (n.tier === 'C' && !S.cOpen && S.tier !== 'C') { S.cOpen = true; sset('ps.cOpen', '1'); re = true; }
     if (S.q && n.sym.indexOf(S.q.trim().toUpperCase()) !== 0) { S.q = ''; $('q').value = ''; re = true; }
@@ -1611,17 +1933,21 @@
   function parseHash() {
     var h = ''; try { h = decodeURIComponent(location.hash.replace(/^#/, '')); } catch (e) { h = location.hash.replace(/^#/, ''); }
     if (!h) return {};
-    if (h.indexOf('=') >= 0) { var o = {}; h.split('&').forEach(function (kv) { var p = kv.split('='); o[p[0]] = p[1]; }); return { t: o.t, s: o.s, l: o.l, v: o.v, o: o.o ? o.o.toUpperCase() : null }; }
+    if (h.indexOf('=') >= 0) { var o = {}; h.split('&').forEach(function (kv) { var p = kv.split('='); o[p[0]] = p[1]; }); return { t: o.t, s: o.s, l: o.l, v: o.v, d: o.d, p: o.p, o: o.o ? o.o.toUpperCase() : null }; }
     return /^[A-Za-z0-9.\-_]{1,12}$/.test(h) ? { o: h.toUpperCase() } : {};
   }
-  function symHash(sym) {
-    var pre = '';
-    if (P && P.side === 'puts') pre = 'v=puts&o=';
-    if (S.sort === 'chase' && inHunt(sym)) pre = 's=chase&o=';
-    return '#' + pre + encodeURIComponent(sym);
+  function viewParts(sym) {
+    var a = [];
+    if (S.day) a.push('d=' + S.day);
+    if (S.period && (!sym || (perView() && perView().by[sym]))) a.push('p=' + S.period);
+    if ((P ? P.side : S.side) === 'puts') a.push('v=puts');
+    if (sym && S.sort === 'chase' && inHunt(sym)) a.push('s=chase');
+    return a;
   }
+  function symHash(sym) { var a = viewParts(sym); return '#' + (a.length ? a.join('&') + '&o=' : '') + encodeURIComponent(sym); }
+  function baseHash() { var a = viewParts(null); return a.length ? '#' + a.join('&') : ''; }
   function setHash(sym) { try { history.replaceState(null, '', location.pathname + location.search + symHash(sym)); } catch (e) { } }
-  function clearHash() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } }
+  function clearHash() { try { history.replaceState(null, '', location.pathname + location.search + baseHash()); } catch (e) { } }
 
 
   function kick(t) { return para('d-k', t); }
@@ -1711,7 +2037,8 @@
     row('Typical moves away', num(n.mv) ? n.mv.toFixed(1) : '–');
     var r20 = span(num(n.ret20) ? (n.ret20 >= 0 ? 'up' : 'down') : '', sp1(n.ret20)); row('Last 20 trading days', r20);
     row('From 52-week closing high', sp1(n.off_high));
-    var old = n.oi_settle && P.newest && n.oi_settle < P.newest;
+    var ref = n.per ? n._settleRef : P.newest;
+    var old = n.oi_settle && ref && n.oi_settle < ref;
     row('Option settle', old ? span('amber', dS(n.oi_settle) + ' (older chain)') : dS(n.oi_settle));
     Array.prototype.forEach.call(dl.querySelectorAll('.cpb-wide'), function (b, i) {
       if (i) Array.prototype.forEach.call(b.querySelectorAll('.cpb-k'), function (k) { b.removeChild(k); });
@@ -1745,6 +2072,7 @@
   function buildDetail(r) {
     var n = r.n, det = r.det; clear(det);
     if (r.leftWhy) det.appendChild(para('d-left', 'Left the list at ' + r.leftAt + ' ET. ' + r.leftWhy));
+    if (n.per) det.appendChild(perHead(n));
     if (typeof n.name === 'string' && n.name) det.appendChild(para('d-name', n.sym + ' · ' + n.name));
     det.appendChild(kick('In plain English'));
     det.appendChild(para('d-en', plainEnglish(n)));
@@ -1755,7 +2083,9 @@
     ch.setAttribute('aria-label', n.sym + ' runway chart. Left and right arrows move through days.');
     left.appendChild(ch);
     var cap = para('cap', captionFor(n)); left.appendChild(cap);
-    right.appendChild(kick('Why it’s here')); right.appendChild(whyList(n)); right.appendChild(tierLine(n));
+    right.appendChild(kick('Why it’s here'));
+    if (n.per) right.appendChild(perWhy(n));
+    right.appendChild(whyList(n)); right.appendChild(tierLine(n));
     right.appendChild(kick('The facts')); right.appendChild(factsGrid(n));
     var xb = expiryBlock(n); if (xb) right.appendChild(xb);
     if (Array.isArray(n.related) && n.related.length) {
@@ -1843,7 +2173,7 @@
     el('path', { d: dl, fill: 'none', stroke: C.light, 'stroke-width': 1.8, 'stroke-linejoin': 'round' }, g);
     el('circle', { cx: xt, cy: Y(c[N - 1]), r: 3.5, fill: '#fff', stroke: C.panel, 'stroke-width': 1.5 }, s);
 
-    var labs = [{ x: xt, t: monD(today, true) + ' today', a: 'middle', w: 0 }];
+    var labs = [{ x: xt, t: monD(today, true) + (n.per || S.day ? '' : ' today'), a: 'middle', w: 0 }];
     if (spanD) labs.push({ x: L + pw, t: monD(exp, true), a: 'end' });
     labs.push({ x: L, t: monD(d[0], true), a: 'start' });
     var kept = [];
@@ -2454,6 +2784,7 @@
       if (helpBuilt) helpBuilt = false;
       renderAll(); return;
     }
+    if (S.period) { perUpdate(); return; }
     if (S.sort === 'chase') {
       if (!Object.keys(S.open).length && viaVisible) { ghosts = {}; $('updateBar').hidden = true; setStick(); renderAll(); return; }
       if (!Object.keys(S.open).length) { renderAll(); return; }
@@ -2501,6 +2832,7 @@
     renderNet();
     renderFailed();
     renderChaseOpt(); renderChase();
+    renderDayBar(); renderPeriods();
     renderCpOpts(); renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
     if ($('numbers').open) renderNumTable();
     if (helpBuilt && !helpBuilt.real) helpBuilt = false;
@@ -2517,10 +2849,12 @@
   }
 
 
-  function getJSON() {
+  function getJSON(src) {
     var ctl = ('AbortController' in window) ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, FETCH_TIMEOUT_MS);
-    var url = dataUrl + (dataUrl.indexOf('?') < 0 ? '?' : '&') + 't=' + Math.floor(Date.now() / 60000);
+    src = src || dataUrl;
+    if (src === dataUrl && S.day) src = daysBase + S.day + '.json';
+    var url = src + (src.indexOf('?') < 0 ? '?' : '&') + 't=' + Math.floor(Date.now() / 60000);
     return fetch(url, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined })
       .then(function (r) {
         clearTimeout(timer);
@@ -2534,8 +2868,10 @@
   function load(initial, viaVisible) {
     if (loading) return;
     loading = true; lastFetchAt = Date.now();
+    var gen = loadGen;
     if (initial && fatal) { var chip = $('chip'); chip.className = 'chip chip-wait'; chip.textContent = 'LOADING'; $('asof').textContent = 'Fetching the latest numbers…'; }
     getJSON().then(function (d) {
+      if (gen !== loadGen) return;
       check(d);
       RAW = d;
       var np = prep(d, S.list, S.side);
@@ -2543,17 +2879,24 @@
       if (!P) { fatal = null; bannerSig = ''; P = np; renderAll(); }
       else if (np.doc.generated === P.doc.generated) renderStatus();
       else applyUpdate(np, viaVisible);
+      daysCheck(d);
     }).catch(function (e) {
+      if (gen !== loadGen) return;
+      if (S.day && !P) { S.day = null; loadGen++; dayFallbackHash(); renderDayBar(); return; }
       var msg = e && e.shown ? e.message : 'the data looked broken';
       if (!P) showFatal(e && e.version !== undefined ? { version: e.version } : { msg: msg });
       else { lastErr = { at: now(), msg: msg }; renderStatus(); }
-    }).then(function () { loading = false; schedule(); });
+    }).then(function () {
+      loading = false;
+      if (gen !== loadGen) { load(true); return; }
+      schedule();
+    });
   }
   function pollDelay() {
     var t = now(), p = tzParts(t, NY), dn = Date.UTC(p.y, p.mo - 1, p.d) / 864e5, mins = p.h * 60 + p.mi;
     return isSession(dn) && mins >= 570 && mins <= 990 ? POLL_FAST : POLL_SLOW;
   }
-  function schedule() { clearTimeout(pollTimer); if (!document.hidden) pollTimer = setTimeout(function () { load(false, false); }, pollDelay()); }
+  function schedule() { clearTimeout(pollTimer); if (S.day) return; if (!document.hidden) pollTimer = setTimeout(function () { load(false, false); }, pollDelay()); }
 
 
   (function initState() {
@@ -2566,16 +2909,20 @@
     if (s && (s === 'best' || SORTS[s])) S.sort = s;
     S.cOpen = c === '1';
     var h = parseHash();
+    if (isDay(h.d)) S.day = h.d;
+    if (PER_LABEL[h.p]) S.period = h.p;
     if (h.t && (h.t === 'all' || TIERS.indexOf(h.t) >= 0)) S.tier = h.t;
     if (h.s && (h.s === 'best' || SORTS[h.s])) S.sort = h.s;
     if (isList(h.l)) S.list = h.l;
     if (h.v === 'puts' || h.v === 'calls') S.side = h.v;
     if (h.o && !h.v) S.side = 'calls';
     if (h.o) pendingOpen = h.o;
+    if (S.period) { perPend = h.o || null; pendingOpen = null; if (S.sort === 'chase') S.sort = 'best'; }
     if (S.tier === 'C') S.cOpen = true;
   })();
   initFolds();
   initChaseFold();
+  initDays();
   renderCounts();
   renderBanners();
   Array.prototype.forEach.call(document.querySelectorAll('#tierSeg button'), function (b) { b.addEventListener('click', function () { setTier(b.getAttribute('data-tier')); }); });
@@ -2634,11 +2981,29 @@
   $('numbers').addEventListener('toggle', function () { if (this.open) renderNumTable(); });
   $('csvBtn').addEventListener('click', downloadCsv);
   window.addEventListener('hashchange', function () {
+    var raw = location.hash.replace(/^#/, '');
+    if (raw && document.getElementById(raw)) return;
     var h = parseHash(); if (!P) return;
-    var want = h.v === 'puts' || h.v === 'calls' ? h.v : (h.o ? 'calls' : null);
+    var want = null;
+    want = h.v === 'puts' || h.v === 'calls' ? h.v : (h.o ? 'calls' : null);
+    var hp = PER_LABEL[h.p] ? h.p : null;
+    if ((h.d || null) !== (S.day || null)) {
+      if (want) { S.side = want; sset('ps.side', want); }
+      setDay(h.d || null, hp ? null : h.o || null);
+      if (hp) showPeriod(hp, h.o || null, false);
+      return;
+    }
+    if (hp !== (S.period || null)) {
+      if (want && want !== P.side) setSide(want, true);
+      showPeriod(hp, hp ? h.o || null : null, false);
+      if (!hp && h.o) openLinked(h.o);
+      return;
+    }
     if (want && want !== P.side) setSide(want, true);
     if (h.o) openLinked(h.o);
   });
+  var skipA = document.querySelector('a.skip');
+  if (skipA) skipA.addEventListener('click', function (e) { e.preventDefault(); var l = $('list'); try { l.focus({ preventScroll: true }); } catch (x) { l.focus(); } scrollToEl(l); });
   var rsT = null;
   window.addEventListener('resize', function () { clearTimeout(rsT); rsT = setTimeout(onResize, 140); });
   function onResize() {
