@@ -19,28 +19,40 @@ function applyLayout() {
   if (maxPane === 'di') $('dchart').style.top = '0px'; else $('dchart').style.top = '';
   sig = '';
 }
+const COARSE = () => window.matchMedia('(pointer: coarse)').matches;
+let fsScrollY = 0;
+function sizeFs() {
+  if (maxPane === null) return;
+  const top = $('main').getBoundingClientRect().top + window.scrollY;
+  document.documentElement.style.setProperty('--fsh', Math.max(200, Math.round(window.innerHeight - top)) + 'px');
+}
 function setMaximized(mode) {
+  const was = maxPane;
+  if (was === null && mode !== null) fsScrollY = window.scrollY;
   maxPane = mode;
   document.body.classList.toggle('expanded', mode !== null);
+  document.documentElement.classList.toggle('fs', mode !== null);
   $('gex').style.display = mode === 'di' ? 'none' : '';
+  if (mode !== null) window.scrollTo(0, 0);
+  sizeFs();
+  if (chart) chart.applyOptions({ handleScroll: touchFor('price') });
+  if (dchart) dchart.applyOptions({ handleScroll: touchFor('di') });
   applyLayout();
-  const fs = document.documentElement.requestFullscreen && !NARROW();
+  const fs = document.documentElement.requestFullscreen && (!NARROW() || COARSE());
   if (mode !== null && fs && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
   if (mode === null && document.fullscreenElement && !document.body.classList.contains('table-max')) document.exitFullscreen().catch(() => {});
-  setTimeout(() => { applyLayout(); sig = ''; }, 150);
+  setTimeout(() => {
+    sizeFs(); applyLayout(); sig = '';
+    if (mode === null && was !== null) window.scrollTo(0, fsScrollY);
+  }, 150);
 }
-function paneAtY(y) {
-  const ph = $('chart').style.display === 'none' ? 0 : $('chart').clientHeight;
-  return y < ph ? 0 : 1;
+
+
+function hookDblClick() {
+  chart.subscribeDblClick(() => setMaximized(maxPane === null ? 'price' : null));
+  dchart.subscribeDblClick(() => setMaximized(maxPane === null ? 'di' : null));
 }
-$('chartbox').addEventListener('dblclick', e => {
-  if (!chart || e.target.id === 'hsplit') return;
-  const r = $('chartbox').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-  if (maxPane !== null) { setMaximized(null); return; }
-  const i = paneAtY(y);
-  if (x > (i === 0 ? chart : dchart).timeScale().width()) return;
-  if (i !== null) setMaximized(i === 0 ? 'price' : 'di');
-});
+document.addEventListener('gesturestart', e => { if (maxPane !== null) e.preventDefault(); });
 $('maxbtns').addEventListener('click', e => {
   const b = e.target.closest('.maxbtn'); if (!b) return;
   e.stopPropagation();
@@ -105,8 +117,44 @@ document.addEventListener('keydown', e => {
   else if (maxPane !== null) setMaximized(null);
 });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && maxPane !== null) setMaximized(null); });
-window.addEventListener('resize', () => { applySide(); applyLayout(); });
+window.addEventListener('resize', () => { applySide(); sizeFs(); applyLayout(); });
 applySide();
+
+
+
+
+
+
+(function () {
+  [['chart', () => chart], ['dchart', () => dchart]].forEach(([id, get]) => {
+    const el = $(id); let pin = null, dragging = false;
+    const geo = t => {
+      const r = el.getBoundingClientRect();
+      return { d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), x: (t[0].clientX + t[1].clientX) / 2 - r.left };
+    };
+    el.addEventListener('touchstart', e => {
+      if (e.touches.length === 1) { dragging = false; pin = null; return; }
+      const c = get();
+      if (e.touches.length !== 2 || dragging || !c) { pin = null; return; }
+      const g = geo(e.touches), ts = c.timeScale(), r = ts.getVisibleLogicalRange(), a = ts.coordinateToLogical(g.x);
+      if (!r || a == null || g.d < 10) return;
+      pin = { d: g.d, n: r.to - r.from, a, W: Math.max(1, ts.width()) };
+    }, { passive: true });
+    el.addEventListener('touchmove', e => {
+      if (e.touches.length === 1 && !pin) { dragging = true; return; }
+      const c = get();
+      if (!pin || e.touches.length !== 2 || !c) return;
+      const g = geo(e.touches);
+      const n = Math.max(6, Math.min(pin.n * 40, pin.n * pin.d / Math.max(10, g.d)));
+      const from = pin.a - n * Math.min(Math.max(g.x, 0), pin.W) / pin.W;
+      c.timeScale().setVisibleLogicalRange({ from, to: from + n });
+    }, { passive: true });
+    el.addEventListener('touchend', e => { if (e.touches.length < 2) pin = null; }, { passive: true });
+    el.addEventListener('touchcancel', () => { pin = null; }, { passive: true });
+  });
+})();
+
+
 
 
 
@@ -114,16 +162,23 @@ applySide();
 (function () {
   const el = $('chart'); let start = null;
   el.addEventListener('pointerdown', e => {
-    if (!chart || e.button !== 0 || e.pointerType === 'touch') return;
+    const touch = e.pointerType === 'touch';
+    if (touch && !e.isPrimary) { start = null; return; }
+    if (!chart || e.button !== 0 || (touch && maxPane !== 'price')) return;
     const r = el.getBoundingClientRect();
     if (e.clientX - r.left > chart.timeScale().width()) return;
     const vr = candles.priceScale().getVisibleRange();
     if (!vr) return;
-    start = { y: e.clientY, from: vr.from, to: vr.to, h: chart.panes()[0].getHeight(), moved: false };
+    start = { x: e.clientX, y: e.clientY, from: vr.from, to: vr.to, h: chart.panes()[0].getHeight(), moved: false, touch };
   }, true);
   window.addEventListener('pointermove', e => {
     if (!start) return;
     const dy = e.clientY - start.y;
+    if (start.touch && !start.moved) {
+      const dx = e.clientX - start.x;
+      if (Math.hypot(dx, dy) < 10) return;
+      if (Math.abs(dy) < 0.6 * Math.abs(dx)) { start = null; return; }
+    }
     if (!start.moved && Math.abs(dy) < 4) return;
     start.moved = true;
     const shift = dy * (start.to - start.from) / Math.max(1, start.h);

@@ -111,7 +111,38 @@ function renderHead() {
   $('ind').innerHTML = `Eagle Eye Technicals · Desktop Integrated + GEX · options: ${m.kind === 'crypto' ? 'none yet for crypto' : 'saved Cboe chain ' + (d ? esc(d.build_et) : '—')} · price: ${esc(srcName(m.price))}${m.published ? pubTxt : ', every ' + cadence(m.poll_s)}` +
     ' · estimates from public data, not a trading signal · charts: <a class="credit" href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>' +
     (errs ? '<br>' + errs : '');
+  const ib = $('infobtn'); if (ib) ib.classList.toggle('err', !!errs);
 }
+
+const SMALLUI = () => window.matchMedia('(max-width: 700px), (max-height: 500px)').matches;
+(function () {
+  const t = document.querySelector('#head .t');
+  if (t && !$('infobtn')) {
+    const b = document.createElement('button');
+    b.id = 'infobtn'; b.type = 'button'; b.textContent = 'ⓘ'; b.title = 'Data sources and notes';
+    t.after(b);
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const on = document.body.classList.toggle('showinfo');
+      try { localStorage.setItem('gexdash.info', on ? '1' : '0'); } catch (x) {  }
+    });
+    try { if (localStorage.getItem('gexdash.info') === '1') document.body.classList.add('showinfo'); } catch (x) {  }
+  }
+  const main = $('main');
+  if (main && !$('pagefoot')) {
+    const f = document.createElement('div');
+    f.id = 'pagefoot';
+    f.innerHTML = 'charts: <a class="credit" href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>';
+    main.after(f);
+  }
+  const bar = $('bar');
+  if (bar && !$('fsexit')) {
+    const x = document.createElement('button');
+    x.id = 'fsexit'; x.type = 'button'; x.textContent = '✕'; x.title = 'Back to the full page (or double-tap the chart)';
+    bar.appendChild(x);
+    x.addEventListener('click', e => { e.stopPropagation(); setMaximized(null); });
+  }
+})();
 function renderStatus() {
   const m = meta;
   if (!m) return;
@@ -130,22 +161,25 @@ function renderStatus() {
     $('dot').className = cls; $('stxt').textContent = txt;
     return;
   }
-  if (pollAge > 30) { cls = 'err'; txt = `server unreachable for ${Math.round(pollAge)} s`; }
-  else if (!p || !p.last) { cls = 'stale'; txt = 'no price yet'; }
+  let short;
+  if (pollAge > 30) { cls = 'err'; txt = `server unreachable for ${Math.round(pollAge)} s`; short = `offline ${Math.round(pollAge)} s`; }
+  else if (!p || !p.last) { cls = 'stale'; txt = short = 'no price yet'; }
   else if (p.source === 'last daily close') {
     cls = 'stale';
     txt = m.errors && m.errors.live ? `live price unavailable (${m.errors.live}) · showing last close ${p.last.toFixed(2)}`
       : `waiting for the live price · showing last close ${p.last.toFixed(2)}`;
+    short = `last close ${p.last.toFixed(2)}`;
   }
-  else if (!m.market_open) txt = `market closed · last ${p && p.last ? p.last.toFixed(2) : '—'}`;
+  else if (!m.market_open) { txt = `market closed · last ${p && p.last ? p.last.toFixed(2) : '—'}`; short = 'market closed'; }
   else {
-    const age = p && p.time ? nowS - p.time : 1e9;
+    const age = p && p.time ? nowS - p.time : 1e9, ageTxt = age < 90 ? Math.max(0, Math.round(age)) + ' s' : Math.round(age / 60) + ' min';
     cls = age > 3 * (m.poll_s || 120) + 60 ? 'stale' : 'live';
-    txt = `live · ${srcName(p)} · ${age < 90 ? Math.max(0, Math.round(age)) + ' s' : Math.round(age / 60) + ' min'} old · every ${cadence(m.poll_s)}` +
+    txt = `live · ${srcName(p)} · ${ageTxt} old · every ${cadence(m.poll_s)}` +
       (m.live_tickers > 1 ? ` · ${m.live_tickers} tickers live` : '');
+    short = `live · ${ageTxt}`;
   }
   if (cls !== 'err' && m.errors && Object.keys(m.errors).some(k => k !== 'history')) cls = 'stale';
-  $('dot').className = cls; $('stxt').textContent = txt;
+  $('dot').className = cls; $('stxt').textContent = SMALLUI() ? short : txt; $('status').title = txt;
 }
 
 
@@ -174,12 +208,15 @@ function renderCards() {
   if (!chart || !secs.length) { host.innerHTML = ''; return; }
   const g = paneGeom(), w = dchart.timeScale().width(), pw = chart.timeScale().width();
   const firstDi = g.findIndex((pg, i) => i > 0 && pg.h >= 30);
+
+
+  const fing = COARSE(), B = fing ? 32 : 22, btnTop = (pg, i) => (fing ? pg.top + pg.h - B - 8 : pg.top + (i === 0 ? 46 : 8));
   $('maxbtns').innerHTML = g.map((pg, i) => (pg.h < 30 || (i > 0 && i !== firstDi) ? '' :
     `<div class="maxbtn" data-i="${i}" title="${maxPane === null ? (i === 0 ? 'Expand the price chart' : 'Expand all the indicators') + ' (or double-click)' : 'Restore (or double-click / Esc)'}" ` +
-    `style="top:${pg.top + (i === 0 ? 46 : 8)}px;left:${(i === 0 ? pw : w) - 30}px">${maxPane === null ? '⤢' : '⤡'}</div>`)).join('');
+    `style="top:${btnTop(pg, i)}px;left:${(i === 0 ? pw : w) - B - 8}px">${maxPane === null ? '⤢' : '⤡'}</div>`)).join('');
   if (g[0] && g[0].h >= 30)
     $('maxbtns').innerHTML += `<div class="maxbtn" data-act="reset" title="Reset the price chart view (Alt+R)" ` +
-      `style="top:46px;left:${pw - 58}px">⟲</div>`;
+      `style="top:${btnTop(g[0], 0)}px;left:${pw - 2 * B - 14}px">⟲</div>`;
   const hsp = $('hsplit');
   if (maxPane === null && g[1]) { hsp.style.display = ''; hsp.style.top = ($('dchart').offsetTop - 7) + 'px'; hsp.style.width = '100%'; }
   else hsp.style.display = 'none';

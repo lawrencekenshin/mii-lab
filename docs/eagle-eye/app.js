@@ -173,6 +173,9 @@ function setTf(t) {
 
 
 const TOUCH_SCROLL = { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false };
+
+const TOUCH_FULL = Object.assign({}, TOUCH_SCROLL, { vertTouchDrag: true });
+const touchFor = which => (maxPane === which ? TOUCH_FULL : TOUCH_SCROLL);
 function makeChart() {
   if (chart) chart.remove();
   if (dchart) dchart.remove();
@@ -184,7 +187,8 @@ function makeChart() {
     rightPriceScale: { borderColor: '#2a2e39' },
     timeScale: { borderColor: '#2a2e39', timeVisible: INTRADAY.has(tf), secondsVisible: false, barSpacing: bs, rightOffset: ro },
     crosshair: { mode: LW.CrosshairMode.Normal },
-    handleScroll: TOUCH_SCROLL,
+    handleScroll: touchFor('di'),
+    handleScale: { pinch: false },
   });
 
   dchart = LW.createChart($('dchart'), base(7, 3));
@@ -197,7 +201,8 @@ function makeChart() {
     rightPriceScale: { borderColor: '#2a2e39' },
     timeScale: { borderColor: '#2a2e39', timeVisible: INTRADAY.has(tf), secondsVisible: false, barSpacing: 7 },
     crosshair: { mode: LW.CrosshairMode.Normal },
-    handleScroll: TOUCH_SCROLL,
+    handleScroll: touchFor('price'),
+    handleScale: { pinch: false },
   });
   candles = chart.addSeries(LW.CandlestickSeries, {
     upColor: C.up, downColor: C.dn, borderVisible: false, wickUpColor: C.up, wickDownColor: C.dn,
@@ -223,6 +228,7 @@ function makeChart() {
   prevR.p = prevR.d = null;
   linkAxes();
   panLink();
+  hookDblClick();
 }
 
 

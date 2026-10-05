@@ -1,5 +1,5 @@
 
-.top{border-bottom:1px solid #2A2E39;position:sticky;top:0;background:rgba(19,23,34,.94);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:40}
+.top{border-bottom:1px solid #2A2E39;position:sticky;top:env(safe-area-inset-top,0px);background:rgba(19,23,34,.94);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:40}
 .topbar{display:flex;align-items:center;gap:14px;height:48px;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,"Roboto","Segoe UI","Helvetica Neue",Arial,sans-serif}
 .brand{color:#8A8E99;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap;display:inline-flex;align-items:center;min-height:44px}
 .tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
