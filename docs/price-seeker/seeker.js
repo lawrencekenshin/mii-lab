@@ -2397,8 +2397,8 @@
       right.appendChild(para('rel', 'Related piles: ' + n.related.filter(function (o) { return o && o.sym; }).map(function (o) { return o.sym + ' ' + strike(o.node) + ' (' + sp1(o.dist) + ')'; }).join(' · ')));
     }
     var links = div('links');
-    var a = document.createElement('a'); a.className = 'btn'; a.textContent = 'Chart on TradingView ->';
-    a.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(n.tv || n.sym); a.target = '_blank'; a.rel = 'noopener noreferrer';
+    var a = document.createElement('a'); a.className = 'btn'; a.textContent = 'Chart on Eagle Eye ->';
+    a.href = '../eagle-eye/?s=' + encodeURIComponent(n.sym); a.target = '_blank'; a.rel = 'noopener noreferrer';
     var cb = btn('btn', 'Copy link'); cb.addEventListener('click', function () { copyLink(n.sym, cb); });
     links.appendChild(a); links.appendChild(cb); right.appendChild(links);
     r.chart = { holder: ch, ro: ro, n: n };
