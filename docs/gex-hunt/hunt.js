@@ -18,7 +18,7 @@ const NAMES = {}, DAYB = {};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const NARROW = () => window.innerWidth < 760;
-const WIDE = () => window.innerWidth >= 1800, MID = () => window.innerWidth >= 1500;
+const WIDE = () => window.innerWidth >= 1800, MID = () => window.innerWidth >= 1560;
 const PUT = () => S.side === 'put';
 const K = () => (PUT() ? 'p' : 'h');
 
@@ -103,9 +103,14 @@ const binsOf = r => ((r.h || {})[S.h] || {}).b || (hh(r) || {}).b;
 const inList = r => S.l === 'all' || (r.l || []).includes(S.l);
 const fr = r => { const f = hh(r) && hh(r).fr; return f && f[1] ? [f[0] - f[1], (f[0] - f[1]) / f[1]] : null; };
 const isFresh = r => { const f = fr(r); return !!f && f[0] >= 1000 && f[1] >= 0.10; };
+
+const cpOf = (r, H = S.h) => { const c = r.cp && r.cp[H]; return c && c[0] + c[1] > 0 ? c : null; };
+const cpShare = c => c[0] / (c[0] + c[1]);
+const cpWk = c => c[2] != null && c[2] + c[3] > 0 ? c[2] / (c[2] + c[3]) : null;
 const SORTS = {
   sc: r => hh(r).sc, s: r => r.s, px: r => r.r20 ?? -9, up: r => hh(r).up, dn: r => hh(r).dn, x: r => hh(r).x,
   lv: r => hh(r).lv.length, com: r => hh(r).com, fr: r => (fr(r) || [-1e12])[0], biz: r => r.biz ?? -1,
+  cp: r => { const c = cpOf(r); return c ? cpShare(c) : -1; },
   days: r => r.days ?? (hh(r).days || 0), ret: r => r.ret ?? -9, best: r => r.touched ? 1 : -Math.abs(r.best ?? 9),
 };
 const SORT = () => (S.per === 'today' || S.v !== 'board' ? S.sort : S.psort);
@@ -161,6 +166,42 @@ function daysCell(g) {
   if (!g || g.v !== 'match' || g.days == null) return '';
   if (g.new) return ' <span class="badge new">NEW</span>';
   return ` <span class="dys" title="on the list since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}">${g.days}d${g.since_start ? '+' : ''}</span>`;
+}
+function cpLab(c) {
+  const sh = cpShare(c), x = sh >= 0.5 ? c[0] / Math.max(c[1], 1) : c[1] / Math.max(c[0], 1);
+  const t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
+  return sh >= 0.55 ? `<b class="up">${t}× calls</b>` : sh <= 0.45 ? `<b class="dn">${t}× puts</b>` : `<b class="cpe">${t}× even</b>`;
+}
+function cpBar(c, cls = '') {
+  const sh = cpShare(c), wk = cpWk(c);
+  return `<i class="cpb ${cls}"><b style="width:${(sh * 100).toFixed(1)}%"></b><em></em>${wk == null ? '' : `<s style="left:${(wk * 100).toFixed(1)}%"></s>`}</i>`;
+}
+function cpMove(c, pre = '1W ') {
+  const wk = cpWk(c);
+  if (wk == null) return `<span class="cpw muted">${pre}n/a</span>`;
+  const d = (cpShare(c) - wk) * 100;
+  if (Math.abs(d) < 1) return `<span class="cpw muted">${pre}=</span>`;
+  return `<span class="cpw ${d > 0 ? 'up' : 'dn'}">${d > 0 ? '▲' : '▼'}${Math.abs(d).toFixed(0)}pt</span>`;
+}
+function cpTip(c, H = S.h, then = 'a week ago (same expiries)') {
+  const wk = cpWk(c);
+  return `${kf(c[0])} calls vs ${kf(c[1])} puts open (${H} expiries), ${Math.round(cpShare(c) * 100)}% calls` +
+    (wk == null ? '' : ` · ${then} ${Math.round(wk * 100)}% calls: calls ${c[0] - c[2] >= 0 ? '+' : '−'}${kf(Math.abs(c[0] - c[2]))}, puts ${c[1] - c[3] >= 0 ? '+' : '−'}${kf(Math.abs(c[1] - c[3]))}`);
+}
+function cpCard(n) {
+  const rows = (D.hs || ['1M', '3M', '6M', '1Y+']).map(H => { const c = cpOf(n, H); if (!c) return '';
+    return `<span class="${H === S.h ? 'wh' : 'muted'}">${H}</span>${cpBar(c, 'wide')}<span class="r">${cpLab(c)}</span>${cpMove(c)}`; }).join('');
+  if (!rows) return '';
+  const c = cpOf(n), wk = c && cpWk(c);
+  const adds = c && wk != null ? ` A week earlier (${day(n.wk_settle)}, same expiries) ${Math.round(wk * 100)}% calls: calls <b class="${c[0] >= c[2] ? 'up' : 'dn'}">${c[0] - c[2] >= 0 ? '+' : '−'}${kf(Math.abs(c[0] - c[2]))}</b>, puts <b class="${c[1] >= c[3] ? 'dn' : 'up'}">${c[1] - c[3] >= 0 ? '+' : '−'}${kf(Math.abs(c[1] - c[3]))}</b>.` : '';
+  return `<div class="card2"><h4><span>Calls : puts</span><span>open contracts</span></h4><div class="cpg">${rows}</div>
+    ${c ? `<div class="txt" style="margin-top:6px">${S.h}: <b>${kf(c[0])}</b> calls vs <b>${kf(c[1])}</b> puts open, ${Math.round(cpShare(c) * 100)}% calls.${adds}</div>` : ''}
+    <div class="note" style="margin-top:4px">Green = calls' share, red = puts'. White tick = a week ago. Every strike counts (in the money too); one contract = 100 shares, whatever its price.</div></div>`;
+}
+function cpCell(r, per) {
+  const c = cpOf(r);
+  if (!c) return '<span class="muted">–</span>';
+  return `<div class="cp" title="${per ? cpTip(c, S.h, 'on ' + day(r.first)) : cpTip(c)}"><div class="cpt">${cpLab(c)}${cpMove(c, per ? '' : '1W ')}</div>${cpBar(c)}</div>`;
 }
 const bizCls = v => v >= 70 ? 'hi' : v >= 50 ? 'mid' : 'lo';
 function bizCell(r) {
@@ -264,9 +305,9 @@ function tiles(G) {
 }
 function cols() {
   const w = W();
-  return [['rk', '#', 0], ['s', 'Stock', 1], ['px', 'Price · 20d', 1, 'r'], ['b', `GEX by strike <span style="text-transform:none;letter-spacing:0">(below ← price → above)</span>`, 0],
+  return [['rk', '#', 0], ['s', 'Stock', 1], ['px', 'Price · 20d', 1, 'r'], ['b', `GEX by strike<br><span class="thsub">below ← price → above</span>`, 0],
     ['up', w.stack, 1, 'r'], ['dn', w.other, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 1], ['com', 'Centre', 1, 'r'],
-    ['fr', w.added, 1, 'r'], ['tf', 'KDJ 1W · 2W · 1M', 0], ['biz', 'Business', 1], ['sc', 'Score', 1]];
+    ['fr', w.added, 1, 'r'], ['cp', 'Calls : Puts', 1], ['tf', 'KDJ 1W · 2W · 1M', 0], ['biz', 'Business', 1], ['sc', 'Score', 1]];
 }
 function headRow(C) {
   const [sk0, sd] = SORT();
@@ -284,13 +325,13 @@ function tableRow(r, i, kind) {
     <td>${glyph(r)}</td>
     <td class="r num"><span class="${PUT() ? 'dn' : 'wh'}">${stackS(g.up)}</span><br><span class="muted" style="font-size:11.5px">${((g.rel || 0) * 100).toFixed(1)}% of $vol</span></td>
     <td class="r num ${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</td><td class="r num wh">${xS(g.x)}</td>
-    ${mid}<td>${kdj(r)}</td><td>${bizCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`;
+    ${mid}<td>${cpCell(r)}</td><td>${kdj(r)}</td><td>${bizCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`;
 }
 function card(r, i, kind) {
   const g = hh(r), w = W();
   return `<div class="pcard ${kind}" data-s="${r.s}"><div class="r1"><span>${kind === 'match' ? `<span class="muted">${i + 1}</span> ` : ''}<b class="wh" style="font-size:15px">${r.s}</b> <span class="muted num" style="font-size:12px">${r.px.toFixed(2)} <span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}">${pc(r.r20, 1)}</span></span>${kind === 'match' ? daysCell(g) : ''}</span>${scoreCell(g.sc)}</div>
     <div style="margin-top:5px">${glyph(r, Math.min(window.innerWidth - 22, 520), 40)}</div>
-    <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span><span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? (r.sec === 'Fund' ? 'fund' : '–')}</b></span></div>
+    <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span>${cpOf(r) ? `<span>calls:puts ${cpLab(cpOf(r))}</span>` : ''}<span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? (r.sec === 'Fund' ? 'fund' : '–')}</b></span></div>
     ${kind === 'match' ? `<div style="margin-top:4px">${chips(r, 5)}</div>` : `<div class="why">${kind === 'near' ? '✕ ' : ''}${esc((g.why || []).join(' · '))}</div>`}</div>`;
 }
 async function renderBoard() {
@@ -328,7 +369,7 @@ async function renderBoard() {
   wireViewBar();
 }
 function foot() {
-  return `<div class="foot">Bars are GEX by strike: net calls − puts per strike, $ per 1% move, priced at the close, every expiry in the ${S.h} window. Green = mostly call open interest, red = mostly puts (the usual convention; public open interest can't show whether dealers are long or short). "${W().added}" = ${W().mine} open interest at the stack's levels vs the settle a week earlier, same expiries still open. Rebuilt once a day from end-of-day options open interest. ${D.canonical ? '' : `<span class="am">This build already carries the ${day(D.settle)} settle (next-morning data) with the ${day(D.day)} close; saved days and the record use the evening build.</span>`} History starts ${day(D.history.first_day)}; days before the live build were rebuilt from saved open-interest snapshots. Untested as a signal: see Record.</div>`;
+  return `<div class="foot">Bars are GEX by strike: net calls − puts per strike, $ per 1% move, priced at the close, every expiry in the ${S.h} window. Green = mostly call open interest, red = mostly puts (the usual convention; public open interest can't show whether dealers are long or short). "${W().added}" = ${W().mine} open interest at the stack's levels vs the settle a week earlier, same expiries still open. "Calls : Puts" = all open call vs put contracts in the window's expiries (every strike); the white tick and ▲/▼ = the call share a week earlier, same expiries. Rebuilt once a day from end-of-day options open interest. ${D.canonical ? '' : `<span class="am">This build already carries the ${day(D.settle)} settle (next-morning data) with the ${day(D.day)} close; saved days and the record use the evening build.</span>`} History starts ${day(D.history.first_day)}; days before the live build were rebuilt from saved open-interest snapshots. Untested as a signal: see Record.</div>`;
 }
 
 
@@ -348,12 +389,12 @@ async function renderPeriod() {
     <div class="tile"><div class="k">On every day</div><div class="v num">${rows.filter(r => r.days === X.n).length}</div><div class="s">the persistent stacks</div></div>
     <div class="tile"><div class="k">Reached their first level</div><div class="v num">${touched} <small>of ${rows.length}</small></div><div class="s">a daily ${w.where === 'above' ? 'high' : 'low'} at or past it after the first day</div></div>
     <div class="tile"><div class="k">Median move since first day</div><div class="v num">${med(rows.map(r => r.ret).filter(x => x != null))}</div><div class="s">no controls here: see Record for the fair test</div></div></div>`;
-  const C = [['rk', '#', 0], ['s', 'Stock', 1], ['days', 'Days on list', 1], ['st', 'Status', 0], ['b', 'GEX by strike (last day on list)', 0],
-    ['up', w.stack, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 0], ['ret', 'Since first day', 1, 'r'], ['best', 'First level', 1], ['biz', 'Business', 1], ['sc', 'Score', 1]];
+  const C = [['rk', '#', 0], ['s', 'Stock', 1], ['days', 'Days on list', 1], ['st', 'Status', 0], ['b', 'GEX by strike<br><span class="thsub">last day on the list</span>', 0],
+    ['up', w.stack, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 0], ['ret', 'Since first day', 1, 'r'], ['cp', 'Calls : Puts<br><span class="thsub">tick = first day</span>', 1], ['best', 'First level', 1], ['biz', 'Business', 1], ['sc', 'Score', 1]];
   if (NARROW()) {
     h += rows.map((r, i) => `<div class="pcard" data-s="${r.s}" data-d="${r.first}"><div class="r1"><span><span class="muted">${i + 1}</span> <b class="wh" style="font-size:15px">${r.s}</b> ${statusCell(r)}</span><span class="num">${dots(r, win)}</span></div>
       <div style="margin-top:5px">${glyph(r, Math.min(window.innerWidth - 22, 520), 40)}</div>
-      <div class="r3 num"><span>on <b>${r.days} of ${X.n}</b></span><span>since ${day(r.first)} <b class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</b></span><span>first level <b>${sk(r.k1)}</b> ${bestCell(r)}</span><span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? '–'}</b></span></div></div>`).join('') ||
+      <div class="r3 num"><span>on <b>${r.days} of ${X.n}</b></span><span>since ${day(r.first)} <b class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</b></span><span>first level <b>${sk(r.k1)}</b> ${bestCell(r)}</span>${cpOf(r) ? `<span>calls:puts ${cpLab(cpOf(r))} ${cpMove(cpOf(r), 'vs ' + day(r.first) + ' ')}</span>` : ''}<span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? '–'}</b></span></div></div>`).join('') ||
       `<div class="empty" style="padding:24px 12px">No name was on the list in this window.</div>`;
   } else {
     h += `<div class="tw"><table class="hunt"><thead>${headRow(C)}</thead><tbody>` + rows.map((r, i) => { const g = hh(r);
@@ -362,10 +403,10 @@ async function renderPeriod() {
         <td>${glyph(r)}</td><td class="r num"><span class="${PUT() ? 'dn' : 'wh'}">${stackS(g.up)}</span><br><span class="muted" style="font-size:11.5px">${day(r.last)}</span></td>
         <td class="r num wh">${xS(g.x)}</td><td>${chips(r)}</td>
         <td class="r num"><span class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</span><br><span class="muted" style="font-size:11.5px">${r.px0.toFixed(2)} → ${r.px_now != null ? r.px_now.toFixed(2) : '–'}</span></td>
-        <td class="num">${sk(r.k1)} <span class="muted">${pc(r.d1)}</span><br>${bestCell(r)}</td><td>${bizCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`; }).join('') +
+        <td>${cpCell(r, true)}</td><td class="num">${sk(r.k1)} <span class="muted">${pc(r.d1)}</span><br>${bestCell(r)}</td><td>${bizCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`; }).join('') +
       (rows.length ? '' : `<tr class="secrow"><td colspan="${C.length}" class="muted" style="padding:16px 8px">No name was on the list in this window.</td></tr>`) + '</tbody></table></div>';
   }
-  h += `<div class="foot">"Since first day" = the close on the first day in the window → the latest close. "First level" = the nearest level ${w.where} the price on that first day; touched means a daily ${w.where === 'above' ? 'high' : 'low'} reached it on a later session (s3 = the 3rd session after). Click a row for today's chart with the first day's levels dashed. These numbers have no controls and the windows overlap: a rally lifts every name. The Record tab compares each new entry with the options' own odds and with similar stocks that did not match.</div>`;
+  h += `<div class="foot">"Since first day" = the close on the first day in the window → the latest close. "First level" = the nearest level ${w.where} the price on that first day; touched means a daily ${w.where === 'above' ? 'high' : 'low'} reached it on a later session (s3 = the 3rd session after). "Calls : Puts" = today's open call vs put contracts in the window's expiries; the white tick and ▲/▼ = the split on the name's first day in the window (the expiries open then). Click a row for today's chart with the first day's levels dashed. These numbers have no controls and the windows overlap: a rally lifts every name. The Record tab compares each new entry with the options' own odds and with similar stocks that did not match.</div>`;
   $('#main').innerHTML = h;
   wireViewBar();
 }
@@ -494,6 +535,7 @@ async function renderDetail() {
     <div class="card2"><h4><span>${g.v === 'match' ? 'Why ' + sym + ' is here' : 'Rules'}${PUT() ? ' · negative' : ''}</span>${verdictHead(r, g)}</h4><div class="ck">${ck}</div></div>
     ${bizCard(sym, n)}
     ${lt ? `<div class="card2"><h4><span>${w.levels}</span><span>OI ${day(n.oi_settle)} settle</span></h4><table class="lvt"><tr><th>Strike</th><th>Away</th><th>Reach</th><th>GEX</th><th>${PUT() ? 'Puts' : 'Calls'}</th><th>Main expiry</th><th>1W</th></tr>${lt}</table><div class="note" style="margin-top:6px">Reach = distance in the main expiry's own implied moves. 1W = ${w.addedLong} since the ${day(n.wk_settle)} settle (all open expiries).</div></div>` : ''}
+    ${cpCard(n)}
     <div class="card2"><h4><span>${sym} vs all ${D.universe} names</span><span>percentile</span></h4>${pb(`Stack ÷ ${w.theirs}s ${w.there}`, P.x)}${pb('Stack vs $ volume', P.rel)}${pb('Stack size ($)', P.up)}${pb(`How far ${w.where}`, P.com)}${pb(`Share 10%+ ${w.where}`, P.far)}</div>
     ${(g.levels || []).length ? `<div class="card2"><h4><span>Is the stack new?</span><span class="${fresh ? 'up' : 'muted'}">${dd == null ? 'n/a' : fresh ? 'FRESH' : 'OLD'}</span></h4><div class="txt">${dd == null ? 'No snapshot from a week earlier.' : `${PUT() ? 'Puts' : 'Calls'} at the levels: <b>${kf(f[0])}</b> now vs ${kf(f[1])} on ${day(n.wk_settle)} (<b>${pc(dd / f[1])}</b>). `}<span class="muted">${dd == null ? '' : fresh ? `${PUT() ? 'Puts' : 'Calls'} are being added at the levels` : `Mostly ${exps} ${w.mine}s that were already there`}${grew.length ? '. Grew 10%+: ' + grew.map(d => sk(d.k) + ' (' + pc((d.oi_all - d.oi_wk) / d.oi_wk) + ')').join(', ') : ''}.${PUT() ? '' : ' In our earlier test of far call piles the one lead was calls <i>added</i> before a move, not old piles.'}</span></div></div>` : ''}
     ${g.v === 'match' && g.days != null ? `<div class="card2"><h4><span>On the list</span><span></span></h4><div class="txt">${g.new ? '<b>New today.</b>' : `<b>${g.days}</b> session${g.days === 1 ? '' : 's'}, since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}.`}</div></div>` : ''}
