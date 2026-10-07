@@ -162,6 +162,26 @@ function daysCell(g) {
   if (g.new) return ' <span class="badge new">NEW</span>';
   return ` <span class="dys" title="on the list since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}">${g.days}d${g.since_start ? '+' : ''}</span>`;
 }
+const bizCls = v => v >= 70 ? 'hi' : v >= 50 ? 'mid' : 'lo';
+function bizCell(r) {
+  if (r.biz == null) return `<span class="muted bzna">${r.sec === 'Fund' ? 'fund' : '–'}</span>`;
+  return `<span class="bz ${bizCls(r.biz)}" title="business score ${r.biz}/100 (not used for ranking)"><i><b style="width:${r.biz}%"></b></i><span class="num">${r.biz}</span></span>`;
+}
+const BIZLAB = { rev_yoy: 'Revenue YoY', eps_yoy: 'EPS YoY', peg: 'PEG', fcf_growth: 'FCF growth', fcf_margin: 'FCF margin', rev_qoq: 'Revenue QoQ' };
+function bizCard(sym, n) {
+  const b = n.bizm;
+  if (!b) return `<div class="card2"><h4><span>Business</span><span class="muted">${n.sector === 'Fund' ? 'fund' : 'no score'}</span></h4><div class="note">${n.sector === 'Fund' ? 'Funds have no business score.' : 'Fewer than 4 of the 6 numbers are reported for this company.'}</div></div>`;
+  const cls = bizCls(b.score), order = ['rev_yoy', 'eps_yoy', 'peg', 'fcf_growth', 'fcf_margin', 'rev_qoq'];
+  const val = (k, v) => v == null ? (k === 'peg' && b.peg_note ? (b.peg_note === 'loss' ? 'loss' : 'EPS falling') : 'n/a') : k === 'peg' ? v.toFixed(2) : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
+  const hasW = b.m.some(x => x[2] != null);
+  const rows = order.map(k => b.m.find(x => x[0] === k)).filter(Boolean).map(([k, , w, v, p]) =>
+    `<span>${BIZLAB[k]}</span><span class="num r">${val(k, v)}</span><i class="pbar"><b class="${p == null ? 'lo' : bizCls(p)}" style="width:${p ?? 0}%"></b></i><span class="num r">${p == null ? '–' : Math.round(p)}</span>${hasW ? `<span class="num r muted">${w}%</span>` : ''}`).join('');
+  const cap = b.mcap ? (b.mcap >= 1e12 ? '$' + (b.mcap / 1e12).toFixed(2) + 'T' : '$' + (b.mcap / 1e9).toFixed(b.mcap >= 1e11 ? 0 : 1) + 'B') : null;
+  return `<div class="card2"><h4><span>Business</span><span class="muted">shown, not used for ranking</span></h4>
+    <div class="bzbig"><b class="bzt ${cls}">${b.score}</b><span class="muted">/100</span><span class="bz wide ${cls}"><i><b style="width:${b.score}%"></b></i></span><span class="muted">${cls === 'hi' ? 'strong' : cls === 'mid' ? 'middling' : 'weak'}</span></div>
+    <div class="bzgrid${hasW ? '' : ' now'}"><span class="muted h">Number</span><span class="muted h r">Value</span><span class="muted h">vs S&amp;P + NDX</span><span class="muted h r">pctl</span>${hasW ? '<span class="muted h r">wt</span>' : ''}${rows}</div>
+    <div class="note" style="margin-top:6px">${cap ? cap + ' market cap · ' : ''}${esc(n.sector || '')}. Each number is ranked against the S&amp;P 500 + Nasdaq-100 (0 = worst, 100 = best; for PEG lower is better); the score is their weighted mix.</div></div>`;
+}
 function scoreCell(v) { return `<span class="sc"><i><b style="width:${Math.max(0, Math.min(100, v || 0))}%"></b></i><span class="num">${(v || 0).toFixed(0)}</span></span>`; }
 
 
@@ -235,7 +255,7 @@ function tiles(G) {
   const frs = m.filter(r => fr(r)).sort((a, b) => fr(b)[0] - fr(a)[0])[0];
   const fl = D.counts[S.side][S.h].fails || {};
   return `<div class="tiles">
-    <div class="tile"><div class="k">Matches · ${S.h}${past ? ' · ' + day(S.d) : ''}</div><div class="v num">${m.length} <small>of ${past ? 'saved' : G.all.length}</small></div><div class="s">${G.n.length} near misses${!past && D.history.days.length > 1 ? ` · <b>${newN}</b> new · <b>${left.length}</b> left` : ''}</div></div>
+    <div class="tile"><div class="k">Matches · ${S.h}${past ? ' · ' + day(S.d) : ''}</div><div class="v num">${m.length} <small>of ${past ? 'saved' : G.all.length}</small></div><div class="s">${G.n.length} near misses${!past && D.history.days.length > 1 ? ` · <b>${newN}</b> new · <b>${left.length}</b> left` : ''}<br><b>${m.filter(r => (r.biz ?? 0) >= 70).length}</b> with business 70+${m.filter(r => (r.biz ?? 0) >= 70).length ? ': ' + m.filter(r => (r.biz ?? 0) >= 70).map(r => r.s).join(', ') : ''}</div></div>
     ${ref}
     <div class="tile ${big ? 'lnk' : ''}" ${big ? `data-s="${big.s}"` : ''}><div class="k">Biggest ${w.mine} stack</div><div class="v num">${big ? big.s + ` <small>${stackS(hh(big).up)}</small>` : '<small>–</small>'}</div><div class="s">${big ? (hh(big).rel * 100).toFixed(1) + "% of a day's $ volume" : ''}</div></div>
     <div class="tile ${frs ? 'lnk' : ''}" ${frs ? `data-s="${frs.s}"` : ''}><div class="k">Most ${w.addedLong} · 1 week</div><div class="v num">${frs ? frs.s + ` <small>${fr(frs)[0] >= 0 ? '+' : ''}${kf(fr(frs)[0])}</small>` : '<small>–</small>'}</div><div class="s">${frs ? `contracts at its levels (${pc(fr(frs)[1])})` : 'no week-ago snapshot'}</div></div>
@@ -246,7 +266,7 @@ function cols() {
   const w = W();
   return [['rk', '#', 0], ['s', 'Stock', 1], ['px', 'Price · 20d', 1, 'r'], ['b', `GEX by strike <span style="text-transform:none;letter-spacing:0">(below ← price → above)</span>`, 0],
     ['up', w.stack, 1, 'r'], ['dn', w.other, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 1], ['com', 'Centre', 1, 'r'],
-    ['fr', w.added, 1, 'r'], ['tf', 'KDJ 1W · 2W · 1M', 0], ['biz', 'Biz', 1, 'r'], ['sc', 'Score', 1]];
+    ['fr', w.added, 1, 'r'], ['tf', 'KDJ 1W · 2W · 1M', 0], ['biz', 'Business', 1], ['sc', 'Score', 1]];
 }
 function headRow(C) {
   const [sk0, sd] = SORT();
@@ -264,13 +284,13 @@ function tableRow(r, i, kind) {
     <td>${glyph(r)}</td>
     <td class="r num"><span class="${PUT() ? 'dn' : 'wh'}">${stackS(g.up)}</span><br><span class="muted" style="font-size:11.5px">${((g.rel || 0) * 100).toFixed(1)}% of $vol</span></td>
     <td class="r num ${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</td><td class="r num wh">${xS(g.x)}</td>
-    ${mid}<td>${kdj(r)}</td><td class="r num">${r.biz ?? '<span class="muted">' + (r.sec === 'Fund' ? 'fund' : '–') + '</span>'}</td><td>${scoreCell(g.sc)}</td></tr>`;
+    ${mid}<td>${kdj(r)}</td><td>${bizCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`;
 }
 function card(r, i, kind) {
   const g = hh(r), w = W();
   return `<div class="pcard ${kind}" data-s="${r.s}"><div class="r1"><span>${kind === 'match' ? `<span class="muted">${i + 1}</span> ` : ''}<b class="wh" style="font-size:15px">${r.s}</b> <span class="muted num" style="font-size:12px">${r.px.toFixed(2)} <span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}">${pc(r.r20, 1)}</span></span>${kind === 'match' ? daysCell(g) : ''}</span>${scoreCell(g.sc)}</div>
     <div style="margin-top:5px">${glyph(r, Math.min(window.innerWidth - 22, 520), 40)}</div>
-    <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span></div>
+    <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span><span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? (r.sec === 'Fund' ? 'fund' : '–')}</b></span></div>
     ${kind === 'match' ? `<div style="margin-top:4px">${chips(r, 5)}</div>` : `<div class="why">${kind === 'near' ? '✕ ' : ''}${esc((g.why || []).join(' · '))}</div>`}</div>`;
 }
 async function renderBoard() {
@@ -329,11 +349,11 @@ async function renderPeriod() {
     <div class="tile"><div class="k">Reached their first level</div><div class="v num">${touched} <small>of ${rows.length}</small></div><div class="s">a daily ${w.where === 'above' ? 'high' : 'low'} at or past it after the first day</div></div>
     <div class="tile"><div class="k">Median move since first day</div><div class="v num">${med(rows.map(r => r.ret).filter(x => x != null))}</div><div class="s">no controls here: see Record for the fair test</div></div></div>`;
   const C = [['rk', '#', 0], ['s', 'Stock', 1], ['days', 'Days on list', 1], ['st', 'Status', 0], ['b', 'GEX by strike (last day on list)', 0],
-    ['up', w.stack, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 0], ['ret', 'Since first day', 1, 'r'], ['best', 'First level', 1], ['sc', 'Score', 1]];
+    ['up', w.stack, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 0], ['ret', 'Since first day', 1, 'r'], ['best', 'First level', 1], ['biz', 'Business', 1], ['sc', 'Score', 1]];
   if (NARROW()) {
     h += rows.map((r, i) => `<div class="pcard" data-s="${r.s}" data-d="${r.first}"><div class="r1"><span><span class="muted">${i + 1}</span> <b class="wh" style="font-size:15px">${r.s}</b> ${statusCell(r)}</span><span class="num">${dots(r, win)}</span></div>
       <div style="margin-top:5px">${glyph(r, Math.min(window.innerWidth - 22, 520), 40)}</div>
-      <div class="r3 num"><span>on <b>${r.days} of ${X.n}</b></span><span>since ${day(r.first)} <b class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</b></span><span>first level <b>${sk(r.k1)}</b> ${bestCell(r)}</span></div></div>`).join('') ||
+      <div class="r3 num"><span>on <b>${r.days} of ${X.n}</b></span><span>since ${day(r.first)} <b class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</b></span><span>first level <b>${sk(r.k1)}</b> ${bestCell(r)}</span><span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? '–'}</b></span></div></div>`).join('') ||
       `<div class="empty" style="padding:24px 12px">No name was on the list in this window.</div>`;
   } else {
     h += `<div class="tw"><table class="hunt"><thead>${headRow(C)}</thead><tbody>` + rows.map((r, i) => { const g = hh(r);
@@ -342,7 +362,7 @@ async function renderPeriod() {
         <td>${glyph(r)}</td><td class="r num"><span class="${PUT() ? 'dn' : 'wh'}">${stackS(g.up)}</span><br><span class="muted" style="font-size:11.5px">${day(r.last)}</span></td>
         <td class="r num wh">${xS(g.x)}</td><td>${chips(r)}</td>
         <td class="r num"><span class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</span><br><span class="muted" style="font-size:11.5px">${r.px0.toFixed(2)} → ${r.px_now != null ? r.px_now.toFixed(2) : '–'}</span></td>
-        <td class="num">${sk(r.k1)} <span class="muted">${pc(r.d1)}</span><br>${bestCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`; }).join('') +
+        <td class="num">${sk(r.k1)} <span class="muted">${pc(r.d1)}</span><br>${bestCell(r)}</td><td>${bizCell(r)}</td><td>${scoreCell(g.sc)}</td></tr>`; }).join('') +
       (rows.length ? '' : `<tr class="secrow"><td colspan="${C.length}" class="muted" style="padding:16px 8px">No name was on the list in this window.</td></tr>`) + '</tbody></table></div>';
   }
   h += `<div class="foot">"Since first day" = the close on the first day in the window → the latest close. "First level" = the nearest level ${w.where} the price on that first day; touched means a daily ${w.where === 'above' ? 'high' : 'low'} reached it on a later session (s3 = the 3rd session after). Click a row for today's chart with the first day's levels dashed. These numbers have no controls and the windows overlap: a rally lifts every name. The Record tab compares each new entry with the options' own odds and with similar stocks that did not match.</div>`;
@@ -472,6 +492,7 @@ async function renderDetail() {
   $('#side').innerHTML = `
     ${ASOF ? `<div class="card2 asofcard"><h4><span class="asof">On ${dayW(ASOF.day)}</span><span>${ASOF.v === 'match' ? 'on the list' : 'near miss'} · score ${(ASOF.sc || 0).toFixed(0)}</span></h4><div class="txt">Price ${ASOF.px.toFixed(2)} → ${n.spot.toFixed(2)} now (<b class="${n.spot >= ASOF.px ? 'up' : 'dn'}">${pc(n.spot / ASOF.px - 1, 1)}</b>). Stack ${stackS(ASOF.up)} vs ${otherS(ASOF.dn)} (${xS(ASOF.x)}). Levels then: ${ASOF.lv.map(l => sk(l[0])).join(', ')} · now: ${(g.levels || []).map(d => sk(d.k)).join(', ') || 'none'}. <span class="lnk" data-d="">Clear</span></div></div>` : ''}
     <div class="card2"><h4><span>${g.v === 'match' ? 'Why ' + sym + ' is here' : 'Rules'}${PUT() ? ' · negative' : ''}</span>${verdictHead(r, g)}</h4><div class="ck">${ck}</div></div>
+    ${bizCard(sym, n)}
     ${lt ? `<div class="card2"><h4><span>${w.levels}</span><span>OI ${day(n.oi_settle)} settle</span></h4><table class="lvt"><tr><th>Strike</th><th>Away</th><th>Reach</th><th>GEX</th><th>${PUT() ? 'Puts' : 'Calls'}</th><th>Main expiry</th><th>1W</th></tr>${lt}</table><div class="note" style="margin-top:6px">Reach = distance in the main expiry's own implied moves. 1W = ${w.addedLong} since the ${day(n.wk_settle)} settle (all open expiries).</div></div>` : ''}
     <div class="card2"><h4><span>${sym} vs all ${D.universe} names</span><span>percentile</span></h4>${pb(`Stack ÷ ${w.theirs}s ${w.there}`, P.x)}${pb('Stack vs $ volume', P.rel)}${pb('Stack size ($)', P.up)}${pb(`How far ${w.where}`, P.com)}${pb(`Share 10%+ ${w.where}`, P.far)}</div>
     ${(g.levels || []).length ? `<div class="card2"><h4><span>Is the stack new?</span><span class="${fresh ? 'up' : 'muted'}">${dd == null ? 'n/a' : fresh ? 'FRESH' : 'OLD'}</span></h4><div class="txt">${dd == null ? 'No snapshot from a week earlier.' : `${PUT() ? 'Puts' : 'Calls'} at the levels: <b>${kf(f[0])}</b> now vs ${kf(f[1])} on ${day(n.wk_settle)} (<b>${pc(dd / f[1])}</b>). `}<span class="muted">${dd == null ? '' : fresh ? `${PUT() ? 'Puts' : 'Calls'} are being added at the levels` : `Mostly ${exps} ${w.mine}s that were already there`}${grew.length ? '. Grew 10%+: ' + grew.map(d => sk(d.k) + ' (' + pc((d.oi_all - d.oi_wk) / d.oi_wk) + ')').join(', ') : ''}.${PUT() ? '' : ' In our earlier test of far call piles the one lead was calls <i>added</i> before a move, not old piles.'}</span></div></div>` : ''}
