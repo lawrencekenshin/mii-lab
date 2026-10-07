@@ -226,6 +226,30 @@ function bizCard(sym, n) {
 function scoreCell(v) { return `<span class="sc"><i><b style="width:${Math.max(0, Math.min(100, v || 0))}%"></b></i><span class="num">${(v || 0).toFixed(0)}</span></span>`; }
 
 
+function duo(r, per) {
+  const c = cpOf(r);
+  let mv = '';
+  if (c) { const wk = cpWk(c), d = wk == null ? null : (cpShare(c) - wk) * 100, when = per ? day(r.first) : '1W';
+    mv = d == null ? `<span class="muted">${when} n/a</span>` : Math.abs(d) < 1 ? `<span class="muted">${when} =</span>`
+      : `<span class="${d > 0 ? 'up' : 'dn'}">${when} ${d > 0 ? '▲' : '▼'}${Math.abs(d).toFixed(0)}pt</span>`; }
+  const cp = `<div class="pk"><div class="pkh"><span>Calls : puts</span>${c ? `<span>${Math.round(cpShare(c) * 100)}%<span class="cw"> calls</span></span>` : ''}</div>` +
+    (c ? `<div class="pkv"><span>${cpLab(c)}</span>${mv}</div>${cpBar(c, 'wide')}` : '<div class="pkv"><span class="muted">n/a</span></div>') + '</div>';
+  const b = r.biz, cls = b == null ? 'lo' : bizCls(b);
+  const bz = `<div class="pk"><div class="pkh"><span>Business</span>${b == null ? '' : `<span class="bzt ${cls}">${cls === 'hi' ? 'strong' : cls === 'mid' ? 'middling' : 'weak'}</span>`}</div>` +
+    `<div class="pkv">${b == null ? `<span class="muted">${r.sec === 'Fund' ? 'fund' : 'no score'}</span>` : `<span><b class="bzt ${cls}">${b}</b><span class="muted"> /100</span></span>`}</div>` +
+    (b == null ? '' : `<span class="bz ${cls}"><i><b style="width:${b}%"></b></i></span>`) + '</div>';
+  return `<div class="duo" title="${c ? cpTip(c, S.h, per ? 'on ' + day(r.first) : undefined) : ''}">${cp}${bz}</div>`;
+}
+const cardW = () => Math.max(200, Math.min(window.innerWidth - 22, 520));
+
+const PSORT = [['sc', 'Score'], ['biz', 'Business'], ['cp', 'Calls share'], ['up', 'Stack'], ['x', '×'], ['days', 'Days on list']];
+function sortBar() {
+  const [k, d] = SORT();
+  return `<div class="sortbar"><span class="muted">Sort</span><select id="sortsel">${PSORT.map(([v, t]) => `<option value="${v}" ${v === k ? 'selected' : ''}>${t}</option>`).join('')}${PSORT.some(x => x[0] === k) ? '' : `<option value="${k}" selected>${k}</option>`}</select>
+    <button class="chip" data-dir="1" title="flip the order">${d < 0 ? '▼ high first' : '▲ low first'}</button></div>`;
+}
+
+
 function renderBar() {
   const rows = D.rows;
   const counts = HS.map(H => rows.filter(r => inList(r) && (r[K()] || {})[H] && r[K()][H].v === 'match').length);
@@ -263,6 +287,8 @@ function viewBar() {
 function wireViewBar() {
   const ds = $('#daysel');
   if (ds) ds.addEventListener('change', () => go({ d: ds.value === D.day ? null : ds.value }, false));
+  const ss = $('#sortsel');
+  if (ss) ss.addEventListener('change', () => { const nx = [ss.value, ss.value === 's' ? 1 : -1]; go(S.per === 'today' ? { sort: nx } : { psort: nx }, false); });
 }
 
 
@@ -330,8 +356,9 @@ function tableRow(r, i, kind) {
 function card(r, i, kind) {
   const g = hh(r), w = W();
   return `<div class="pcard ${kind}" data-s="${r.s}"><div class="r1"><span>${kind === 'match' ? `<span class="muted">${i + 1}</span> ` : ''}<b class="wh" style="font-size:15px">${r.s}</b> <span class="muted num" style="font-size:12px">${r.px.toFixed(2)} <span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}">${pc(r.r20, 1)}</span></span>${kind === 'match' ? daysCell(g) : ''}</span>${scoreCell(g.sc)}</div>
-    <div style="margin-top:5px">${glyph(r, Math.min(window.innerWidth - 22, 520), 40)}</div>
-    <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span>${cpOf(r) ? `<span>calls:puts ${cpLab(cpOf(r))}</span>` : ''}<span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? (r.sec === 'Fund' ? 'fund' : '–')}</b></span></div>
+    <div style="margin-top:5px">${glyph(r, cardW(), 40)}</div>
+    <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span></div>
+    ${duo(r)}
     ${kind === 'match' ? `<div style="margin-top:4px">${chips(r, 5)}</div>` : `<div class="why">${kind === 'near' ? '✕ ' : ''}${esc((g.why || []).join(' · '))}</div>`}</div>`;
 }
 async function renderBoard() {
@@ -352,7 +379,7 @@ async function renderBoard() {
     h += `<div class="pastnote">Saved board for <b>${dayW(S.d)}</b> · close ${day(S.d)} · OI ${day(x.settle)} settle${String(x.source || '').startsWith('oiarchive') ? ' · rebuilt from saved open-interest snapshots' : ''}. Rows are as they were that day. Click a name to see today's chart with that day's levels dashed. <span class="lnk" data-d="">Back to latest →</span></div>`; }
   h += ruleStrip() + tiles(G);
   if (NARROW()) {
-    h += m.map(r => card(r, rank(r), 'match')).join('');
+    h += sortBar() + m.map(r => card(r, rank(r), 'match')).join('');
     if (!m.length) h += `<div class="empty" style="padding:24px 12px">${q ? 'No match for “' + esc(q) + '”.' : 'No name matches every rule in this window' + (past ? ' that day.' : ' today.')}</div>`;
     if (n.length) h += `<div class="sect" style="padding:12px 10px 6px"><b>Near misses</b> · one rule off</div>` + n.map(r => card(r, 0, 'near')).join('');
     if (other.length) h += `<div class="sect" style="padding:12px 10px 6px"><b>Other names</b></div>` + other.map(r => card(r, 0, 'other')).join('');
@@ -392,9 +419,9 @@ async function renderPeriod() {
   const C = [['rk', '#', 0], ['s', 'Stock', 1], ['days', 'Days on list', 1], ['st', 'Status', 0], ['b', 'GEX by strike<br><span class="thsub">last day on the list</span>', 0],
     ['up', w.stack, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 0], ['ret', 'Since first day', 1, 'r'], ['cp', 'Calls : Puts<br><span class="thsub">tick = first day</span>', 1], ['best', 'First level', 1], ['biz', 'Business', 1], ['sc', 'Score', 1]];
   if (NARROW()) {
-    h += rows.map((r, i) => `<div class="pcard" data-s="${r.s}" data-d="${r.first}"><div class="r1"><span><span class="muted">${i + 1}</span> <b class="wh" style="font-size:15px">${r.s}</b> ${statusCell(r)}</span><span class="num">${dots(r, win)}</span></div>
-      <div style="margin-top:5px">${glyph(r, Math.min(window.innerWidth - 22, 520), 40)}</div>
-      <div class="r3 num"><span>on <b>${r.days} of ${X.n}</b></span><span>since ${day(r.first)} <b class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</b></span><span>first level <b>${sk(r.k1)}</b> ${bestCell(r)}</span>${cpOf(r) ? `<span>calls:puts ${cpLab(cpOf(r))} ${cpMove(cpOf(r), 'vs ' + day(r.first) + ' ')}</span>` : ''}<span>business <b class="bzt ${r.biz == null ? 'lo' : bizCls(r.biz)}">${r.biz ?? '–'}</b></span></div></div>`).join('') ||
+    h += sortBar() + rows.map((r, i) => `<div class="pcard" data-s="${r.s}" data-d="${r.first}"><div class="r1"><span><span class="muted">${i + 1}</span> <b class="wh" style="font-size:15px">${r.s}</b> ${statusCell(r)}</span><span class="num">${dots(r, win)}</span></div>
+      <div style="margin-top:5px">${glyph(r, cardW(), 40)}</div>
+      <div class="r3 num"><span>on <b>${r.days} of ${X.n}</b></span><span>since ${day(r.first)} <b class="${(r.ret || 0) >= 0 ? 'up' : 'dn'}">${pc(r.ret, 1)}</b></span><span>first level <b>${sk(r.k1)}</b> ${bestCell(r)}</span></div>${duo(r, true)}</div>`).join('') ||
       `<div class="empty" style="padding:24px 12px">No name was on the list in this window.</div>`;
   } else {
     h += `<div class="tw"><table class="hunt"><thead>${headRow(C)}</thead><tbody>` + rows.map((r, i) => { const g = hh(r);
@@ -534,8 +561,9 @@ async function renderDetail() {
     ${ASOF ? `<div class="card2 asofcard"><h4><span class="asof">On ${dayW(ASOF.day)}</span><span>${ASOF.v === 'match' ? 'on the list' : 'near miss'} · score ${(ASOF.sc || 0).toFixed(0)}</span></h4><div class="txt">Price ${ASOF.px.toFixed(2)} → ${n.spot.toFixed(2)} now (<b class="${n.spot >= ASOF.px ? 'up' : 'dn'}">${pc(n.spot / ASOF.px - 1, 1)}</b>). Stack ${stackS(ASOF.up)} vs ${otherS(ASOF.dn)} (${xS(ASOF.x)}). Levels then: ${ASOF.lv.map(l => sk(l[0])).join(', ')} · now: ${(g.levels || []).map(d => sk(d.k)).join(', ') || 'none'}. <span class="lnk" data-d="">Clear</span></div></div>` : ''}
     <div class="card2"><h4><span>${g.v === 'match' ? 'Why ' + sym + ' is here' : 'Rules'}${PUT() ? ' · negative' : ''}</span>${verdictHead(r, g)}</h4><div class="ck">${ck}</div></div>
     ${bizCard(sym, n)}
+    ${NARROW() ? cpCard(n) : ''}
     ${lt ? `<div class="card2"><h4><span>${w.levels}</span><span>OI ${day(n.oi_settle)} settle</span></h4><table class="lvt"><tr><th>Strike</th><th>Away</th><th>Reach</th><th>GEX</th><th>${PUT() ? 'Puts' : 'Calls'}</th><th>Main expiry</th><th>1W</th></tr>${lt}</table><div class="note" style="margin-top:6px">Reach = distance in the main expiry's own implied moves. 1W = ${w.addedLong} since the ${day(n.wk_settle)} settle (all open expiries).</div></div>` : ''}
-    ${cpCard(n)}
+    ${NARROW() ? '' : cpCard(n)}
     <div class="card2"><h4><span>${sym} vs all ${D.universe} names</span><span>percentile</span></h4>${pb(`Stack ÷ ${w.theirs}s ${w.there}`, P.x)}${pb('Stack vs $ volume', P.rel)}${pb('Stack size ($)', P.up)}${pb(`How far ${w.where}`, P.com)}${pb(`Share 10%+ ${w.where}`, P.far)}</div>
     ${(g.levels || []).length ? `<div class="card2"><h4><span>Is the stack new?</span><span class="${fresh ? 'up' : 'muted'}">${dd == null ? 'n/a' : fresh ? 'FRESH' : 'OLD'}</span></h4><div class="txt">${dd == null ? 'No snapshot from a week earlier.' : `${PUT() ? 'Puts' : 'Calls'} at the levels: <b>${kf(f[0])}</b> now vs ${kf(f[1])} on ${day(n.wk_settle)} (<b>${pc(dd / f[1])}</b>). `}<span class="muted">${dd == null ? '' : fresh ? `${PUT() ? 'Puts' : 'Calls'} are being added at the levels` : `Mostly ${exps} ${w.mine}s that were already there`}${grew.length ? '. Grew 10%+: ' + grew.map(d => sk(d.k) + ' (' + pc((d.oi_all - d.oi_wk) / d.oi_wk) + ')').join(', ') : ''}.${PUT() ? '' : ' In our earlier test of far call piles the one lead was calls <i>added</i> before a move, not old piles.'}</span></div></div>` : ''}
     ${g.v === 'match' && g.days != null ? `<div class="card2"><h4><span>On the list</span><span></span></h4><div class="txt">${g.new ? '<b>New today.</b>' : `<b>${g.days}</b> session${g.days === 1 ? '' : 's'}, since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}.`}</div></div>` : ''}
@@ -599,7 +627,7 @@ function render(top) {
   if (top) window.scrollTo(0, 0);
 }
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-h],[data-l],[data-v],[data-near],[data-sort],[data-s],[data-side],[data-per],[data-d]');
+  const t = e.target.closest('[data-h],[data-l],[data-v],[data-near],[data-sort],[data-dir],[data-s],[data-side],[data-per],[data-d]');
   if (!t || t.tagName === 'A') return;
   if (t.dataset.side) return go({ side: PUT() ? 'call' : 'put' }, false);
   if (t.dataset.h) return go({ h: t.dataset.h }, false);
@@ -607,6 +635,7 @@ document.addEventListener('click', e => {
   if (t.dataset.per) return go({ per: t.dataset.per, d: null }, false);
   if (t.dataset.v) return go({ v: t.dataset.v, s: t.dataset.v === 'detail' ? S.s : null, d: t.dataset.v === 'board' && S.v === 'detail' && S.per !== 'today' ? null : S.d });
   if (t.dataset.near) return go({ near: !S.near }, false);
+  if (t.dataset.dir) { const [k, d] = SORT(); return go(S.per === 'today' ? { sort: [k, -d] } : { psort: [k, -d] }, false); }
   if (t.dataset.sort) { const k = t.dataset.sort, cur = SORT(), nx = [k, cur[0] === k ? -cur[1] : (k === 's' ? 1 : -1)];
     return go(S.per === 'today' ? { sort: nx } : { psort: nx }, false); }
   if (t.dataset.s) return go({ v: 'detail', s: t.dataset.s, d: t.dataset.d || (pastDay() ? S.d : null) });
