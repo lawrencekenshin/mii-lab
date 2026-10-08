@@ -10,6 +10,7 @@
 <meta name="description" content="How many S&amp;P 500 stocks are above their 50-day and 200-day averages right now, the washouts since 2013, and what came after them. Updated through the trading day.">
 <title>Market breadth · live</title>
 <link rel="stylesheet" href="breadth.css">
+<link rel="stylesheet" href="kdjwash.css?v=7">
 </head>
 <body>
 <a class="skip" href="#daily">Skip to the chart</a>
@@ -189,6 +190,7 @@
     </section>
 
 
+
     <section class="card" id="idx" aria-labelledby="t2">
       <div class="card-head">
         <div class="card-title">
@@ -254,6 +256,51 @@
       <p class="eli5" id="studyEli5"></p>
       <div class="table-scroll"><table id="washTable"></table></div>
       <p class="src" id="studySrc"></p>
+    </section>
+
+
+    <section class="card" id="kdjwash" aria-labelledby="tkw">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tkw">KDJ washout meter<span class="tsep"> · </span><span class="tspan" data-kwspan>last 5 years</span></h2>
+          <p class="sub">How many of each index’s stocks are maxed-out oversold on the weekly KDJ. The same count the KDJ bot sends each morning, with its ARMED and STRONG levels.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asofKW"></p>
+      <p class="banner banner-warn" id="errKW" hidden></p>
+      <div id="bodyKW" hidden>
+        <div class="kw-cards" id="cardsKW" role="group" aria-label="Pick an index for the chart and the table"></div>
+        <div class="controls kw-controls">
+          <div class="seg kw-tf" role="group" aria-label="Candle size">
+            <button type="button" data-kwt="1D" aria-pressed="false">Daily</button>
+            <button type="button" data-kwt="1W" aria-pressed="true">Weekly</button>
+            <button type="button" data-kwt="2W" aria-pressed="false">2-week</button>
+            <button type="button" data-kwt="1M" aria-pressed="false">Monthly</button>
+          </div>
+          <div class="seg seg-range kw-range" role="group" aria-label="KDJ washout meter time window">
+            <button type="button" data-kwr="2Y" aria-pressed="false" aria-label="Last 2 years">2Y</button>
+            <button type="button" data-kwr="5Y" aria-pressed="true" aria-label="Last 5 years">5Y</button>
+            <button type="button" data-kwr="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+            <button type="button" data-kwr="All" aria-pressed="false" aria-label="Since 2013">All</button>
+          </div>
+        </div>
+        <div class="readout kw-ro" id="roKW" aria-live="polite"></div>
+        <div class="kw-chart" id="chartKW" role="img" aria-label="The index ETF on top; under it, the share of its stocks washed out on KDJ, with the ARM and STRONG levels"></div>
+        <p class="legend" id="lgKW"></p>
+        <h3 class="kw-h3">Every armed spell since 2013 · <span id="kwEpIdx">S&amp;P 500</span> · weekly</h3>
+        <p class="kw-cap" id="capKW"></p>
+        <div class="table-scroll"><table id="tableKW" class="kw-table"></table></div>
+        <h3 class="kw-h3">What the bot’s tiers have meant</h3>
+        <div class="table-scroll"><table id="tiersKW" class="kw-table kw-tiers"></table></div>
+        <p class="src" id="tiersNoteKW"></p>
+        <p class="eli5 kw-eli5"><b>In one line</b>A lot of stocks washed out at once has marked dips worth scaling into, not exact bottoms: near the highs, 4 in 10 arms saw another 5%+ drop first.</p>
+        <div class="box">
+          <div class="box-row"><b>How to read it</b><span id="howKW"></span></div>
+          <div class="box-row"><b>Right now</b><span id="nowKW"></span></div>
+          <div class="box-row"><b>The study</b><span id="studyKW"></span></div>
+        </div>
+        <p class="kdj-honest" id="honestKW"></p>
+      </div>
     </section>
 
 
@@ -341,6 +388,7 @@
       <p class="kdj-honest">KDJ of the breadth line describes its swing; it has not been tested as a buy or sell signal.</p>
     </section>
 
+
     <details class="card table-card">
       <summary>The numbers as a table</summary>
       <div class="table-scroll"><table id="tfTable"></table></div>
@@ -383,5 +431,6 @@
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
 <script src="breadth.js" defer></script>
+<script src="kdjwash.js?v=7" defer></script>
 </body>
 </html>
