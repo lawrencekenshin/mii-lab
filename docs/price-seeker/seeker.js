@@ -103,6 +103,10 @@
 
 
   var params = new URLSearchParams(location.search);
+
+
+  var EMBED = params.get('embed') === '1';
+  if (EMBED) document.documentElement.classList.add('ps-embed');
   var dataUrl = LIVE_URL, previewHost = null;
 
   function dataHostOk(u) {
@@ -143,8 +147,8 @@
   function para(cls, text) { var p = document.createElement('p'); if (cls) p.className = cls; if (text != null) p.textContent = text; return p; }
   function btn(cls, text) { var b = document.createElement('button'); b.type = 'button'; if (cls) b.className = cls; if (text != null) b.textContent = text; return b; }
   function add(parent) { for (var i = 1; i < arguments.length; i++) { var a = arguments[i]; if (a == null) continue; parent.appendChild(typeof a === 'string' ? document.createTextNode(a) : a); } return parent; }
-  function sget(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) {  } }
+  function sget(k) { if (EMBED) return null; try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function sset(k, v) { if (EMBED) return; try { localStorage.setItem(k, v); } catch (e) {  } }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function safeId(s) { return String(s).replace(/[^A-Za-z0-9_-]/g, '_'); }
 
@@ -2158,6 +2162,10 @@
     });
   }
   function openLinked(sym) {
+    if (EMBED) {
+      hideCheck();
+      Object.keys(S.open).forEach(function (k) { if (k !== sym && rowRefs[k]) closeRow(rowRefs[k], false); });
+    }
     if (S.period) {
       var pw = PERF[S.period], psd = pw && pw[P && P.side === 'puts' ? 'puts' : 'calls'];
       if (!pw && perLoading[S.period]) { perPend = sym; return; }
@@ -2193,7 +2201,7 @@
   function toggleRow(sym) { var r = rowRefs[sym]; if (!r) return; if (S.open[sym]) closeRow(r, true); else openRow(r, true); }
   function openRow(r, user) {
     var sym = r.n.sym;
-    if (user && GEO.mode === 'card') Object.keys(S.open).forEach(function (k) { if (k !== sym && rowRefs[k]) closeRow(rowRefs[k], false); });
+    if (user && (GEO.mode === 'card' || EMBED)) Object.keys(S.open).forEach(function (k) { if (k !== sym && rowRefs[k]) closeRow(rowRefs[k], false); });
     S.open[sym] = 1;
     r.art.classList.add('open'); r.b.setAttribute('aria-expanded', 'true'); r.det.hidden = false;
     if (r.n.per && !r.n._full) perFull(r); else
@@ -2207,10 +2215,12 @@
     if (user && parseHash().o === sym) clearHash();
   }
   function scrollToEl(node) {
+    if (EMBED) return;
     if (!node) return;
     try { node.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' }); } catch (e) { node.scrollIntoView(true); }
   }
   function flashRow(r) {
+    if (EMBED) return;
     if (reduced()) return;
     r.art.classList.remove('jump'); void r.art.offsetWidth; r.art.classList.add('jump');
     setTimeout(function () { r.art.classList.remove('jump'); }, 700);
@@ -2399,11 +2409,15 @@
     var links = div('links');
     var a = document.createElement('a'); a.className = 'btn'; a.textContent = 'Chart on Eagle Eye ->';
     a.href = '../eagle-eye/?s=' + encodeURIComponent(n.sym); a.target = '_blank'; a.rel = 'noopener noreferrer';
-    var cb = btn('btn', 'Copy link'); cb.addEventListener('click', function () { copyLink(n.sym, cb); });
-    links.appendChild(a); links.appendChild(cb); right.appendChild(links);
+    links.appendChild(a);
+    if (EMBED) {
+      var op = document.createElement('a'); op.className = 'btn'; op.textContent = 'Open in Price Seeker ->';
+      op.href = location.pathname + symHash(n.sym); op.target = '_blank'; op.rel = 'noopener noreferrer'; links.appendChild(op);
+    } else { var cb = btn('btn', 'Copy link'); cb.addEventListener('click', function () { copyLink(n.sym, cb); }); links.appendChild(cb); }
+    right.appendChild(links);
     r.chart = { holder: ch, ro: ro, n: n };
     drawRunway(r.chart);
-    r.gx = gexBlock(n, left);
+    if (!EMBED) r.gx = gexBlock(n, left);
   }
 
 
@@ -3472,6 +3486,16 @@
     if (want && want !== P.side) setSide(want, true);
     if (h.o) openLinked(h.o);
   });
+  if (EMBED && window.parent !== window) {
+    var embH = -1, embMain = document.querySelector('main');
+    var embPost = function () {
+      var h = embMain ? Math.ceil(embMain.getBoundingClientRect().height) : 0;
+      if (h === embH) return; embH = h;
+      try { window.parent.postMessage({ type: 'ps-embed', h: h }, '*'); } catch (e) {  }
+    };
+    if (embMain && 'ResizeObserver' in window) new ResizeObserver(embPost).observe(embMain);
+    setInterval(embPost, 1000);
+  }
   var skipA = document.querySelector('a.skip');
   if (skipA) skipA.addEventListener('click', function (e) { e.preventDefault(); var l = $('list'); try { l.focus({ preventScroll: true }); } catch (x) { l.focus(); } scrollToEl(l); });
   var rsT = null;

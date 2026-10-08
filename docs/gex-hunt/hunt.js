@@ -526,10 +526,17 @@ async function renderDetail() {
   const lst = `<div id="lst"><div class="h"><span>${G.m.length} ${PUT() ? 'negative ' : ''}matches · ${S.h}</span><span>score</span></div>` +
     (listRows.includes(r) ? '' : `<div class="grp">Selected</div>${lstItem(r, '')}<div class="grp">Matches</div>`) +
     listRows.map((x, i) => lstItem(x, i + 1)).join('') + '</div>';
-  $('#main').innerHTML = `<div id="det">${lst}<div id="cbox"><div class="empty">Loading ${esc(sym)}…</div></div><div id="side"></div></div>`;
+  const prevSym = (($('#skFrame') || {}).dataset || {}).sym;
+  if ($('#det #seekbox')) {
+    $('#lst').outerHTML = lst; $('#cmain').innerHTML = `<div class="empty">Loading ${esc(sym)}…</div>`; $('#side').innerHTML = '';
+    if (prevSym !== sym) $('#cbox').scrollTop = 0;
+  } else {
+    $('#main').innerHTML = `<div id="det">${lst}<div id="cbox"><div id="cmain"><div class="empty">Loading ${esc(sym)}…</div></div>${seekBox()}</div><div id="side"></div></div>`;
+  }
+  seekShow(sym);
   const selEl = $('#lst .it.sel'); if (selEl) selEl.scrollIntoView({ block: 'nearest' });
   let n;
-  try { n = await loadName(sym); } catch (e) { $('#cbox').innerHTML = `<div class="empty">Could not load ${esc(sym)}: ${esc(e.message)}</div>`; return; }
+  try { n = await loadName(sym); } catch (e) { $('#cmain').innerHTML = `<div class="empty">Could not load ${esc(sym)}: ${esc(e.message)}</div>`; return; }
   ASOF = null;
   if (S.d && S.d !== D.day) {
     try { const b = await loadDay(S.d), dr = b.rows.find(x => x.s === sym), e = dr && (dr[K()] || {})[S.h];
@@ -538,8 +545,8 @@ async function renderDetail() {
   }
   if (S.s !== sym || S.v !== 'detail') return;
   const g = n[K()][S.h], lv = n.lv[S.h];
-  if (!g) { $('#cbox').innerHTML = `<div class="empty">No ${S.h} data for ${esc(sym)}.</div>`; return; }
-  $('#cbox').innerHTML = `<div id="chead"><span class="t"><b>${sym}</b> · ${esc(n.name || '')} · D</span>
+  if (!g) { $('#cmain').innerHTML = `<div class="empty">No ${S.h} data for ${esc(sym)}.</div>`; return; }
+  $('#cmain').innerHTML = `<div id="chead"><span class="t"><b>${sym}</b> · ${esc(n.name || '')} · D</span>
     <span class="muted num">close ${n.spot.toFixed(2)} · <span class="${(n.ret20 || 0) >= 0 ? 'up' : 'dn'}">${pc(n.ret20, 1)} 20d</span> · GEX ${S.h} · King ${sk(lv.king)} · Flip ${lv.flip ? lv.flip.toFixed(1) : '—'} · Net ${fm(lv.net)}</span>
     <span style="margin-left:auto;display:flex;gap:6px"><button class="btn g" data-v="board">← Board</button></span></div>
     <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}Price axis stretched to the whole stack. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
@@ -570,13 +577,36 @@ async function renderDetail() {
     ${recTxt}
     <div class="card2"><h4><span>Data</span><span></span></h4><div class="note">Option chain built ${new Date(n.build).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' })} ET · open interest ${day(n.oi_settle)} settle · price ${day(n.px_day)} close · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`;
 }
+
+
+let SEEK_BASE = '../price-seeker/';
+function seekBox() {
+  return `<div id="seekbox"><div class="sk-h"><span class="k">Price Seeker</span><span class="muted">the far ${PUT() ? 'put' : 'call'} pile, its odds and the facts for this name</span></div>
+    <div class="empty" id="skWait">Loading Price Seeker…</div><iframe id="skFrame" title="Price Seeker for this name" referrerpolicy="no-referrer"></iframe></div>`;
+}
+function seekShow(sym) {
+  const f = $('#skFrame'); if (!f) return;
+  const u = SEEK_BASE + '?embed=1#' + (PUT() ? 'v=puts&o=' : '') + encodeURIComponent(sym);
+  const k = $('#seekbox .sk-h .muted'); if (k) k.textContent = `the far ${PUT() ? 'put' : 'call'} pile, its odds and the facts for this name`;
+  if (f.dataset.u === u) return;
+  if (!f.dataset.u) f.src = u;
+  else { try { f.contentWindow.location.replace(u); } catch (e) { f.src = u; } }
+  f.dataset.u = u; f.dataset.sym = sym;
+}
+window.addEventListener('message', e => {
+  const f = $('#skFrame');
+  if (!f || e.source !== f.contentWindow || !e.data || e.data.type !== 'ps-embed') return;
+  const h = Math.max(0, Math.min(6000, Math.round(+e.data.h) || 0));
+  f.style.height = h + 'px';
+  const w = $('#skWait'); if (w && h > 40) w.remove();
+});
 function lstItem(x, i) {
   return `<div class="it ${x.s === S.s ? 'sel' : ''}" data-s="${x.s}"><span class="muted">${i}</span><span class="tk">${x.s}</span>${glyph(x, 110, 26)}<span class="s num">${hh(x).sc.toFixed(0)}</span></div>`;
 }
 function drawChart(n) {
   const box = $('#chart'); if (!box || !n[K()][S.h]) return;
   const Wd = Math.max(320, box.clientWidth - 4);
-  const Hh = NARROW() ? 440 : Math.max(480, window.innerHeight - 95 - 90);
+  const Hh = NARROW() ? 440 : Math.max(480, window.innerHeight - 95 - 130);
   box.innerHTML = chartSVG(n, Wd, Hh, ASOF && ASOF.lv ? ASOF : null);
 }
 function resTxt(e, n, t, label) {
