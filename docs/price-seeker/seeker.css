@@ -653,5 +653,15 @@ html.dlg-open,html.dlg-open body{overflow:hidden}
 p.off-why{margin:0}
 
 
+.gx{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.gx-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.gx-head .d-k{margin:0}
+.gx-h button{min-height:34px;padding:4px 12px;font-size:12.5px}
+@media (max-width:719px){.gx-h button{min-height:40px}}
+.gx-sub{font-size:12.5px;color:var(--muted);margin:6px 0;font-variant-numeric:tabular-nums}
+.gx-chart{cursor:default}
+.gx-links{margin-top:10px}
+
+
 @media (max-width:420px){.topbar{gap:8px}.tabs{gap:0}.tab{padding:13px 4px;font-size:13px;letter-spacing:-.015em}}
 @media (max-width:359px){.topbar{gap:6px}.brand{font-size:11.5px}.tab{padding:13px 2.5px;font-size:12px}}

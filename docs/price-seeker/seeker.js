@@ -2203,7 +2203,7 @@
   function closeRow(r, user) {
     var sym = r.n.sym;
     delete S.open[sym];
-    r.art.classList.remove('open'); r.b.setAttribute('aria-expanded', 'false'); r.det.hidden = true; clear(r.det); r.chart = null;
+    r.art.classList.remove('open'); r.b.setAttribute('aria-expanded', 'false'); r.det.hidden = true; clear(r.det); r.chart = null; r.gx = null;
     if (user && parseHash().o === sym) clearHash();
   }
   function scrollToEl(node) {
@@ -2403,6 +2403,167 @@
     links.appendChild(a); links.appendChild(cb); right.appendChild(links);
     r.chart = { holder: ch, ro: ro, n: n };
     drawRunway(r.chart);
+    r.gx = gexBlock(n, left);
+  }
+
+
+
+  var HUNT_BASE = 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/hunt-data/hunt/', HUNT_PAGE = '../gex-hunt/';
+  var GX_HS = ['1M', '3M', '6M', '1Y+'], HUNT = {};
+  var gxH = (function () { var v = sget('ps.gxh'); return GX_HS.indexOf(v) >= 0 ? v : '1Y+'; })();
+  function huntName(sym) {
+    var c = HUNT[sym];
+    if (c && now() - c.at < 30 * 60 * 1000) return c.p;
+    var p = getJSON(HUNT_BASE + 'names/' + encodeURIComponent(sym) + '.json');
+    HUNT[sym] = { p: p, at: now() };
+    p.catch(function () { delete HUNT[sym]; });
+    return p;
+  }
+  function gxUsd(v) {
+    if (!num(v)) return '–';
+    var a = Math.abs(v), s = v < 0 ? '−$' : '$';
+    if (a >= 1e9) return s + (a / 1e9).toFixed(2) + 'B';
+    if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e8 ? 0 : 1) + 'M';
+    return a < 1000 ? s + '0' : s + Math.round(a / 1e3) + 'K';
+  }
+  function gxPc(v) { if (!num(v)) return '–'; var t = Math.abs(v * 100).toFixed(0); return (+t === 0 ? '' : v >= 0 ? '+' : '−') + t + '%'; }
+  function gxExp(s) { return typeof s === 'string' && s.length >= 10 ? MON[+s.slice(5, 7) - 1] + ' ' + (+s.slice(8, 10)) + ' \'' + s.slice(2, 4) : ''; }
+  function gexBlock(n, host) {
+    var w = div('gx'), head = div('gx-head');
+    head.appendChild(kick('GEX map'));
+    var seg = div('seg gx-h');
+    seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Expiries in the GEX map');
+    GX_HS.forEach(function (h) { var b = btn('', h); b.setAttribute('data-h', h); b.setAttribute('aria-pressed', h === gxH ? 'true' : 'false'); seg.appendChild(b); });
+    head.appendChild(seg); w.appendChild(head);
+    var sub = para('gx-sub', ''); w.appendChild(sub);
+    var box = div('chart gx-chart'); w.appendChild(box);
+    var cap = para('cap', ''); w.appendChild(cap);
+    var links = div('links gx-links'), a = document.createElement('a');
+    a.className = 'btn'; a.textContent = 'Open in GEX Hunt ->'; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    links.appendChild(a); w.appendChild(links);
+    host.appendChild(w);
+    var st = { holder: box, sub: sub, cap: cap, link: a, n: n, d: null, puts: SW().key !== 'calls' };
+    gxLink(st);
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-h]') : null; if (!b || b.getAttribute('data-h') === gxH) return;
+      gxH = b.getAttribute('data-h'); sset('ps.gxh', gxH);
+      Array.prototype.forEach.call(document.querySelectorAll('.gx-h button'), function (x) { x.setAttribute('aria-pressed', x.getAttribute('data-h') === gxH ? 'true' : 'false'); });
+      Object.keys(S.open).forEach(function (k) { var r = rowRefs[k]; if (r && r.gx) drawGex(r.gx); });
+    });
+    box.appendChild(span('mut', 'Loading the GEX map…'));
+    huntName(n.sym).then(function (d) {
+      if (!box.isConnected) return;
+      st.d = d; drawGex(st);
+    }, function () {
+      if (!box.isConnected) return;
+      clear(box); box.appendChild(span('mut', 'No GEX map for ' + n.sym + ' right now.'));
+    });
+    return st;
+  }
+  function gxLink(st) { st.link.href = HUNT_PAGE + '#v=detail&s=' + encodeURIComponent(st.n.sym) + '&h=' + encodeURIComponent(gxH) + '&x=' + (st.puts ? 'neg' : 'pos'); }
+  function drawGex(st) {
+    var d = st.d, n = st.n, h = st.holder, put = st.puts; if (!d) return;
+    clear(h); gxLink(st);
+    var side = put ? d.p : d.h, g = side && side[gxH], lv = d.lv && d.lv[gxH];
+    var O = Array.isArray(d.ohlc) ? d.ohlc.filter(function (r) { return Array.isArray(r) && num(r[2]) && num(r[3]); }) : [];
+    if (!g || !lv || !O.length || !num(d.spot) || !d.bars) {
+      h.appendChild(span('mut', 'No ' + gxH + ' GEX map for ' + n.sym + '.')); st.sub.textContent = ''; st.cap.textContent = ''; return;
+    }
+    st.sub.textContent = 'GEX ' + gxH + ' · King ' + strike(lv.king) + ' · Flip ' + (num(lv.flip) ? lv.flip.toFixed(1) : '—') + ' · Net ' + gxUsd(lv.net) + ' · close ' + px(d.spot) + ' on ' + dS(d.px_day);
+    var Wd = Math.max(240, Math.round(h.clientWidth || 600)), narrow = Wd < 700, Hh = GEO.mode === 'card' ? 420 : 470;
+    var S0 = d.spot, L = (g.levels || []).filter(function (l) { return l && num(l.k) && num(l.gex); });
+    O = O.slice(Wd < 420 ? -60 : narrow ? -90 : -130);
+    var pile = num(n.node) ? n.node : null;
+    var ks = L.map(function (l) { return l.k; }); if (pile !== null) ks.push(pile);
+    var lvHi = Math.max.apply(null, ks.concat([S0])), lvLo = Math.min.apply(null, ks.concat([S0]));
+    var lo = Math.min(Math.min.apply(null, O.map(function (r) { return r[3]; })), lvLo, S0 * 0.85) * (put ? 0.93 : 0.97);
+    var hi = Math.max(Math.max.apply(null, O.map(function (r) { return r[2]; })), lvHi, S0 * 1.08) * (put ? 1.03 : 1.08);
+    var padR = Math.max(58, Math.ceil(textW(hi.toFixed(2), 11, 700)) + 14), cw = Wd - padR;
+    var cx1 = cw * (narrow ? 0.38 : 0.50), bx0 = cx1 + 12, bx1 = cw - (narrow ? Math.min(110, cw * 0.28) : 215);
+    var top = 8, bot = Hh - 24, CS = 22, Y = lin(lo, hi, bot - CS, top + CS);
+    var s = svgNode(Wd, Hh); h.appendChild(s);
+    s.setAttribute('role', 'img');
+    s.setAttribute('aria-label', n.sym + ' GEX map, ' + gxH + ' expiries: net GEX at each strike beside the last ' + O.length + ' daily candles. King ' + strike(lv.king) + (pile !== null ? ', pile ' + strike(pile) : '') + '.');
+    var ax = { fill: C.muted, 'font-size': 11 };
+    var raw = (hi - lo) / 8, p10 = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var stp = [1, 2, 2.5, 5, 10].map(function (m) { return m * p10; }).filter(function (v) { return v >= raw; })[0] || 10 * p10;
+    for (var p = Math.ceil(lo / stp) * stp; p < hi; p += stp) {
+      el('line', { x1: 0, x2: cw, y1: Y(p), y2: Y(p), stroke: C.line, 'stroke-opacity': 0.7 }, s);
+      if (Math.abs(Y(p) - Y(S0)) > 12 && !(num(lv.king) && Math.abs(Y(p) - Y(lv.king)) <= 12))
+        tx(s, cw + 7, Y(p) + 4, p.toFixed(stp < 1 ? 2 : stp < 10 ? 1 : 0), ax);
+    }
+    el('line', { x1: cw, x2: cw, y1: 0, y2: bot, stroke: C.line }, s);
+    if (g.up > 0 && L.length) {
+      if (put) { var b0 = Math.min.apply(null, L.map(function (l) { return l.k; })) * 0.98; el('rect', { x: 0, y: Y(S0 * 0.98), width: cw, height: Math.max(0, Y(b0) - Y(S0 * 0.98)), fill: C.down, 'fill-opacity': 0.07 }, s); }
+      else { var t0 = Math.max.apply(null, L.map(function (l) { return l.k; })) * 1.02; el('rect', { x: 0, y: Y(t0), width: cw, height: Math.max(0, Y(S0 * 1.02) - Y(t0)), fill: C.up, 'fill-opacity': 0.06 }, s); }
+    }
+    var cwid = cx1 / O.length;
+    O.forEach(function (r, i) {
+      var o = r[1], c = r[4], x = i * cwid + cwid / 2, col = c >= o ? C.up : C.down;
+      el('line', { x1: x, x2: x, y1: Y(r[2]), y2: Y(r[3]), stroke: col }, s);
+      if (num(o) && num(c)) el('rect', { x: x - cwid * 0.35, y: Y(Math.max(o, c)), width: Math.max(1, cwid * 0.7), height: Math.max(1, Math.abs(Y(o) - Y(c))), fill: col }, s);
+    });
+    var lastM = -1, lastX = -99;
+    O.forEach(function (r, i) {
+      var dt = new Date(r[0] * 1000), mo = dt.getUTCMonth();
+      if (mo !== lastM && dt.getUTCDate() <= 7) { lastM = mo; if (i * cwid - lastX < 34) return; lastX = i * cwid; tx(s, i * cwid, Hh - 7, MON[mo], ax); }
+    });
+    var bars = (d.bars[gxH] || []).filter(function (b) { return Array.isArray(b) && num(b[0]) && num(b[1]) && b[0] > lo && b[0] < hi; });
+    var mx = Math.max.apply(null, [1].concat(bars.map(function (b) { return Math.abs(b[1]); })));
+    var kk = bars.map(function (b) { return b[0]; }).sort(function (a, b) { return a - b; }), gap = Infinity;
+    for (var i = 1; i < kk.length; i++) gap = Math.min(gap, kk[i] - kk[i - 1]);
+    var bh = Math.max(2, Math.min(14, isFinite(gap) ? (Y(0) - Y(gap)) * 0.75 : 6));
+    function blen(v) { return Math.abs(v) / mx * (bx1 - bx0); }
+    bars.forEach(function (b) {
+      var k = b[0], net = b[1], len = blen(net); if (len < 0.5) return;
+      var hot = k === g.kt && (put ? net < 0 : net > 0);
+      var rc = el('rect', { x: bx0, y: Y(k) - bh / 2, width: len, height: bh, fill: net > 0 ? (hot ? '#3FBFAE' : C.up) : (hot ? '#FF6F6C' : C.down), opacity: 0.88 }, s);
+      el('title', {}, rc).textContent = strike(k) + ': ' + gxUsd(net);
+    });
+    if (num(lv.king) && lv.king > lo && lv.king < hi) {
+      el('line', { x1: 0, x2: cw, y1: Y(lv.king), y2: Y(lv.king), stroke: C.gold, 'stroke-width': 1.5 }, s);
+      el('rect', { x: cw + 2, y: Y(lv.king) - 9, width: padR - 4, height: 18, fill: C.gold, rx: 2 }, s);
+      tx(s, cw + 6, Y(lv.king) + 4, lv.king.toFixed(2), { fill: C.bg, 'font-size': 11, 'font-weight': 700 });
+    }
+    var wall = put ? lv.call_wall : lv.put_wall;
+    if (num(wall) && wall > lo && wall < hi) {
+      var pb = bars.filter(function (b) { return b[0] === wall; })[0], wc = put ? C.up : C.down, wt = (put ? 'CALL' : 'PUT') + ' WALL ' + strike(wall);
+      var ww = textW(wt, 11, 600) + 14, wx = Math.max(bx0, Math.min(cw - ww - 6, bx0 + (pb ? blen(pb[1]) : 0) + 6));
+      el('line', { x1: 0, x2: cw, y1: Y(wall), y2: Y(wall), stroke: wc, 'stroke-width': 1.3 }, s);
+      el('rect', { x: wx, y: Y(wall) - 9, width: ww, height: 18, rx: 3, fill: wc }, s);
+      tx(s, wx + ww / 2, Y(wall) + 4, wt, { fill: '#fff', 'font-size': 11, 'text-anchor': 'middle', 'font-weight': 600 });
+    }
+    el('line', { x1: 0, x2: cw, y1: Y(S0), y2: Y(S0), stroke: C.fear, 'stroke-dasharray': '2 3' }, s);
+    el('rect', { x: cw + 2, y: Y(S0) - 9, width: padR - 4, height: 18, fill: C.fear, rx: 2 }, s);
+    tx(s, cw + 6, Y(S0) + 4, S0.toFixed(2), { fill: '#fff', 'font-size': 11 });
+    var showExp = Wd >= 560, pileOn = false;
+    L.forEach(function (dl) {
+      var yy = Y(dl.k), isK = dl.k === lv.king, isP = pile !== null && Math.abs(dl.k - pile) < 1e-6;
+      if (isP) pileOn = true;
+      var t = (isK ? 'KING ' : '') + (isP ? 'PILE ' : '') + strike(dl.k) + ' ' + gxPc(dl.k / S0 - 1) + ' · ' + gxUsd(dl.gex) + (showExp && dl.exp ? ' · ' + gxExp(dl.exp) : '');
+      var tw = textW(t, 11, isK || isP ? 700 : 500) + 14, lx = Math.max(0, Math.min(cw - tw - 6, bx0 + blen(dl.gex) + 6));
+      var fill = isK ? C.gold : put ? '#3A1D1F' : '#16302D', stroke = isP ? C.amber : isK ? C.gold : put ? '#8A3B39' : '#2F6F66', tc = isK ? C.bg : isP ? C.amber : put ? '#F3A5A3' : '#9FE0D6';
+      el('rect', { x: lx, y: yy - 9, width: tw, height: 18, rx: 3, fill: fill, stroke: stroke, 'stroke-width': isP ? 2 : 1 }, s);
+      tx(s, lx + tw / 2, yy + 4, t, { fill: tc, 'font-size': 11, 'text-anchor': 'middle', 'font-weight': isK || isP ? 700 : 500 });
+    });
+    if (pile !== null && !pileOn && pile > lo && pile < hi) {
+      el('line', { x1: 0, x2: cw, y1: Y(pile), y2: Y(pile), stroke: C.amber, 'stroke-width': 1.3, 'stroke-dasharray': '6 4' }, s);
+      tx(s, bx0 + 4, Y(pile) - 5, strike(pile) + ' · pile', { fill: C.amber, 'font-size': 11, 'font-weight': 700 }, true);
+    }
+    var nl = L.length + ' level' + (L.length === 1 ? '' : 's'), com = num(g.com) ? Math.abs(g.com * 100).toFixed(0) + '%' : '–';
+    var stk = gxUsd(Math.abs(g.up || 0)), oth = g.dn ? gxUsd(Math.abs(g.dn)) : '$0';
+    var xx = num(g.x) && g.up > 0 ? (g.x >= 49.9 ? '50+' : g.x.toFixed(g.x >= 10 ? 0 : 1)) + '×' : null;
+    function fit(c) { for (var j = 0; j < c.length; j++) if (textW(c[j], 12.5, 600) <= cw - 16) return c[j]; return c[c.length - 1]; }
+    var capStack = fit([(put ? 'PUT STACK BELOW' : 'CALL STACK ABOVE') + ' · ' + stk + ' · ' + nl + ' · centre ' + (put ? '−' : '+') + com,
+      (put ? 'PUT STACK' : 'STACK') + ' · ' + stk + ' · ' + nl + ' · centre ' + (put ? '−' : '+') + com, (put ? 'PUT STACK' : 'STACK') + ' · ' + stk + ' · centre ' + (put ? '−' : '+') + com, (put ? 'PUT STACK' : 'STACK') + ' · ' + stk]);
+    var capOther = fit([(put ? 'CALLS ABOVE' : 'PUTS BELOW') + ' · ' + oth + (xx ? '  →  ' + (put ? 'the put stack' : 'stack') + ' is ' + xx + (g.x >= 1 ? ' bigger' : ' the ' + (put ? 'calls' : 'puts')) : ''),
+      (put ? 'CALLS ABOVE' : 'PUTS BELOW') + ' · ' + oth + (xx ? ' · stack ' + xx : ''), (put ? 'CALLS ABOVE' : 'PUTS BELOW') + ' · ' + oth]);
+    tx(s, 8, top + 15, put ? capOther : capStack, { fill: '#7FD3C9', 'font-size': 12.5, 'font-weight': 600 }, true);
+    tx(s, 8, bot - 6, put ? capStack : capOther, { fill: '#E88A88', 'font-size': 12.5, 'font-weight': 600 }, true);
+    var pday = n.per && n.per.day ? n.per.day : S.day;
+    st.cap.textContent = 'Bars = net GEX at each strike at the ' + dS(d.px_day) + ' close, open interest ' + dS(d.oi_settle) + ' settle: the same map as the GEX Hunt tab, updated once a day after the close (green = more call gamma, red = more put gamma). ' +
+      (pile === null ? '' : 'The amber-outlined ' + strike(pile) + ' is this page’s pile' + (pday && pday !== d.px_day ? ' on ' + wS(pday) + ', drawn on the latest map. ' :
+        lv.king === pile ? ', and it is also the king. ' : '. It is measured on the live price with this page’s own rules, so the biggest bar can sit at another strike. '));
   }
   function captionFor(n) {
     var by = wS(n.main_exp), od = p0(n.odds);
@@ -3319,7 +3480,7 @@
     var g = geoNow(); var mode0 = GEO.mode; GEO.mode = g; var sw = spkW();
     closePop();
     if (P && (g !== mode0 || sw !== GEO.spk)) { GEO.spk = sw; renderList(); }
-    else if (P) Object.keys(S.open).forEach(function (k) { var r = rowRefs[k]; if (r && r.chart) drawRunway(r.chart); });
+    else if (P) Object.keys(S.open).forEach(function (k) { var r = rowRefs[k]; if (r && r.chart) drawRunway(r.chart); if (r && r.gx) drawGex(r.gx); });
     GEO.spk = sw;
     if (P && STORY && storyIsOpen()) drawStory();
     if (P && CHASE && chaseIsOpen()) drawChase();
