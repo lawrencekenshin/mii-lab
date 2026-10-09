@@ -4,7 +4,7 @@
 
 const HS = ['1M', '3M', '6M', '1Y+'];
 const LISTS = [['all', 'All'], ['spx', 'SPY'], ['ndx', 'QQQ'], ['wl', 'Watchlist 1'], ['ai', 'AI']];
-const PERS = [['today', 'Today'], ['1W', '1W'], ['1M', '1M'], ['ALL', 'Total']];
+const PERS = [['today', 'Today'], ['chg', 'Changes'], ['1W', '1W'], ['1M', '1M'], ['ALL', 'Total']];
 const store = {
   get(k, d) { try { const v = localStorage.getItem('hunt.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('hunt.' + k, JSON.stringify(v)); } catch (e) {  } },
@@ -489,6 +489,12 @@ function chartSVG(n, Wd, Hh, asof) {
   const blen = v => Math.abs(v) / mx * (bx1 - bx0);
   bars.forEach(([k, net]) => { const len = blen(net); if (len < 0.5) return;
     s += `<rect x="${bx0}" y="${y(k) - bh / 2}" width="${len}" height="${bh}" fill="${net > 0 ? (!put && k === g.kt ? '#3fbfae' : '#26a69a') : (put && k === g.kt ? '#ff6f6c' : '#ef5350')}" opacity=".88"><title>${sk(k)}: ${fm(net)}</title></rect>`; });
+  const pv = !asof && n.prev && n.prev.bars && n.prev.bars[S.h];
+  if (pv) { const nowL = {}; (n.bars[S.h] || []).forEach(b => { nowL[b[0]] = Math.abs(b[1]); });
+    pv.forEach(([k, net]) => { if (!(k > lo && k < hi) || !(k in nowL)) return; const was = Math.abs(net), nv = nowL[k];
+      if (Math.abs(nv - was) < Math.max(0.04 * mx, 0.2 * Math.max(was, nv))) return;
+      const x = Math.min(cw - 4, bx0 + blen(was)); if (x - bx0 < 1.5) return;
+      s += `<line x1="${x}" x2="${x}" y1="${y(k) - bh / 2 - 3}" y2="${y(k) + bh / 2 + 3}" stroke="#f2f4f8" stroke-width="2" stroke-linecap="round"><title>${sk(k)} on the previous map: ${fm(net)}</title></line>`; }); }
   if (lv.king > lo && lv.king < hi) {
     s += `<line x1="0" x2="${cw}" y1="${y(lv.king)}" y2="${y(lv.king)}" stroke="#f5d63d" stroke-width="1.5"/><rect x="${cw + 2}" y="${y(lv.king) - 9}" width="${padR - 4}" height="18" fill="#f5d63d" rx="2"/><text x="${cw + 7}" y="${y(lv.king) + 4}" font-size="11" fill="#131722" font-weight="700">${lv.king.toFixed(2)}</text>`;
   }
@@ -549,7 +555,7 @@ async function renderDetail() {
   $('#cmain').innerHTML = `<div id="chead"><span class="t"><b>${sym}</b> · ${esc(n.name || '')} · D</span>
     <span class="muted num">close ${n.spot.toFixed(2)} · <span class="${(n.ret20 || 0) >= 0 ? 'up' : 'dn'}">${pc(n.ret20, 1)} 20d</span> · GEX ${S.h} · King ${sk(lv.king)} · Flip ${lv.flip ? lv.flip.toFixed(1) : '—'} · Net ${fm(lv.net)}</span>
     <span style="margin-left:auto;display:flex;gap:6px"><button class="btn g" data-v="board">← Board</button></span></div>
-    <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}Price axis stretched to the whole stack. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
+    <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}${n.prev && !ASOF ? `<b class="tickkey">▏</b> white ticks = the previous map (${day(n.prev.px_day)} close · OI ${day(n.prev.oi_settle)}). ` : ''}Price axis stretched to the whole stack. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
     <div id="chart"></div>`;
   drawChart(n);
   const ck = g.checks.map(([id, ok, t]) => `<span class="${ok ? 'y' : 'n'}">${ok ? '✓' : '✕'}</span><span>${esc(t)}</span>`).join('');
@@ -565,6 +571,7 @@ async function renderDetail() {
     if (e) recTxt = `<div class="card2"><h4><span>Record</span><span>${e.censored ? 'not scored' : 'pre-registered'}</span></h4><div class="txt">Joined <b>${day(e.day)}</b>${e.censored ? ' (already on the list when history starts)' : ''} at ${e.spot.toFixed(2)} · first level <b>${sk(e.k1)}</b> (${pc(e.d1)}), biggest <b>${sk(e.kt)}</b> (${pc(e.dt)}).<br>${resTxt(e, '20', 'k1', 'First level, 20 sessions')}<br>${resTxt(e, '60', 'kt', 'Biggest level, 60 sessions')}</div></div>`;
   } catch (err) {  }
   $('#side').innerHTML = `
+    ${ASOF ? '' : chgCard(n)}
     ${ASOF ? `<div class="card2 asofcard"><h4><span class="asof">On ${dayW(ASOF.day)}</span><span>${ASOF.v === 'match' ? 'on the list' : 'near miss'} · score ${(ASOF.sc || 0).toFixed(0)}</span></h4><div class="txt">Price ${ASOF.px.toFixed(2)} → ${n.spot.toFixed(2)} now (<b class="${n.spot >= ASOF.px ? 'up' : 'dn'}">${pc(n.spot / ASOF.px - 1, 1)}</b>). Stack ${stackS(ASOF.up)} vs ${otherS(ASOF.dn)} (${xS(ASOF.x)}). Levels then: ${ASOF.lv.map(l => sk(l[0])).join(', ')} · now: ${(g.levels || []).map(d => sk(d.k)).join(', ') || 'none'}. <span class="lnk" data-d="">Clear</span></div></div>` : ''}
     <div class="card2"><h4><span>${g.v === 'match' ? 'Why ' + sym + ' is here' : 'Rules'}${PUT() ? ' · negative' : ''}</span>${verdictHead(r, g)}</h4><div class="ck">${ck}</div></div>
     ${bizCard(sym, n)}
@@ -576,6 +583,126 @@ async function renderDetail() {
     ${g.v === 'match' && g.days != null ? `<div class="card2"><h4><span>On the list</span><span></span></h4><div class="txt">${g.new ? '<b>New today.</b>' : `<b>${g.days}</b> session${g.days === 1 ? '' : 's'}, since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}.`}</div></div>` : ''}
     ${recTxt}
     <div class="card2"><h4><span>Data</span><span></span></h4><div class="note">Option chain built ${new Date(n.build).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' })} ET · open interest ${day(n.oi_settle)} settle · price ${day(n.px_day)} close · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`;
+}
+
+
+
+const SU = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + fm(Math.abs(v));
+const SKf = n => (n > 0 ? '+' : n < 0 ? '−' : '') + kf(Math.abs(n));
+function gexDeltas(n) {
+  const a = (n.prev.bars || {})[S.h] || [], b = n.bars[S.h] || [], pa = {}, pb = {};
+  a.forEach(x => { pa[x[0]] = x; }); b.forEach(x => { pb[x[0]] = x; });
+  return b.map(x => x[0]).filter(k => pa[k]).sort((p, q) => p - q).map(k => {
+    const x = pa[k], y = pb[k];
+    return { k, was: x[1], now: y[1], d: y[1] - x[1], dc: y[4] - x[2], dp: y[5] - x[3] };
+  });
+}
+function chgMini(n, D0, Wd, Hh) {
+  const S0 = n.spot, X = D0.filter(x => x.k >= S0 * 0.75 && x.k <= S0 * 1.35 && x.d);
+  if (!X.length) return '';
+  const mx = Math.max(1, ...X.map(x => Math.abs(x.d))), lo = Math.min(...X.map(x => x.k), S0), hi = Math.max(...X.map(x => x.k), S0);
+  const top = 8, bot = Hh - 18, y = k => top + (hi - k) / ((hi - lo) || 1) * (bot - top), cx = 30 + (Wd - 30) / 2, half = (Wd - 30) / 2 - 4;
+  const ks = X.map(x => x.k), gap = ks.length > 1 ? Math.min(...ks.slice(1).map((k, i) => k - ks[i])) : 1, bh = Math.max(2, Math.min(9, (y(lo) - y(lo + gap)) * 0.8));
+  let s = `<svg width="${Wd}" height="${Hh}" viewBox="0 0 ${Wd} ${Hh}" style="display:block;font-variant-numeric:tabular-nums">`;
+  const st = niceStep(hi - lo, 6);
+  for (let t = Math.ceil(lo / st) * st; t <= hi; t += st) s += `<line x1="28" x2="${Wd}" y1="${y(t)}" y2="${y(t)}" stroke="#2a2e39"/><text x="0" y="${y(t) + 3.5}" fill="#787b86" font-size="10.5">${sk(t)}</text>`;
+  s += `<line x1="${cx}" x2="${cx}" y1="${top}" y2="${bot}" stroke="#4a4f5c"/><line x1="28" x2="${Wd}" y1="${y(S0)}" y2="${y(S0)}" stroke="#2962ff" stroke-dasharray="2,3"/><text x="${Wd - 2}" y="${y(S0) - 3}" fill="#8ec0fa" font-size="10.5" text-anchor="end">price ${S0.toFixed(2)}</text>`;
+  X.forEach(x => { const len = Math.max(1, Math.abs(x.d) / mx * half);
+    s += `<rect x="${x.d >= 0 ? cx : cx - len}" y="${y(x.k) - bh / 2}" width="${len}" height="${bh}" fill="${x.d >= 0 ? '#26a69a' : '#ef5350'}" opacity=".9"><title>${sk(x.k)}: ${SU(x.d)} · calls ${SKf(x.dc)} · puts ${SKf(x.dp)}</title></rect>`; });
+  return s + `<text x="${cx - 6}" y="${Hh - 4}" fill="#787b86" font-size="10.5" text-anchor="end">← GEX lost</text><text x="${cx + 6}" y="${Hh - 4}" fill="#787b86" font-size="10.5">GEX added →</text></svg>`;
+}
+function chgCard(n) {
+  const a = n.prev, g = n[K()][S.h], lv = n.lv[S.h], w = W();
+  if (!a || !g || !lv || !(a.lv || {})[S.h]) return '';
+  const al = a.lv[S.h], ag = (a[K()] || {})[S.h] || {}, D0 = gexDeltas(n), S0 = n.spot;
+  const same = a.px_day === n.px_day, ld = x => same ? `OI ${day(x.oi_settle)}` : day(x.px_day);
+  const MINADD = 250;
+  const cUp = D0.filter(x => x.k > S0 && x.dc >= MINADD).sort((p, q) => q.dc - p.dc), pDn = D0.filter(x => x.k < S0 && x.dp >= MINADD).sort((p, q) => q.dp - p.dp);
+  const dn = lv.net - al.net, nm = { king: 'king', call_wall: 'call wall', put_wall: 'put wall' };
+  const moved = ['king', 'call_wall', 'put_wall'].filter(k => al[k] !== lv[k]), kept = ['king', 'call_wall', 'put_wall'].filter(k => al[k] === lv[k] && lv[k] != null);
+  const vT = v => v === 'match' ? 'on the list' : v === 'near' ? 'a near miss' : 'off the list';
+  const eng = `Net GEX ${dn >= 0 ? 'rose' : 'fell'} ${fm(Math.abs(dn))} (${fm(al.net)} → ${fm(lv.net)}). `
+    + (cUp.length ? `Calls were added above the price: <b>${SKf(cUp[0].dc)}</b> at ${sk(cUp[0].k)}${cUp[1] ? `, <b>${SKf(cUp[1].dc)}</b> at ${sk(cUp[1].k)}` : ''} (${SKf(cUp.reduce((t, x) => t + x.dc, 0))} in all). ` : '')
+    + (pDn.length ? `Puts were added below: <b>${SKf(pDn[0].dp)}</b> at ${sk(pDn[0].k)}${pDn[1] ? `, <b>${SKf(pDn[1].dp)}</b> at ${sk(pDn[1].k)}` : ''} (${SKf(pDn.reduce((t, x) => t + x.dp, 0))} in all). ` : '')
+    + (a.oi_settle === n.oi_settle ? `Same open interest (${day(n.oi_settle)} settle): the change comes from the price. ` : !cUp.length && !pDn.length ? 'Little new open interest at any strike. ' : '')
+    + (same ? `Same close (${day(n.px_day)}): only the open interest changed. ` : `The price went ${a.spot.toFixed(2)} → ${S0.toFixed(2)} (${pc(S0 / a.spot - 1, 1)}). `)
+    + moved.map(k => `<b>The ${nm[k]} moved ${lv[k] > al[k] ? 'up' : 'down'} from ${sk(al[k])} to ${sk(lv[k])}.</b> `).join('')
+    + (kept.length ? `The ${kept.map(k => `${nm[k]} (${sk(lv[k])})`).join(', ')} didn't move. ` : '')
+    + (ag.v !== g.v && (ag.v === 'match' || g.v === 'match') ? `<b>${g.v === 'match' ? 'It joined the list' : 'It left the list'}</b> (was ${vT(ag.v)}).` : '');
+  const mag = v => fm(Math.abs(v || 0)), mv = k => al[k] !== lv[k] ? `<b class="up">${sk(al[k])} → ${sk(lv[k])}</b>` : `${lv[k] != null ? sk(lv[k]) : '–'} <span class="muted">same</span>`;
+  const lk = (ag.lv || []), nk = (g.levels || []).map(x => x.k), add = nk.filter(k => !lk.includes(k)), drop = lk.filter(k => !nk.includes(k));
+  const big = D0.slice().sort((p, q) => Math.abs(q.d) - Math.abs(p.d)).slice(0, 6).filter(x => x.d);
+  return `<div class="card2 gxc"><h4><span class="gxc-k">GEX changes</span><span>since the last map · ${S.h}</span></h4>
+    <p class="eng">${eng}</p>
+    <table class="gxc-t"><tr><th></th><th class="r">${ld(a)}</th><th class="r">${ld(n)}</th><th class="r">change</th></tr>
+      <tr><td>Net GEX</td><td class="r">${fm(al.net)}</td><td class="r"><b>${fm(lv.net)}</b></td><td class="r ${dn > 0 ? 'up' : dn < 0 ? 'dn' : 'muted'}">${dn ? SU(dn) : '–'}</td></tr>
+      ${ag.up != null ? `<tr><td>${w.stack}</td><td class="r">${mag(ag.up)}</td><td class="r"><b>${mag(g.up)}</b></td><td class="r ${Math.abs(g.up) - Math.abs(ag.up) >= 0 ? 'up' : 'dn'}">${SU(Math.abs(g.up) - Math.abs(ag.up))}</td></tr>` : ''}
+      ${ag.dn != null ? `<tr><td>${w.other}</td><td class="r">${mag(ag.dn)}</td><td class="r"><b>${mag(g.dn)}</b></td><td class="r ${Math.abs(g.dn) - Math.abs(ag.dn) <= 0 ? 'up' : 'dn'}">${SU(Math.abs(g.dn) - Math.abs(ag.dn))}</td></tr>` : ''}
+      ${al.flip != null && lv.flip != null ? `<tr><td>Flip</td><td class="r">${al.flip.toFixed(1)}</td><td class="r"><b>${lv.flip.toFixed(1)}</b></td><td class="r muted">${lv.flip - al.flip ? (lv.flip > al.flip ? '+' : '−') + Math.abs(lv.flip - al.flip).toFixed(1) : '–'}</td></tr>` : ''}
+    </table>
+    <div class="gxc-l">King ${mv('king')} · call wall ${mv('call_wall')} · put wall ${mv('put_wall')}</div>
+    <div class="gxc-l">${w.levels}: ${add.length ? `<span class="up">+ ${add.map(sk).join(', ')}</span> ` : ''}${drop.length ? `<span class="dn">− ${drop.map(sk).join(', ')}</span>` : ''}${!add.length && !drop.length ? '<span class="muted">same</span>' : ''}${ag.sc != null && g.sc != null && Math.round(ag.sc) !== Math.round(g.sc) ? ` · score ${ag.sc.toFixed(0)} → <b>${g.sc.toFixed(0)}</b>` : ''}</div>
+    <div class="gxc-h">Change by strike</div>${chgMini(n, D0, NARROW() ? Math.max(260, window.innerWidth - 60) : 346, 220)}
+    ${big.length ? `<div class="gxc-h">Biggest changes</div><table class="gxc-t"><tr><th>Strike</th><th class="r">GEX change</th><th class="r">Calls</th><th class="r">Puts</th></tr>${big.map(x => `<tr><td><b>${sk(x.k)}</b> <span class="muted">${pc(x.k / S0 - 1)}</span></td><td class="r ${x.d >= 0 ? 'up' : 'dn'}">${SU(x.d)}</td><td class="r ${x.dc > 0 ? 'up' : x.dc < 0 ? 'dn' : 'muted'}">${SKf(x.dc) || '0'}</td><td class="r ${x.dp > 0 ? 'dn' : x.dp < 0 ? 'up' : 'muted'}">${SKf(x.dp) || '0'}</td></tr>`).join('')}</table>` : ''}
+    <div class="note"><b class="tickkey">▏</b> white ticks on the chart = where a bar ended on the previous map (${day(a.px_day)} close · open interest ${day(a.oi_settle)} settle). Open interest changes once a day; GEX also moves with the price.</div></div>`;
+}
+async function renderChanges() {
+  $('#main').innerHTML = viewBar() + '<div class="empty">Loading the previous session…</div>'; wireViewBar();
+  let prev;
+  try { prev = await loadDay(D.prev_day); } catch (e) { prev = null; }
+  if (S.v !== 'board' || S.per !== 'chg') return;
+  const w = W(), H = S.h, k = K();
+  if (!prev) { $('#main').innerHTML = viewBar() + `<div class="empty">No saved board for ${dayW(D.prev_day)}, so there is nothing to compare with yet.</div>`; wireViewBar(); return; }
+  const P0 = {}; prev.rows.forEach(r => { P0[r.s] = r; });
+  const g0 = s => ((P0[s] || {})[k] || {})[H] || null, isM = g => !!g && g.v === 'match';
+  let now = D.rows.filter(r => inList(r) && hh(r));
+  if (S.q) now = now.filter(r => matchQ(r, S.q));
+  const joined = now.filter(r => isM(hh(r)) && !isM(g0(r.s))).sort((a, b) => hh(b).sc - hh(a).sc);
+  const stale = r => (hh(r).fl || []).some(f => f === 'data' || f === 'price');
+  const left = now.filter(r => !isM(hh(r)) && isM(g0(r.s)) && !stale(r)).sort((a, b) => g0(b.s).sc - g0(a.s).sc);
+  const unjudged = now.filter(r => !isM(hh(r)) && isM(g0(r.s)) && stale(r));
+  const stay = now.filter(r => isM(hh(r)) && isM(g0(r.s)));
+  const lvK = g => (g && g.lv || []).map(l => l[0]);
+  const lvDiff = (a, b) => ({ add: lvK(b).filter(x => !lvK(a).includes(x)), drop: lvK(a).filter(x => !lvK(b).includes(x)) });
+  const dUp = r => { const a = g0(r.s), b = hh(r); return a && a.up ? (b.up - a.up) / Math.abs(a.up) : null; };
+  const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(0);
+  const CHECK = { ratio: `the ${w.theirs}s ${w.there} got small enough`, stack: 'the stack got big enough', rel: "big enough for the stock's trading",
+    com: `centred far enough ${w.where}`, far: `a level 10%+ ${w.where} now`, levels: 'enough levels now', negbar: `no big ${w.theirs} bar ${w.there} now`, net: 'the whole map turned the right way' };
+  const passed = r => { const a = g0(r.s); if (!a) return [P0[r.s] ? 'passes every check now' : 'new in the sweep']; const p = (a.fl || []).filter(f => !(hh(r).fl || []).includes(f)).map(f => CHECK[f] || 'one more check passes'); return p.length ? p : ['passes every check now']; };
+  const lvTxt = (a, b) => { const d = lvDiff(a, b); return [d.add.length ? '<span class="up">+ ' + d.add.map(sk).join(', ') + '</span>' : '', d.drop.length ? '<span class="dn">− ' + d.drop.map(sk).join(', ') + '</span>' : ''].filter(Boolean).join(' &nbsp;') || '<span class="muted">same levels</span>'; };
+  const upTxt = r => { const a = g0(r.s), b = hh(r), d = dUp(r); return `<span class="${PUT() ? 'dn' : 'wh'}">${stackS(b.up)}</span><br><span class="muted" style="font-size:11.5px">${a ? stackS(a.up) + ' before' : 'new'}${d != null ? ` · <b class="${d >= 0 ? 'up' : 'dn'}">${pc(d)}</b>` : ''}</span>`; };
+  const scTxt = (a, b) => `${scoreCell(b)}<div class="muted num" style="font-size:11.5px;margin-top:2px">${a == null ? '' : 'was ' + a.toFixed(0) + ' · '}<b class="${b - (a || 0) >= 0 ? 'up' : 'dn'}">${sgn(b - (a || 0))}</b></div>`;
+  const was = r => { const g = g0(r.s); return !P0[r.s] ? '<span class="muted">not tracked</span>' : g && g.v === 'near' ? '<span class="am">near miss</span>' : '<span class="muted">off the list</span>'; };
+  const movers = stay.map(r => ({ r, ds: hh(r).sc - g0(r.s).sc })).sort((a, b) => Math.abs(b.ds) - Math.abs(a.ds));
+  const grew = stay.concat(joined).filter(r => g0(r.s) && g0(r.s).up).sort((a, b) => (Math.abs(hh(b).up) - Math.abs(g0(b.s).up)) - (Math.abs(hh(a).up) - Math.abs(g0(a.s).up)))[0];
+  const kingMv = stay.filter(r => g0(r.s).king != null && hh(r).king != null && g0(r.s).king !== hh(r).king);
+  const lvMv = stay.filter(r => { const d = lvDiff(g0(r.s), hh(r)); return d.add.length || d.drop.length; });
+  const what = {
+    J: r => passed(r).map(t => '<span class="y">✓</span> ' + t).join('<br>'),
+    L: r => (hh(r).why || []).slice(0, 2).map(t => '<span class="n">✕</span> ' + esc(t)).join('<br>') || '<span class="muted">no longer passes</span>',
+    S: r => { const a = g0(r.s), b = hh(r); return [a.king !== b.king ? `King ${sk(a.king)} → <b>${sk(b.king)}</b>` : '', `${xS(a.x)} → <b>${xS(b.x)}</b> the ${w.theirs}s ${w.there}`].filter(Boolean).join('<br>'); },
+  };
+  const statusOf = { J: r => was(r), L: r => `<span class="kg">on the list</span><br><span class="muted" style="font-size:11.5px">score ${g0(r.s).sc.toFixed(0)}</span>`, S: () => '<span class="kg">on the list</span>' };
+  const scoreOf = { J: r => scTxt(g0(r.s) ? g0(r.s).sc : null, hh(r).sc), L: r => hh(r).v === 'near' ? '<span class="am">near miss now</span>' : '<span class="muted">off now</span>', S: r => scTxt(g0(r.s).sc, hh(r).sc) };
+  const head = `<tr><th>Stock</th><th>Before</th><th>GEX by strike<br><span class="thsub">now</span></th><th class="r">${w.stack}</th><th>${w.levels}<br><span class="thsub">vs before</span></th><th>What changed</th><th>Score</th></tr>`;
+  const tr = (kind, r) => `<tr class="row ${kind !== 'L' ? 'match' : ''}" data-s="${r.s}"><td><div class="tk">${r.s}</div><div class="nm">${esc(r.n || '')}</div></td><td>${statusOf[kind](r)}</td><td>${glyph(r)}</td><td class="r num">${upTxt(r)}</td><td class="num">${lvTxt(g0(r.s), hh(r))}</td><td class="chg-w">${what[kind](r)}</td><td class="chg-s">${scoreOf[kind](r)}</td></tr>`;
+  const card = (kind, r) => `<div class="pcard" data-s="${r.s}"><div class="r1"><span><b class="wh" style="font-size:15px">${r.s}</b> <span class="muted" style="font-size:12px">${kind === 'S' ? '' : statusOf[kind](r).replace('<br>', ' · ')}</span></span><span>${scoreOf[kind](r)}</span></div>
+    <div style="margin-top:5px">${glyph(r, cardW(), 40)}</div><div class="r3 num"><span>${upTxt(r).replace('<br>', ' ')}</span></div><div style="font-size:12.5px;margin-top:4px">${lvTxt(g0(r.s), hh(r))}</div><div style="font-size:12.5px;margin-top:4px;line-height:1.5">${what[kind](r)}</div></div>`;
+  const sec = (t, kind, rows, note) => !rows.length ? '' : `<div class="chg-sec"><h3>${t} <span class="c">${rows.length}</span></h3>${note ? `<div class="muted chg-n">${note}</div>` : ''}${NARROW() ? rows.map(r => card(kind, r)).join('') : `<div class="tw"><table class="hunt">${head}<tbody>${rows.map(r => tr(kind, r)).join('')}</tbody></table></div>`}</div>`;
+  let h = viewBar() + `<div class="pastnote chgnote"><b>Changes</b> · ${w.pat} · <b>${H}</b> · ${dayW(D.day)} close vs ${dayW(D.prev_day)} (open interest ${day(D.settle)} vs ${day(prev.settle)} settle). What moved on the board since the last session. Tap a name for its page and its GEX changes.</div>`;
+  h += `<div class="tiles">
+    <div class="tile"><div class="k">Joined the list</div><div class="v num up">+${joined.length}</div><div class="s">${joined.filter(r => g0(r.s) && g0(r.s).v === 'near').length} were near misses before<br>${joined.slice(0, 6).map(r => `<b class="lnk" data-s="${r.s}">${r.s}</b>`).join(' ')}</div></div>
+    <div class="tile"><div class="k">Left the list</div><div class="v num dn">−${left.length}</div><div class="s">${left.filter(r => hh(r).v === 'near').length} near miss${left.filter(r => hh(r).v === 'near').length === 1 ? '' : 'es'} now<br>${left.slice(0, 6).map(r => `<b class="lnk" data-s="${r.s}">${r.s}</b>`).join(' ')}</div></div>
+    <div class="tile"><div class="k">Biggest score move · stayed on</div><div class="v num">${movers[0] ? movers[0].r.s + ` <small>${sgn(movers[0].ds)}</small>` : '<small>–</small>'}</div><div class="s">${movers[0] ? `${g0(movers[0].r.s).sc.toFixed(0)} → ${hh(movers[0].r).sc.toFixed(0)}` : ''}${movers[1] ? ` · next ${movers[1].r.s} ${sgn(movers[1].ds)}` : ''}</div></div>
+    <div class="tile"><div class="k">${w.stack} grew most</div><div class="v num">${grew ? grew.s + ` <small>${SU(Math.abs(hh(grew).up) - Math.abs(g0(grew.s).up))}</small>` : '<small>–</small>'}</div><div class="s">${grew ? `${stackS(g0(grew.s).up)} → ${stackS(hh(grew).up)} (${pc(dUp(grew))})` : ''}</div></div>
+    <div class="tile"><div class="k">Levels or king moved</div><div class="v num">${lvMv.length} <small>name${lvMv.length === 1 ? '' : 's'}</small></div><div class="s">${kingMv.length ? 'King moved: ' + kingMv.slice(0, 4).map(r => `<b>${r.s}</b> ${sk(g0(r.s).king)}→${sk(hh(r).king)}`).join(', ') : 'no king moved'}</div></div></div>`;
+  h += `<div class="chg-wrap">` + sec('Joined', 'J', joined, 'Green ticks = the checks it failed before and passes now.') + sec('Left', 'L', left, 'Red crosses = what it misses now.')
+    + (unjudged.length ? `<div class="chg-sec"><h3>Not judged today <span class="c">${unjudged.length}</span></h3><div class="muted chg-n">On the list before; today's option data or price isn't in yet for these, so they can't be judged: ${unjudged.map(r => `<span class="lnk" data-s="${r.s}">${r.s}</span>`).join(', ')}.</div></div>` : '')
+    + sec('Still on the list · biggest moves', 'S', movers.slice(0, 8).map(m => m.r), 'Sorted by the size of the score change.')
+    + (joined.length + left.length + movers.length ? '' : '<div class="empty" style="padding:24px 12px">Nothing changed on this list.</div>') + '</div>';
+  h += `<div class="foot">Changes compare the latest board with the saved board of the session before it, on the same expiry window and side. A name joins or leaves because its option map changed (new open interest at the settle) or because the price moved against the levels.</div>`;
+  $('#main').innerHTML = h;
+  wireViewBar();
 }
 
 
@@ -647,6 +774,7 @@ async function renderRecord() {
 function renderMain() {
   if (S.v === 'detail' && S.s) return renderDetail();
   if (S.v === 'record') return renderRecord().catch(e => { $('#main').innerHTML = `<div class="empty">Record unavailable: ${esc(e.message)}</div>`; });
+  if (S.per === 'chg') return renderChanges().catch(e => { $('#main').innerHTML = `<div class="empty">Changes unavailable: ${esc(e.message)}</div>`; });
   if (S.per !== 'today') return renderPeriod().catch(e => { $('#main').innerHTML = `<div class="empty">Periods unavailable: ${esc(e.message)}</div>`; });
   renderBoard();
 }

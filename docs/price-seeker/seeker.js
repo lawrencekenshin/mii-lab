@@ -1323,7 +1323,8 @@
     var info = S.day ? dayInfo(S.day) : null;
     $('dayLbl').textContent = S.day ? wS(S.day) + (info && info.rebuilt ? ' (rebuilt)' : '') : 'today';
     $('dayBtn').classList.toggle('on', !!S.day);
-    Array.prototype.forEach.call(document.querySelectorAll('#perSeg button'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-per') === S.period ? 'true' : 'false'); });
+    chgButton();
+    Array.prototype.forEach.call(document.querySelectorAll('#perSeg button'), function (b) { b.setAttribute('aria-pressed', (b.id === 'chgBtn' ? CHG.open : b.getAttribute('data-per') === S.period) ? 'true' : 'false'); });
   }
   function openDayMenu(open) {
     var m = $('dayMenu'), b = $('dayBtn');
@@ -1400,6 +1401,7 @@
   function setPeriod(k) { showPeriod(S.period === k ? null : k, null, true); }
   function showPeriod(k, sym, scroll) {
     k = PER_LABEL[k] ? k : null;
+    if (k && CHG.open) toggleChg(false);
     if (k && typeof isHunt === 'function' && isHunt(S.sort)) { S.sort = 'best'; S.chaseParked = false; sset('ps.sort', 'best'); }
     S.period = k; perPend = sym || null; perFail = false;
     closePop(); hideCheck(); ghosts = {}; $('updateBar').hidden = true; setStick();
@@ -1574,6 +1576,206 @@
     Array.prototype.forEach.call(document.querySelectorAll('#perSeg button'), function (b) { b.addEventListener('click', function () { setPeriod(b.getAttribute('data-per')); }); });
     $('perClose').addEventListener('click', function () { showPeriod(null); scrollToEl($('filters')); });
     loadDays();
+  }
+
+
+
+
+  function gxRows(d, H) {
+    var a = (d.prev && d.prev.bars && d.prev.bars[H]) || [], b = (d.bars && d.bars[H]) || [], pa = {};
+    a.forEach(function (x) { if (Array.isArray(x)) pa[x[0]] = x; });
+    return b.filter(function (y) { return Array.isArray(y) && pa[y[0]]; }).map(function (y) {
+      var x = pa[y[0]]; return { k: y[0], d: y[1] - x[1], dc: y[4] - x[2], dp: y[5] - x[3] };
+    }).sort(function (p, q) { return p.k - q.k; });
+  }
+  function gxSU(v) { return (v > 0 ? '+' : v < 0 ? '−' : '±') + gxUsd(Math.abs(v)).replace('−', ''); }
+  function gxSK(v) { var a = Math.abs(v); return (v > 0 ? '+' : v < 0 ? '−' : '') + (a >= 1e4 ? Math.round(a / 1e3) + 'k' : a >= 1e3 ? (a / 1e3).toFixed(1) + 'k' : String(a)); }
+  function gxCell(tr, text, cls) { var td = document.createElement('td'); if (cls) td.className = cls; td.textContent = text; tr.appendChild(td); return td; }
+  function gxTable(head, rows) {
+    var t = document.createElement('table'); t.className = 'gxc-t';
+    var hr = document.createElement('tr'); head.forEach(function (h, i) { var th = document.createElement('th'); th.textContent = h; if (i) th.className = 'r'; hr.appendChild(th); }); t.appendChild(hr);
+    rows.forEach(function (r) { var tr = document.createElement('tr'); r.forEach(function (c, i) { gxCell(tr, c[0], (i ? 'r ' : '') + (c[1] || '')); }); t.appendChild(tr); });
+    return t;
+  }
+  function gxMini(R, S0, W, H) {
+    var X = R.filter(function (x) { return x.d && x.k >= S0 * 0.75 && x.k <= S0 * 1.35; });
+    if (!X.length) return null;
+    var mx = Math.max.apply(null, [1].concat(X.map(function (x) { return Math.abs(x.d); }))), ks = X.map(function (x) { return x.k; });
+    var lo = Math.min.apply(null, ks.concat([S0])), hi = Math.max.apply(null, ks.concat([S0])), top = 8, bot = H - 18, Yk = lin(lo, hi, bot, top);
+    var cx = 30 + (W - 30) / 2, half = (W - 30) / 2 - 4, gap = Infinity, i;
+    for (i = 1; i < ks.length; i++) gap = Math.min(gap, ks[i] - ks[i - 1]);
+    var bh = Math.max(2, Math.min(9, isFinite(gap) ? (Yk(lo) - Yk(lo + gap)) * 0.8 : 6)), s = svgNode(W, H);
+    s.setAttribute('role', 'img'); s.setAttribute('aria-label', 'Change in GEX by strike since the previous map');
+    var raw = (hi - lo) / 6, p10 = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var stp = [1, 2, 2.5, 5, 10].map(function (m) { return m * p10; }).filter(function (v) { return v >= raw; })[0] || 10 * p10;
+    for (var t = Math.ceil(lo / stp) * stp; t <= hi; t += stp) { el('line', { x1: 28, x2: W, y1: Yk(t), y2: Yk(t), stroke: C.line }, s); tx(s, 0, Yk(t) + 3.5, strike(t), { fill: C.muted, 'font-size': 10.5 }); }
+    el('line', { x1: cx, x2: cx, y1: top, y2: bot, stroke: '#4A4F5C' }, s);
+    el('line', { x1: 28, x2: W, y1: Yk(S0), y2: Yk(S0), stroke: C.fear, 'stroke-dasharray': '2 3' }, s);
+    tx(s, W - 2, Yk(S0) - 3, 'price ' + px(S0), { fill: C.light, 'font-size': 10.5, 'text-anchor': 'end' });
+    X.forEach(function (x) { var len = Math.max(1, Math.abs(x.d) / mx * half);
+      var r = el('rect', { x: x.d >= 0 ? cx : cx - len, y: Yk(x.k) - bh / 2, width: len, height: bh, fill: x.d >= 0 ? C.up : C.down, opacity: 0.9 }, s);
+      el('title', {}, r).textContent = strike(x.k) + ': ' + gxSU(x.d) + ' · calls ' + gxSK(x.dc) + ' · puts ' + gxSK(x.dp); });
+    tx(s, cx - 6, H - 4, '← GEX lost', { fill: C.muted, 'font-size': 10.5, 'text-anchor': 'end' });
+    tx(s, cx + 6, H - 4, 'GEX added →', { fill: C.muted, 'font-size': 10.5 });
+    return s;
+  }
+  function renderGxChanges(st) {
+    var box = st.chg; if (!box) return; clear(box);
+    var d = st.d, a = d && d.prev, put = st.puts, H = gxH;
+    var g = d && (put ? d.p : d.h) && (put ? d.p : d.h)[H], lv = d && d.lv && d.lv[H];
+    var al = a && a.lv && a.lv[H], ag = a && (put ? a.p : a.h) && (put ? a.p : a.h)[H];
+    if (!g || !lv || !al) { box.hidden = true; return; }
+    box.hidden = false;
+    var R = gxRows(d, H), S0 = d.spot, same = a.px_day === d.px_day, MIN = 250;
+    var cUp = R.filter(function (x) { return x.k > S0 && x.dc >= MIN; }).sort(function (p, q) { return q.dc - p.dc; });
+    var pDn = R.filter(function (x) { return x.k < S0 && x.dp >= MIN; }).sort(function (p, q) { return q.dp - p.dp; });
+    var sum = function (L, f) { return L.reduce(function (t, x) { return t + x[f]; }, 0); };
+    var NM = { king: 'king', call_wall: 'call wall', put_wall: 'put wall' }, dn = lv.net - al.net, txt = [];
+    txt.push('Net GEX ' + (dn >= 0 ? 'rose ' : 'fell ') + gxUsd(Math.abs(dn)) + ' (' + gxUsd(al.net) + ' → ' + gxUsd(lv.net) + ').');
+    if (cUp.length) txt.push('Calls were added above the price: ' + gxSK(cUp[0].dc) + ' at ' + strike(cUp[0].k) + (cUp[1] ? ', ' + gxSK(cUp[1].dc) + ' at ' + strike(cUp[1].k) : '') + ' (' + gxSK(sum(cUp, 'dc')) + ' in all).');
+    if (pDn.length) txt.push('Puts were added below: ' + gxSK(pDn[0].dp) + ' at ' + strike(pDn[0].k) + (pDn[1] ? ', ' + gxSK(pDn[1].dp) + ' at ' + strike(pDn[1].k) : '') + ' (' + gxSK(sum(pDn, 'dp')) + ' in all).');
+    if (a.oi_settle === d.oi_settle) txt.push('Same open interest (' + dS(d.oi_settle) + ' settle): the change comes from the price.');
+    else if (!cUp.length && !pDn.length) txt.push('Little new open interest at any strike.');
+    txt.push(same ? 'Same close (' + dS(d.px_day) + '): only the open interest changed.' : 'The price went ' + px(a.spot) + ' → ' + px(S0) + ' (' + sp1(S0 / a.spot - 1) + ').');
+    var moved = ['king', 'call_wall', 'put_wall'].filter(function (k) { return num(al[k]) && num(lv[k]) && al[k] !== lv[k]; });
+    var kept = ['king', 'call_wall', 'put_wall'].filter(function (k) { return num(lv[k]) && al[k] === lv[k]; });
+    moved.forEach(function (k) { txt.push('The ' + NM[k] + ' moved ' + (lv[k] > al[k] ? 'up' : 'down') + ' from ' + strike(al[k]) + ' to ' + strike(lv[k]) + '.'); });
+    if (kept.length) txt.push('The ' + kept.map(function (k) { return NM[k] + ' (' + strike(lv[k]) + ')'; }).join(', ') + ' didn’t move.');
+    box.appendChild(kick('GEX changes · since the last map'));
+    box.appendChild(para('gxc-eng', txt.join(' ')));
+    var la = same ? 'OI ' + dS(a.oi_settle) : dS(a.px_day), lb = same ? 'OI ' + dS(d.oi_settle) : dS(d.px_day), rows = [];
+    var sgnCls = function (v, good) { return !v ? 'mut' : (good ? v > 0 : v < 0) ? 'up' : 'down'; };
+    rows.push(['Net GEX', gxUsd(al.net), gxUsd(lv.net), dn ? gxSU(dn) : '–', sgnCls(dn, true)]);
+    if (ag && num(ag.up)) { var du = Math.abs(g.up) - Math.abs(ag.up); rows.push([put ? 'Put stack below' : 'Calls stack above', gxUsd(Math.abs(ag.up)), gxUsd(Math.abs(g.up)), du ? gxSU(du) : '–', sgnCls(du, true)]); }
+    if (ag && num(ag.dn)) { var dd = Math.abs(g.dn) - Math.abs(ag.dn); rows.push([put ? 'Calls above' : 'Puts below', gxUsd(Math.abs(ag.dn)), gxUsd(Math.abs(g.dn)), dd ? gxSU(dd) : '–', sgnCls(dd, false)]); }
+    if (num(al.flip) && num(lv.flip)) { var df = lv.flip - al.flip; rows.push(['Flip', al.flip.toFixed(1), lv.flip.toFixed(1), df ? (df > 0 ? '+' : '−') + Math.abs(df).toFixed(1) : '–', 'mut']); }
+    box.appendChild(gxTable(['', la, lb, 'change'], rows.map(function (r) { return [[r[0]], [r[1]], [r[2]], [r[3], r[4]]]; })));
+    var mv = function (k) { return num(lv[k]) ? (al[k] !== lv[k] && num(al[k]) ? strike(al[k]) + ' → ' + strike(lv[k]) : strike(lv[k]) + ' same') : '–'; };
+    box.appendChild(para('gxc-l', 'King ' + mv('king') + ' · call wall ' + mv('call_wall') + ' · put wall ' + mv('put_wall')));
+    var lk = (ag && ag.lv) || [], nk = (g.levels || []).map(function (x) { return x.k; });
+    var add = nk.filter(function (k) { return lk.indexOf(k) < 0; }), drop = lk.filter(function (k) { return nk.indexOf(k) < 0; });
+    box.appendChild(para('gxc-l', (put ? 'Levels below: ' : 'Levels above: ') + (add.length ? '+ ' + add.map(strike).join(', ') + ' ' : '') + (drop.length ? '− ' + drop.map(strike).join(', ') : '') + (!add.length && !drop.length ? 'same' : '')));
+    var mini = gxMini(R, S0, Math.min(560, Math.max(260, Math.round(st.holder.clientWidth || 560))), 220);
+    if (mini) { box.appendChild(para('gxc-h', 'Change by strike')); var mh = div('gxc-mini'); mh.appendChild(mini); box.appendChild(mh); }
+    var big = R.slice().sort(function (p, q) { return Math.abs(q.d) - Math.abs(p.d); }).filter(function (x) { return x.d; }).slice(0, 6);
+    if (big.length) {
+      box.appendChild(para('gxc-h', 'Biggest changes'));
+      box.appendChild(gxTable(['Strike', 'GEX change', 'Calls', 'Puts'], big.map(function (x) {
+        return [[strike(x.k) + ' ' + gxPc(x.k / S0 - 1)], [gxSU(x.d), x.d >= 0 ? 'up' : 'down'], [gxSK(x.dc) || '0', x.dc > 0 ? 'up' : x.dc < 0 ? 'down' : 'mut'], [gxSK(x.dp) || '0', x.dp > 0 ? 'down' : x.dp < 0 ? 'up' : 'mut']];
+      })));
+    }
+    box.appendChild(para('cap', 'White ticks on the map = where a bar ended on the previous map (' + dS(a.px_day) + ' close, open interest ' + dS(a.oi_settle) + ' settle). Open interest changes once a day; GEX also moves with the price.'));
+  }
+
+
+
+
+  var CHG = { open: false, data: null, gen: null, loading: false, failedAt: 0, more: {} };
+  var changesUrl = dataUrl.replace(/[^/]*$/, 'changes.json');
+  function chgButton() {
+    var seg = $('perSeg'); if (!seg || $('chgBtn')) return;
+    var b = btn('chg-btn', 'Changes'); b.id = 'chgBtn'; b.setAttribute('aria-pressed', 'false'); b.title = 'What changed on the list since the last saved day';
+    b.addEventListener('click', function () { toggleChg(!CHG.open); });
+    seg.insertBefore(b, seg.firstChild);
+  }
+  function chgCard() {
+    var c = $('chgCard'); if (c) return c;
+    c = document.createElement('section'); c.className = 'card per chg'; c.id = 'chgCard'; c.hidden = true;
+    var at = $('periods'); at.parentNode.insertBefore(c, at.nextSibling);
+    return c;
+  }
+  function toggleChg(on) {
+    CHG.open = !!on;
+    var b = $('chgBtn'); if (b) b.setAttribute('aria-pressed', CHG.open ? 'true' : 'false');
+    if (!CHG.open) { chgCard().hidden = true; return; }
+    if (S.period) showPeriod(null);
+    if (S.day) setDay(null);
+    renderChg(true);
+  }
+  function loadChg(cb) {
+    if (CHG.loading) return;
+    CHG.loading = true;
+    getJSON(changesUrl).then(function (d) {
+      if (!d || !d.changes || typeof d.changes !== 'object') throw new Error('shape');
+      CHG.data = d.changes; CHG.gen = d.generated; return true;
+    }).catch(function () { CHG.failedAt = Date.now(); return false; }).then(function (ok) { CHG.loading = false; cb(ok); });
+  }
+  function chgWhy(sym, ix) {
+    if (!Array.isArray(ix)) return '';
+    var e = offChecks(sym, ix), f = e.querySelector ? e.querySelector('.first-fail') : null;
+    return ((f || e).textContent || '').replace(/^✗ /, '');
+  }
+  function chgShort(ix) {
+    if (!Array.isArray(ix)) return '';
+    var w = SW();
+    switch (ix[1]) {
+      case 'far': return a1(ix[3]) + ' ' + w.dir + ' now';
+      case 'reach': return (num(ix[5]) ? ix[5].toFixed(1) : '–') + ' typical moves';
+      case 'persist': return 'top pile ' + (num(ix[5]) ? ix[5] : '–') + ' of 10';
+      case 'calls': return (num(ix[5]) ? ratioTxt(ix[5]) : '–') + ' to 1';
+      case 'big': return p0(ix[4]) + ' of ' + w.gam + ' gamma';
+      default: return 'pile at or ' + w.away + ' the price';
+    }
+  }
+  var CHG_GROUP = { far: 'Closer than 10% now: on to Closing in', reach: 'Out of reach now', persist: 'The pile moved', calls: 'Not mostly one side now',
+    big: 'The pile got small', below: 'The pile is at or past the price', above: 'The pile is at or past the price' };
+  function chgSym(sym) { var b = btn('linkbtn chg-tk', sym); b.addEventListener('click', function () { openLinked(sym); }); return b; }
+  function chgRow(sym, parts) { var r = div('chg-r'); r.appendChild(chgSym(sym)); parts.forEach(function (p) { if (p) r.appendChild(typeof p === 'string' ? span('chg-m', p) : p); }); return r; }
+  function renderChg(scroll) {
+    var c = chgCard(); if (!CHG.open || !P) return;
+    c.hidden = false; clear(c);
+    var top = div('per-top'), h = document.createElement('h2'); h.textContent = 'Changes today'; top.appendChild(h);
+    var x = btn('x-btn', '✕'); x.setAttribute('aria-label', 'Close Changes today'); x.addEventListener('click', function () { toggleChg(false); }); top.appendChild(x);
+    c.appendChild(top);
+    if (!CHG.data || (P.doc && CHG.gen !== P.doc.generated && Date.now() - CHG.failedAt > 60e3)) {
+      if (!CHG.loading) loadChg(function (ok) { if (CHG.open) { if (ok) renderChg(scroll); else { clear(c); c.appendChild(top); c.appendChild(para('sub', 'Couldn’t load the changes just now. Tap Changes again to try again.')); } } });
+      if (!CHG.data) { c.appendChild(para('sub', 'Loading…')); return; }
+    }
+    var w = SW(), side = P.side === 'puts' ? 'puts' : 'calls', K = CHG.data[side];
+    if (!K) { c.appendChild(para('sub', 'No changes for this side yet.')); return; }
+    c.appendChild(para('sub', wS(CHG.data.day) + ' vs ' + wS(CHG.data.vs) + ' · ' + w.opts + ' ' + w.dir + ' the price · open interest ' + dS(CHG.data.settle) + ' vs ' + dS(CHG.data.vs_settle) + ' settle. What moved on the list since the last saved day; tap a name for its row.'));
+    var tally = div('ftally');
+    var ft = function (v, k, cls) { var f = div('ft' + (cls ? ' ' + cls : '')); f.appendChild(span('ft-v', v)); f.appendChild(span('ft-k', k)); tally.appendChild(f); };
+    ft('+' + K.joined.length, 'joined the list', 'ft-worked'); ft('−' + K.left.length, 'left the list', 'ft-wrong_way'); ft(String(K.tiers.length), 'changed tier');
+    ft(String(K.n_closer || 0), 'moved 1+ pt closer to the pile');
+    if (K.added && K.added[0]) ft(K.added[0].sym + ' ' + gxSK(K.added[0].n), 'most ' + w.opts + ' added at a pile'); else ft('–', 'most ' + w.opts + ' added at a pile');
+    c.appendChild(tally);
+    var sec = function (t, n) { var hh = document.createElement('h3'); hh.className = 'chg-h'; hh.textContent = t + (n != null ? ' · ' + n : ''); c.appendChild(hh); };
+    if (K.joined.length) {
+      sec('Joined', K.joined.length);
+      var J = CHG.more[side + 'j'] ? K.joined : K.joined.slice(0, 10);
+      J.forEach(function (j) {
+        c.appendChild(chgRow(j.sym, [tierPill(j.tier), 'pile ' + strike(j.node) + ' · ' + a1(j.dist) + ' away · odds ' + p0(j.odds) + (num(j.add) && j.add ? ' · ' + gxSK(j.add) + ' ' + w.opts : ''),
+          j.was ? span('chg-w', 'before: ' + chgWhy(j.sym, j.was)) : span('chg-w', 'new in the sweep')]));
+      });
+      if (K.joined.length > J.length) { var mb = btn('linkbtn chg-more', '+ ' + (K.joined.length - J.length) + ' more joined'); mb.addEventListener('click', function () { CHG.more[side + 'j'] = 1; renderChg(); }); c.appendChild(mb); }
+    }
+    if (K.left.length) {
+      sec('Left', K.left.length);
+      var G = {}, order = [];
+      K.left.forEach(function (l) { var ix = P.idx ? P.idx[l.sym] : null, code = Array.isArray(ix) ? ix[1] : 'gone'; if (!G[code]) { G[code] = []; order.push(code); } G[code].push({ l: l, ix: ix }); });
+      order.sort(function (p, q) { return G[q].length - G[p].length; }).forEach(function (code) {
+        var g = div('chg-g'); g.appendChild(para('chg-gh', (CHG_GROUP[code] || 'Off the list today') + ' · ' + G[code].length));
+        var chips = div('chg-chips');
+        G[code].forEach(function (o) { var ch = span('chg-chip', null); ch.appendChild(chgSym(o.l.sym)); ch.appendChild(span('chg-m', chgShort(o.ix))); chips.appendChild(ch); });
+        g.appendChild(chips); c.appendChild(g);
+      });
+    }
+    if (K.tiers.length) {
+      sec('Tier changes', K.tiers.length);
+      K.tiers.forEach(function (t) { c.appendChild(chgRow(t.sym, [tierPill(t.t0), span('chg-m', '→'), tierPill(t.t1)])); });
+    }
+    var two = div('chg-2'), col = function (t, rows) { var d = div(''); var hh = document.createElement('h3'); hh.className = 'chg-h'; hh.textContent = t; d.appendChild(hh); rows.forEach(function (r) { d.appendChild(r); }); two.appendChild(d); };
+    col('Moved toward the pile', K.closer.map(function (m) { return chgRow(m.sym, [a1(m.d0) + ' → ' + a1(m.d1) + ' from ' + strike(m.node), span('chg-m up', (Math.abs(m.d0 - m.d1) * 100).toFixed(1) + ' pts closer')]); }));
+    col('Moved away', K.farther.map(function (m) { return chgRow(m.sym, [a1(m.d0) + ' → ' + a1(m.d1) + ' from ' + strike(m.node), span('chg-m down', (Math.abs(m.d1 - m.d0) * 100).toFixed(1) + ' pts farther')]); }));
+    c.appendChild(two);
+    var two2 = div('chg-2'), col2 = function (t, rows) { var d = div(''); var hh = document.createElement('h3'); hh.className = 'chg-h'; hh.textContent = t; d.appendChild(hh); rows.forEach(function (r) { d.appendChild(r); }); two2.appendChild(d); };
+    col2(w.Opts + ' added at the pile · 1 session', K.added.map(function (o) { return chgRow(o.sym, [span('chg-m up', gxSK(o.n) + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.pc) ? ' (' + sp1(o.pc) + ')' : '')]); })
+      .concat((K.cut || []).slice(0, 1).map(function (o) { return chgRow(o.sym, [span('chg-m down', gxSK(o.n) + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.pc) ? ' (' + sp1(o.pc) + ')' : '') + ' · biggest cut']); })));
+    col2('Odds that moved', (K.odds || []).map(function (o) { return chgRow(o.sym, [p0(o.o0) + ' → ' + p0(o.o1), o.e0 !== o.e1 ? span('chg-m amber', 'main expiry rolled ' + dS(o.e0) + ' → ' + dS(o.e1)) : span('chg-m', 'the price moved')]); }));
+    c.appendChild(two2);
+    c.appendChild(para('src', 'Compared with the saved list of ' + wS(CHG.data.vs) + '. A name leaves when one of the five checks stops passing; the price moving inside 10% of its pile moves it to Closing in.'));
+    if (scroll) scrollToEl(c);
   }
 
 
@@ -2452,11 +2654,12 @@
     var sub = para('gx-sub', ''); w.appendChild(sub);
     var box = div('chart gx-chart'); w.appendChild(box);
     var cap = para('cap', ''); w.appendChild(cap);
+    var chg = div('gxc'); chg.hidden = true; w.appendChild(chg);
     var links = div('links gx-links'), a = document.createElement('a');
     a.className = 'btn'; a.textContent = 'Open in GEX Hunt ->'; a.target = '_blank'; a.rel = 'noopener noreferrer';
     links.appendChild(a); w.appendChild(links);
     host.appendChild(w);
-    var st = { holder: box, sub: sub, cap: cap, link: a, n: n, d: null, puts: SW().key !== 'calls' };
+    var st = { holder: box, sub: sub, cap: cap, chg: chg, link: a, n: n, d: null, puts: SW().key !== 'calls' };
     gxLink(st);
     seg.addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('button[data-h]') : null; if (!b || b.getAttribute('data-h') === gxH) return;
@@ -2481,7 +2684,7 @@
     var side = put ? d.p : d.h, g = side && side[gxH], lv = d.lv && d.lv[gxH];
     var O = Array.isArray(d.ohlc) ? d.ohlc.filter(function (r) { return Array.isArray(r) && num(r[2]) && num(r[3]); }) : [];
     if (!g || !lv || !O.length || !num(d.spot) || !d.bars) {
-      h.appendChild(span('mut', 'No ' + gxH + ' GEX map for ' + n.sym + '.')); st.sub.textContent = ''; st.cap.textContent = ''; return;
+      h.appendChild(span('mut', 'No ' + gxH + ' GEX map for ' + n.sym + '.')); st.sub.textContent = ''; st.cap.textContent = ''; st.chg.hidden = true; return;
     }
     st.sub.textContent = 'GEX ' + gxH + ' · King ' + strike(lv.king) + ' · Flip ' + (num(lv.flip) ? lv.flip.toFixed(1) : '—') + ' · Net ' + gxUsd(lv.net) + ' · close ' + px(d.spot) + ' on ' + dS(d.px_day);
     var Wd = Math.max(240, Math.round(h.clientWidth || 600)), narrow = Wd < 700, Hh = GEO.mode === 'card' ? 420 : 470;
@@ -2534,6 +2737,18 @@
       var rc = el('rect', { x: bx0, y: Y(k) - bh / 2, width: len, height: bh, fill: net > 0 ? (hot ? '#3FBFAE' : C.up) : (hot ? '#FF6F6C' : C.down), opacity: 0.88 }, s);
       el('title', {}, rc).textContent = strike(k) + ': ' + gxUsd(net);
     });
+    var pv = d.prev && d.prev.bars && d.prev.bars[gxH];
+    if (Array.isArray(pv)) {
+      var nowL = {}; (d.bars[gxH] || []).forEach(function (b) { if (Array.isArray(b)) nowL[b[0]] = Math.abs(b[1]); });
+      pv.forEach(function (b) {
+        var k = b[0]; if (!(k > lo && k < hi) || !(k in nowL)) return;
+        var was = Math.abs(b[1]), nv = nowL[k];
+        if (Math.abs(nv - was) < Math.max(0.04 * mx, 0.2 * Math.max(was, nv))) return;
+        var xt = Math.min(cw - 4, bx0 + blen(was)); if (xt - bx0 < 1.5) return;
+        var ln = el('line', { x1: xt, x2: xt, y1: Y(k) - bh / 2 - 3, y2: Y(k) + bh / 2 + 3, stroke: '#F2F4F8', 'stroke-width': 2, 'stroke-linecap': 'round' }, s);
+        el('title', {}, ln).textContent = strike(k) + ' on the previous map: ' + gxUsd(b[1]);
+      });
+    }
     if (num(lv.king) && lv.king > lo && lv.king < hi) {
       el('line', { x1: 0, x2: cw, y1: Y(lv.king), y2: Y(lv.king), stroke: C.gold, 'stroke-width': 1.5 }, s);
       el('rect', { x: cw + 2, y: Y(lv.king) - 9, width: padR - 4, height: 18, fill: C.gold, rx: 2 }, s);
@@ -2578,6 +2793,7 @@
     st.cap.textContent = 'Bars = net GEX at each strike at the ' + dS(d.px_day) + ' close, open interest ' + dS(d.oi_settle) + ' settle: the same map as the GEX Hunt tab, updated once a day after the close (green = more call gamma, red = more put gamma). ' +
       (pile === null ? '' : 'The amber-outlined ' + strike(pile) + ' is this page’s pile' + (pday && pday !== d.px_day ? ' on ' + wS(pday) + ', drawn on the latest map. ' :
         lv.king === pile ? ', and it is also the king. ' : '. It is measured on the live price with this page’s own rules, so the biggest bar can sit at another strike. '));
+    renderGxChanges(st);
   }
   function captionFor(n) {
     var by = wS(n.main_exp), od = p0(n.odds);
@@ -3319,6 +3535,7 @@
     renderCpOpts(); renderListBar(); renderStatus(); renderTiles(); renderStory(); renderCounts(); renderList(); renderClosing(); renderHits(); renderScore(); renderRules(); renderFoot();
     if ($('numbers').open) renderNumTable();
     if (helpBuilt && !helpBuilt.real) helpBuilt = false;
+    if (CHG.open) renderChg();
     if (pendingOpen) { var o = pendingOpen; pendingOpen = null; openLinked(o); }
   }
   function showFatal(e) {
@@ -3348,12 +3565,41 @@
         throw fmtErr(e && e.name === 'AbortError' ? 'timed out after 15 s' : 'network error');
       });
   }
+
+
+
+
+  var extrasUrl = dataUrl.replace(/[^/]*$/, 'extras.json');
+  var XTR = { data: null, gen: null, at: 0, pending: null, failedAt: 0 }, XTR_EVERY = 30 * 60 * 1000;
+  function prefetchExtras() {
+    if (S.day || XTR.pending) return XTR.pending;
+    XTR.pending = getJSON(extrasUrl).then(function (x) {
+      XTR.pending = null;
+      if (x && typeof x === 'object') { XTR.data = x; XTR.gen = x.generated; XTR.at = now(); }
+    }, function () { XTR.pending = null; XTR.failedAt = Date.now(); });
+    return XTR.pending;
+  }
+  function mergeExtras(d) {
+    var x = XTR.data;
+    if (!x || !d || typeof d !== 'object' || S.day) return d;
+    ['failed', 'net', 'chase', 'fresh', 'ewz'].forEach(function (k) { if (x[k] !== undefined && d[k] === undefined) d[k] = x[k]; });
+    if (d.puts && typeof d.puts === 'object' && x.puts && x.puts.failed !== undefined && d.puts.failed === undefined) d.puts.failed = x.puts.failed;
+    return d;
+  }
+  function withExtras(d) {
+    if (S.day || !d || typeof d !== 'object') return d;
+    var hunt = typeof isHunt === 'function' && isHunt(S.sort);
+    var stale = !XTR.data || (XTR.gen !== d.generated && (hunt || now() - XTR.at >= XTR_EVERY));
+    if (!XTR.pending && stale && Date.now() - XTR.failedAt >= 60e3) prefetchExtras();
+    return XTR.pending ? XTR.pending.then(function () { return mergeExtras(d); }) : mergeExtras(d);
+  }
   function load(initial, viaVisible) {
     if (loading) return;
     loading = true; lastFetchAt = Date.now();
     var gen = loadGen;
     if (initial && fatal) { var chip = $('chip'); chip.className = 'chip chip-wait'; chip.textContent = 'LOADING'; $('asof').textContent = 'Fetching the latest numbers…'; }
-    getJSON().then(function (d) {
+    if (!P) prefetchExtras();
+    getJSON().then(withExtras).then(function (d) {
       if (gen !== loadGen) return;
       check(d);
       RAW = d;
