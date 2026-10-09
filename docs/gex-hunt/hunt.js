@@ -483,18 +483,24 @@ function chartSVG(n, Wd, Hh, asof) {
     if (ix >= 0) { const x = ix * cwid + cwid / 2; s += `<line x1="${x}" x2="${x}" y1="${top}" y2="${bot}" stroke="#b39ddb" stroke-dasharray="3,3"/><text x="${Math.max(2, x - 44)}" y="${bot - 28}" fill="#b39ddb" font-size="11">${day(asof.day)}</text>`; }
     asof.lv.forEach(([k]) => { if (k > lo && k < hi) s += `<line x1="0" x2="${cw}" y1="${y(k)}" y2="${y(k)}" stroke="#b39ddb" stroke-opacity=".7" stroke-dasharray="5,4"/><text x="4" y="${y(k) - 3}" fill="#b39ddb" font-size="10.5">${sk(k)} · ${day(asof.day)}</text>`; });
   }
-  const bars = (n.bars[S.h] || []).filter(b => b[0] > lo && b[0] < hi), mx = Math.max(1, ...bars.map(b => Math.abs(b[1])));
+  const bars = (n.bars[S.h] || []).filter(b => b[0] > lo && b[0] < hi);
+  const PV = {}; if (!asof && n.prev && n.prev.bars && n.prev.bars[S.h]) n.prev.bars[S.h].forEach(b => { PV[b[0]] = b[1]; });
+  const mx = Math.max(1, ...bars.map(b => Math.abs(b[1])), ...bars.filter(b => b[0] in PV).map(b => Math.abs(PV[b[0]])));
   const kk = bars.map(b => b[0]).sort((a, b) => a - b); let gap = Infinity; for (let i = 1; i < kk.length; i++) gap = Math.min(gap, kk[i] - kk[i - 1]);
   const bh = Math.max(2, Math.min(14, isFinite(gap) ? (y(0) - y(gap)) * 0.75 : 6));
   const blen = v => Math.abs(v) / mx * (bx1 - bx0);
-  bars.forEach(([k, net]) => { const len = blen(net); if (len < 0.5) return;
-    s += `<rect x="${bx0}" y="${y(k) - bh / 2}" width="${len}" height="${bh}" fill="${net > 0 ? (!put && k === g.kt ? '#3fbfae' : '#26a69a') : (put && k === g.kt ? '#ff6f6c' : '#ef5350')}" opacity=".88"><title>${sk(k)}: ${fm(net)}</title></rect>`; });
-  const pv = !asof && n.prev && n.prev.bars && n.prev.bars[S.h];
-  if (pv) { const nowL = {}; (n.bars[S.h] || []).forEach(b => { nowL[b[0]] = Math.abs(b[1]); });
-    pv.forEach(([k, net]) => { if (!(k > lo && k < hi) || !(k in nowL)) return; const was = Math.abs(net), nv = nowL[k];
-      if (Math.abs(nv - was) < Math.max(0.04 * mx, 0.2 * Math.max(was, nv))) return;
-      const x = Math.min(cw - 4, bx0 + blen(was)); if (x - bx0 < 1.5) return;
-      s += `<line x1="${x}" x2="${x}" y1="${y(k) - bh / 2 - 3}" y2="${y(k) + bh / 2 + 3}" stroke="#f2f4f8" stroke-width="2" stroke-linecap="round"><title>${sk(k)} on the previous map: ${fm(net)}</title></line>`; }); }
+  const colOf = (k, net) => net > 0 ? (!put && k === g.kt ? '#3fbfae' : '#26a69a') : (put && k === g.kt ? '#ff6f6c' : '#ef5350');
+  const lite = net => net > 0 ? '#8ff5e6' : '#ffb0ae';
+  const big = (was, nv) => Math.abs(nv - was) >= Math.max(0.04 * mx, 0.2 * Math.max(was, nv));
+  bars.forEach(([k, net]) => { const len = blen(net), yy = y(k) - bh / 2, was = PV[k];
+    if (was != null && big(Math.abs(was), Math.abs(net))) {
+      const lw = blen(was), base = (was > 0) === (net > 0) ? Math.min(lw, len) : 0, t = `<title>${sk(k)}: ${fm(net)} (previous map ${fm(was)})</title>`;
+      if (lw > len) s += `<rect x="${bx0 + len}" y="${yy}" width="${lw - len}" height="${bh}" fill="${colOf(k, was)}" opacity=".34">${t}</rect>`;
+      if (base > 0.5) s += `<rect x="${bx0}" y="${yy}" width="${base}" height="${bh}" fill="${colOf(k, net)}" opacity=".88">${t}</rect>`;
+      if (len - base > 0.5) s += `<rect x="${bx0 + base}" y="${yy}" width="${len - base}" height="${bh}" fill="${lite(net)}">${t}</rect>`;
+      return; }
+    if (len < 0.5) return;
+    s += `<rect x="${bx0}" y="${yy}" width="${len}" height="${bh}" fill="${colOf(k, net)}" opacity=".88"><title>${sk(k)}: ${fm(net)}</title></rect>`; });
   if (lv.king > lo && lv.king < hi) {
     s += `<line x1="0" x2="${cw}" y1="${y(lv.king)}" y2="${y(lv.king)}" stroke="#f5d63d" stroke-width="1.5"/><rect x="${cw + 2}" y="${y(lv.king) - 9}" width="${padR - 4}" height="18" fill="#f5d63d" rx="2"/><text x="${cw + 7}" y="${y(lv.king) + 4}" font-size="11" fill="#131722" font-weight="700">${lv.king.toFixed(2)}</text>`;
   }
@@ -523,6 +529,8 @@ function verdictHead(r, g) {
   if (g.v === 'near') return `<span class="am">NEAR MISS · score ${g.sc.toFixed(0)}</span>`;
   return `<span class="dn">NOT A MATCH · score ${g.sc.toFixed(0)}</span>`;
 }
+const GSW = (f, o) => `<svg width="16" height="8" style="vertical-align:-0.5px"><rect width="16" height="8" rx="1" fill="${f}" opacity="${o}"/></svg>`;
+const GKEY = `<i>${GSW('#26a69a', .34)} faded end = GEX lost</i> · <i>${GSW('#8ff5e6', 1)} bright end = GEX added</i>`;
 let ASOF = null;
 async function renderDetail() {
   const sym = S.s, r = D.rows.find(x => x.s === sym);
@@ -555,7 +563,7 @@ async function renderDetail() {
   $('#cmain').innerHTML = `<div id="chead"><span class="t"><b>${sym}</b> · ${esc(n.name || '')} · D</span>
     <span class="muted num">close ${n.spot.toFixed(2)} · <span class="${(n.ret20 || 0) >= 0 ? 'up' : 'dn'}">${pc(n.ret20, 1)} 20d</span> · GEX ${S.h} · King ${sk(lv.king)} · Flip ${lv.flip ? lv.flip.toFixed(1) : '—'} · Net ${fm(lv.net)}</span>
     <span style="margin-left:auto;display:flex;gap:6px"><button class="btn g" data-v="board">← Board</button></span></div>
-    <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}${n.prev && !ASOF ? `<b class="tickkey">▏</b> white ticks = the previous map (${day(n.prev.px_day)} close · OI ${day(n.prev.oi_settle)}). ` : ''}Price axis stretched to the whole stack. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
+    <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}${n.prev && !ASOF ? `<span class="gkey">vs ${day(n.prev.px_day)} close · OI ${day(n.prev.oi_settle)}: ${GKEY}</span> · ` : ''}Price axis stretched to the whole stack. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
     <div id="chart"></div>`;
   drawChart(n);
   const ck = g.checks.map(([id, ok, t]) => `<span class="${ok ? 'y' : 'n'}">${ok ? '✓' : '✕'}</span><span>${esc(t)}</span>`).join('');
@@ -644,7 +652,7 @@ function chgCard(n) {
     <div class="gxc-l">${w.levels}: ${add.length ? `<span class="up">+ ${add.map(sk).join(', ')}</span> ` : ''}${drop.length ? `<span class="dn">− ${drop.map(sk).join(', ')}</span>` : ''}${!add.length && !drop.length ? '<span class="muted">same</span>' : ''}${ag.sc != null && g.sc != null && Math.round(ag.sc) !== Math.round(g.sc) ? ` · score ${ag.sc.toFixed(0)} → <b>${g.sc.toFixed(0)}</b>` : ''}</div>
     <div class="gxc-h">Change by strike</div>${chgMini(n, D0, NARROW() ? Math.max(260, window.innerWidth - 60) : 346, 220)}
     ${big.length ? `<div class="gxc-h">Biggest changes</div><table class="gxc-t"><tr><th>Strike</th><th class="r">GEX change</th><th class="r">Calls</th><th class="r">Puts</th></tr>${big.map(x => `<tr><td><b>${sk(x.k)}</b> <span class="muted">${pc(x.k / S0 - 1)}</span></td><td class="r ${x.d >= 0 ? 'up' : 'dn'}">${SU(x.d)}</td><td class="r ${x.dc > 0 ? 'up' : x.dc < 0 ? 'dn' : 'muted'}">${SKf(x.dc) || '0'}</td><td class="r ${x.dp > 0 ? 'dn' : x.dp < 0 ? 'up' : 'muted'}">${SKf(x.dp) || '0'}</td></tr>`).join('')}</table>` : ''}
-    <div class="note"><b class="tickkey">▏</b> white ticks on the chart = where a bar ended on the previous map (${day(a.px_day)} close · open interest ${day(a.oi_settle)} settle). Open interest changes once a day; GEX also moves with the price.</div></div>`;
+    <div class="note">On the chart: ${GKEY}, against the previous map (${day(a.px_day)} close · open interest ${day(a.oi_settle)} settle). Open interest changes once a day; GEX also moves with the price.</div></div>`;
 }
 async function renderChanges() {
   $('#main').innerHTML = viewBar() + '<div class="empty">Loading the previous session…</div>'; wireViewBar();

@@ -236,7 +236,8 @@ body.neg .dots i.on { background:var(--dn); }
 @media (max-width:374px) { .pkh .cw { display:none; } .pk { padding:5px 7px 8px; } }
 
 
-.tickkey { color:#f2f4f8; }
+.gkey { color:#b2b5be; }
+.gkey i, .gxc .note i { font-style:normal; white-space:nowrap; }
 .gxc { border-color:#2f6f66; font-size:12.5px; line-height:1.5; }
 .gxc .gxc-k { color:#9fe0d6; }
 .gxc .eng { margin:0 0 8px; color:var(--txt); }
