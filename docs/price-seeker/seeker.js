@@ -43,7 +43,7 @@
       oldPile: 'Often a fund selling calls against shares it owns, not a bet on a jump.', noise: 'often covered calls; likely noise',
       sub: 'Big piles of call options parked far above the price, and whether the price is heading to them.',
       cv1: 'A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.',
-      cv2: 'We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
+      cv2: '',
       king: '', noteC: 'Often covered-call writing', sig: 'buy',
       foot: 'Pile (the king node) = the strike where the biggest call bet in the stock’s option map sits, estimated from public open interest.' },
     puts: { key: 'puts', opt: 'put', opts: 'puts', Opts: 'Puts', dir: 'below', rise: 'fall', mv: 'down', gam: 'downside', sign: -1, ext: 'low',
@@ -51,7 +51,7 @@
       oldPile: 'Often a fund hedging shares it owns, or someone selling puts for income, not a bet on a drop.', noise: 'often hedges or put selling; likely noise',
       sub: 'Big piles of put options parked far below the price, and whether the price is heading down to them.',
       cv1: 'A big put pile far below the price is usually insurance (a fund hedging shares it owns) or someone selling puts for income. A bet on a drop is the minority.',
-      cv2: 'We assume dealers sold these puts (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
+      cv2: '',
       king: ' on the put side', noteC: 'Often hedges or put selling', sig: 'sell',
       foot: 'Pile (the put king node) = the strike where the biggest put bet in the stock’s option map sits, estimated from public open interest.' },
   };
@@ -67,7 +67,7 @@
       ['Price → pile and To go', 'The pile is the strike where options traders’ biggest ' + w.bet + ' sits (the king node' + w.king + '). To go = how far the price has to ' + w.rise + ' to reach it. The little bar under it: calls (green) against puts (red) across all of the stock’s options, written calls : puts. The line above the list says which: traded on the latest day, or, when you sort by them, traded over the past week or held. Volume counts contracts traded, bought or sold, so it shows activity, not direction.'],
       ['Trip', 'Start line = the price 20 days ago, flag = the pile. Green = how much of the trip is done. Red = the price went the other way.'],
       ['Last 60 days', 'The last 60 daily closes. The dashed amber line is the pile, so the gap you see is the distance left.'],
-      ['Odds', 'The options’ own chance that the price trades at the pile at least once by the date shown. Priced by the market, not our forecast, and not tested. Different dates are not like-for-like.'],
+      ['Odds', 'The options’ own chance that the price trades at the pile at least once by the date shown. Priced by the market. Different dates are not like-for-like.'],
       ['New ' + w.opts + ' + Held', w.Opts + ' added at the pile over the last few sessions (changes once a day). Held dots: was this the top strike in each of the last 10 sessions, oldest on the left.'],
       ['$ in ' + w.opts, 'What the ' + w.opts + ' at the pile were worth at the last saved option prices. It is money parked at that strike, bought or sold: public data can’t say which side. “vs daily trading” compares it with a normal day’s trading in the stock; “$ per day left” weights money on a shorter clock more.'],
       ['Business', 'A 0–100 business-quality score from reported growth, cash flow and valuation, scored against large US companies. Green = a high score. Funds, and companies outside the large-company list or without enough reported numbers, have no score (–).']
@@ -1235,7 +1235,7 @@
       ul.appendChild(li);
     });
     var li2 = document.createElement('li'); li2.className = 'mut';
-    li2.appendChild(document.createTextNode('New calls show interest, not direction: each one has a buyer and a seller. Not tested yet: an early read from a handful of names.'));
+    li2.appendChild(document.createTextNode('New calls show interest, not direction: each one has a buyer and a seller.'));
     ul.appendChild(li2);
     return ul;
   }
@@ -1247,7 +1247,7 @@
     return 'Hunting the EWZ pattern across ' + (P.list === 'all' ? 'all ' + (Hn && num(Hn.checked) ? int(Hn.checked) + ' ' : '') + 'names' : LISTS[P.list].label + ' names') +
       ' with a big call pile far above the price and calls well above puts at it: fresh calls arriving at that pile over the last few sessions, however long it has been the top pile. The best-match list wants a pile that has stayed the top pile, which is why it left EWZ off. Rolled in = the top strike moved closer to the price while calls at the old top strike were cut, as EWZ’s did (45 to 43) before Brazil’s Oct 4 vote: ' +
       (rolled ? (rolled === 1 ? 'that one comes' : 'those come') + ' first, then the most calls added' : 'none today; ranked by the most calls added') +
-      ' (the number before each name). One case so far: a hunt to watch, not a tested signal. ' +
+      ' (the number before each name). ' +
       (n && on === 0 ? 'None of them is on the best-match list today.' : on === n && n ? 'All of them are on the best-match list too.' : on ? on + ' of them ' + (on === 1 ? 'is' : 'are') + ' on the best-match list too.' : '');
   }
   function ewzWhy(n) {
@@ -1267,7 +1267,7 @@
       ul.appendChild(li);
     });
     var li2 = document.createElement('li'); li2.className = 'mut';
-    li2.appendChild(document.createTextNode('Named after EWZ: this setup came before Brazil’s first-round vote, and EWZ jumped about 11% the next morning toward its 43 pile. New calls show interest, not direction: each one has a buyer and a seller. One case so far, not tested.'));
+    li2.appendChild(document.createTextNode('Named after EWZ: this setup came before Brazil’s first-round vote, and EWZ jumped about 11% the next morning toward its 43 pile. New calls show interest, not direction: each one has a buyer and a seller.'));
     ul.appendChild(li2);
     return ul;
   }

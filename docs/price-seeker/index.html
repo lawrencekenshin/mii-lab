@@ -96,9 +96,7 @@
       </div>
       <ol class="cv-list" id="cvList">
         <li id="cv1">A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</li>
-        <li id="cv2">We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</li>
         <li id="cv3">Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</li>
-        <li>Nothing on this page has been tested yet. The scoreboard below will tell us once enough piles have resolved.</li>
       </ol>
     </div>
 
@@ -329,14 +327,14 @@
 
   <div class="box" id="caveatBox">
     <div class="box-row"><b id="bxNot">What a pile means</b><span id="bx1">A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.</span></div>
-    <div class="box-row"><b>Who’s on the other side? We guess.</b><span id="bx2">We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.</span></div>
+    
     <div class="box-row"><b>Yesterday’s piles, today’s prices</b><span id="bx3">Open interest is the previous session’s settle, so call counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.</span></div>
-    <div class="box-row"><b>Not tested yet</b><span>Nothing on this page has been tested yet. The scoreboard above will tell us once enough piles have resolved.</span></div>
+    
   </div>
 
   <footer class="foot">
     <p id="footPile">Pile (the king node) = the strike where the biggest call bet in the stock’s option map sits, estimated from public open interest.</p>
-    <p>Odds = the options market’s own estimate of the chance the price trades at the pile at least once before its main expiry. Priced by the market, not our forecast.</p>
+    <p>Odds = the options market’s own estimate of the chance the price trades at the pile at least once before its main expiry. Priced by the market.</p>
     <p id="footRec">Pile records start Sep 8; open-interest history starts Sep 28.</p>
     <p id="footData">Derived from delayed public options data (previous-session open interest) and ~15-minute delayed prices. Only computed values are shown, not quotes.</p>
     <p>No cookies, no tracking.</p>
