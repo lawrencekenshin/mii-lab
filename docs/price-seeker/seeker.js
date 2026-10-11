@@ -42,7 +42,7 @@
       reach: 'trades at or above', seek: 'upward', other: 'puts', mostly: 'Mostly calls', bet: 'call bet', away: 'below',
       oldPile: 'Often a fund selling calls against shares it owns, not a bet on a jump.', noise: 'often covered calls; likely noise',
       sub: 'Big piles of call options parked far above the price, and whether the price is heading to them.',
-      cv1: 'This is a watch list, not a buy signal. A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.',
+      cv1: 'A big call pile far above the price is sometimes an informed bet, and often a hedge or a fund selling calls against shares it owns.',
       cv2: 'We assume dealers sold these calls (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
       king: '', noteC: 'Often covered-call writing', sig: 'buy',
       foot: 'Pile (the king node) = the strike where the biggest call bet in the stock’s option map sits, estimated from public open interest.' },
@@ -50,7 +50,7 @@
       reach: 'trades at or below', seek: 'downward', other: 'calls', mostly: 'Mostly puts', bet: 'put bet', away: 'above',
       oldPile: 'Often a fund hedging shares it owns, or someone selling puts for income, not a bet on a drop.', noise: 'often hedges or put selling; likely noise',
       sub: 'Big piles of put options parked far below the price, and whether the price is heading down to them.',
-      cv1: 'This is a watch list, not a sell signal. A big put pile far below the price is usually insurance (a fund hedging shares it owns) or someone selling puts for income. A bet on a drop is the minority.',
+      cv1: 'A big put pile far below the price is usually insurance (a fund hedging shares it owns) or someone selling puts for income. A bet on a drop is the minority.',
       cv2: 'We assume dealers sold these puts (the usual case). Public data can’t show who holds which side, so every pile is an estimate.',
       king: ' on the put side', noteC: 'Often hedges or put selling', sig: 'sell',
       foot: 'Pile (the put king node) = the strike where the biggest put bet in the stock’s option map sits, estimated from public open interest.' },
@@ -87,10 +87,10 @@
     set('pageSub', w.sub); set('cv1', w.cv1); set('cv2', w.cv2);
     set('hdBet', '$ in ' + w.opts); set('hdBetS', '$ ' + w.opts + ' · Biz'); set('hdNew', 'New ' + w.opts); set('rbBet', '$ in ' + w.opts);
     set('tierNote', 'Tier C = old piles. ' + w.noteC + '; likely noise. Shown so you can check them.');
-    set('cvLine', 'Watch list, not a ' + w.sig + ' signal. Nothing here is tested yet.');
+    set('cvLine', 'What a pile means');
     set('cv3', 'Open interest is the previous session’s settle, so ' + w.opt + ' counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.');
     set('optBet', 'Biggest bet ($ in ' + w.opts + ')');
-    set('bxNot', 'Not a ' + w.sig + ' signal'); set('bx1', w.cv1); set('bx2', w.cv2);
+    set('bxNot', 'What a pile means'); set('bx1', w.cv1); set('bx2', w.cv2);
     set('bx3', 'Open interest is the previous session’s settle, so ' + w.opt + ' counts change once a day. Prices are about 15 minutes delayed. When the price moves we recompute which strike is the biggest pile, but new contracts only show up the next day.');
     var ibN = document.querySelector('#lhead .c-new .ib'), ibB = document.querySelector('#lhead .c-bet .ib');
     if (ibN) ibN.setAttribute('aria-label', 'About new ' + w.opts + ' and held');
@@ -1035,7 +1035,7 @@
     renderChaseChecks(c);
     $('chaseNote').textContent = (lead ? 'We picked ' + c.sym + ' because it is the clearest example running now.' :
       'We show ' + c.sym + ' next to ' + cs[0].sym + (c.sym === 'EWT' ? ' because it is the Taiwan fund whose biggest holding is TSMC.' : ' because it is the same pattern on a related name.') + ' It is not the furthest along: the hunt ranks that.') +
-      (c.touch ? '' : ' It hasn’t reached ' + strike(node) + ': a chase can stall, or the pile can move.') + ' Nothing here is tested yet.';
+      (c.touch ? '' : ' It hasn’t reached ' + strike(node) + ': a chase can stall, or the pile can move.');
     var n = P.chase ? P.chase.names.length : 0;
     $('chaseHunt').textContent = 'Hunt this pattern: ' + (P.chase ? n + (n === 1 ? ' name matches' : ' names match') + (P.list === 'all' ? '' : ' on ' + LISTS[P.list].label) + ' today' : 'not in this file') + ' →';
     $('chaseHunt').disabled = !P.chase || P.side !== 'calls';
@@ -1217,7 +1217,7 @@
     return 'Fresh Calls AI Pile: AI companies' + (P.list === 'all' || P.list === 'ai' ? '' : ' on ' + LISTS[P.list].label) +
       ' whose biggest call pile is a big one, sits above the price (at any distance), and where open calls at that pile have grown clearly over the last few sessions' +
       (Hn && num(Hn.checked) ? ' (' + n + ' of the ' + int(Hn.checked) + ' AI companies with a big pile above the price)' : '') +
-      '. Ranked by how fast the calls grew (the number before each name). In our first look, piles where new calls kept arriving were reached more often than piles that sat still, but on only a handful of names: a watch list, not a tested signal. ' +
+      '. Ranked by how fast the calls grew (the number before each name). ' +
       (n && on === 0 ? 'None of them is on the best-match list today.' : on === n && n ? 'All of them are on the best-match list too.' : on ? on + ' of them ' + (on === 1 ? 'is' : 'are') + ' on the best-match list too.' : '');
   }
   function freshWhy(n) {

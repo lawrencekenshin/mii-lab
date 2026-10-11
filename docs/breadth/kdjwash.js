@@ -435,7 +435,7 @@
     $('nowKW').textContent = nw;
     $('studyKW').textContent = V.study.fair.join(' ');
     $('honestKW').textContent = 'Counts today’s index members back in time (names that left the index are missing), so older readings look milder than they were. ' +
-      'Closed candles only, like the bot; the open candle is shown as if it closed at the last close. The dots and spells describe the swing; the study lines say the edge over buying any equally deep dip is small and not proven. Rebuilt after each US close. Not advice.';
+      'Closed candles only, like the bot; the open candle is shown as if it closed at the last close. The dots and spells describe the swing. Rebuilt after each US close.';
   }
 
   function drawAll() { if (!V) return; renderControls(); draw(); renderLegend(); }

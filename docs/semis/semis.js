@@ -1422,7 +1422,7 @@
     if (col) {
       var gd = has ? gpuDay(col) : null;
       parts.push([!has ? 'GPU prices: in progress' : gd && col.first && gd > col.first ? 'GPU prices: latest list prices (' + fmtDay(dayNum(gd), false) + ')' :
-        'GPU prices: first record (' + fmtDay(dayNum(col.first), false) + ')', 'GPU rental list prices · a dated baseline, not a signal' +
+        'GPU prices: first record (' + fmtDay(dayNum(col.first), false) + ')', 'GPU rental list prices · a dated baseline' +
         (col.first ? ' · collected daily since ' + fmtDay(dayNum(col.first), true) : '')]);
     }
     if (J.census) parts.push(['Census 2023+', 'US AI-hardware imports, 2023+ (Census) · monthly table in "GPU · CPU · memory in full"']);

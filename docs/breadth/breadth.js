@@ -559,7 +559,7 @@
       late.map(function (p) { return p.name + ' at the close of ' + fmtDay(D.d[lastIdx(p.lines[0].v)], false); }).join(', ') + ')' : '';
     $('idxNow').textContent = 'Above their 50-day average: ' + parts.join(' · ') + lateTxt + '.' + gapTxt;
     $('idxHow').textContent = 'When the big-company index (Nasdaq-100) stays far above the S&P 500 and the small caps (Russell 2000), a few large stocks are holding the index up while most stocks fall: a narrow market. ' +
-      'When all three wash out together, the selling is everywhere. The washout rule was studied on the S&P 500 only; on the other two it is the same rule, untested.';
+      'When all three wash out together, the selling is everywhere. The washout rule was studied on the S&P 500; the other two use the same rule.';
     var sp = Sp.map(function (p) { var li = lastIdx(p.lines[0].v), R = panelPct(p, li); return p.name + ' ' + pct0(val(p)) + ' (' + pctWord(R.s13) + ')'; });
     $('spNow').textContent = 'S&P 500 stocks above their average ' + now + ': ' + sp.join(' · ') + '. Percentiles since 2013; low = rare.';
     $('spHow').textContent = 'The 20-day line turns first (days), the 200-day last (months). All four low together = a broad, deep selloff; the 20-day turning up while the 200-day is still low = an early bounce inside a weak trend. ' +
