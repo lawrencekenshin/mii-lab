@@ -1,0 +1,35 @@
+
+
+
+.vx-top{display:grid;grid-template-columns:minmax(0,1fr);gap:8px 28px;margin-top:10px;align-items:center}
+.vx-num{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px}
+#numVX{color:var(--light);font-weight:700;font-size:44px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.vx-zone{font-size:17px;font-weight:700;color:var(--white)}
+.vx-zone.calm{color:var(--light)} .vx-zone.hot{color:#FFB74D} .vx-zone.panic{color:var(--down)}
+.vx-mean{margin:6px 0 0;font-size:14px;line-height:1.4;color:var(--text)}
+.vx-mean b{color:var(--white)}
+.vx-meter svg,.vx-chart svg,.vx-bars svg{display:block;width:100%;height:auto;overflow:visible}
+#vixts .readout-grid{margin-top:12px}
+.vx-controls{margin:12px 0 2px}
+.seg-range.vx-range{max-width:260px}
+.vx-ro{min-height:2.9em}
+.vx-chart{position:relative;width:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:crosshair}
+.readout .vr{color:var(--light);font-weight:700}
+.readout .vz-panic{color:var(--down);font-weight:700}
+.vx-h3{margin:20px 0 0;color:var(--white);font-size:18px;font-weight:700;letter-spacing:-.01em}
+.vx-cap{margin:4px 0 6px;font-size:13px;line-height:1.4;color:var(--muted)}
+.vx-eli5{margin-top:14px}
+.lg-ratio{display:inline-block;width:16px;height:0;border-top:2px solid #8EC0FA}
+.lg-spy{display:inline-block;width:16px;height:0;border-top:1.5px solid #D1D4DC}
+.lg-one{display:inline-block;width:16px;height:0;border-top:1.5px solid #EF5350}
+.lg-q5{display:inline-block;width:16px;height:0;border-top:1.5px dashed #FFB74D}
+.lg-hot{display:inline-block;width:12px;height:10px;background:rgba(239,83,80,.35);border-radius:1px}
+.lg-b21{display:inline-block;width:10px;height:10px;background:#3987E5;border-radius:1px}
+.lg-b09{display:inline-block;width:10px;height:10px;background:#5D606B;border-radius:1px}
+@media (max-width:560px){#tilesVX{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:720px){
+  .vx-top{grid-template-columns:minmax(0,40fr) minmax(0,60fr)}
+  #numVX{font-size:54px}
+  .vx-h3{font-size:21px}
+  .vx-ro{min-height:1.6em}
+}

@@ -10,6 +10,8 @@
 <meta name="description" content="How many S&amp;P 500 stocks are above their 50-day and 200-day averages right now, the washouts since 2013, and what came after them. Updated through the trading day.">
 <title>Market breadth · live</title>
 <link rel="stylesheet" href="breadth.css">
+<link rel="stylesheet" href="vixts.css?v=1">
+<link rel="stylesheet" href="idxkdj.css?v=1">
 <link rel="stylesheet" href="kdjwash.css?v=7">
 </head>
 <body>
@@ -189,6 +191,48 @@
       </article>
     </section>
 
+
+    <section class="card" id="vixts" aria-labelledby="tvx">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tvx">VIX ÷ VIX3M<span class="tsep"> · </span><span class="tspan" data-vxspan>last 5 years</span></h2>
+          <p class="sub">Near-term fear (the 1-month VIX) against 3-month fear (VIX3M). Below 1 = calm. Above 1 = panic.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asofVX"></p>
+      <p class="banner banner-warn" id="errVX" hidden></p>
+      <div id="bodyVX" hidden>
+        <div class="vx-top">
+          <div class="vx-hero">
+            <div class="vx-num"><span id="numVX">–</span><span class="vx-zone" id="zoneVX"></span></div>
+            <p class="vx-mean" id="meanVX"></p>
+          </div>
+          <div class="vx-meter" id="meterVX" role="img" aria-label="Where today's ratio sits among the five groups the study used, and the 1.0 panic line"></div>
+        </div>
+        <div class="readout readout-grid"><div class="rg" id="tilesVX"></div></div>
+        <div class="controls vx-controls">
+          <div class="seg seg-range vx-range" role="group" aria-label="VIX ÷ VIX3M time window">
+            <button type="button" data-vxr="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+            <button type="button" data-vxr="5Y" aria-pressed="true" aria-label="Last 5 years">5Y</button>
+            <button type="button" data-vxr="All" aria-pressed="false" aria-label="All data since 2009">All</button>
+          </div>
+        </div>
+        <div class="readout vx-ro" id="roVX" aria-live="polite"></div>
+        <div class="vx-chart" id="chartVX" role="img" aria-label="SPY above, VIX divided by VIX3M below, with the 1.0 panic line"></div>
+        <p class="legend" id="lgVX"></p>
+        <h3 class="vx-h3">What came next, in the study</h3>
+        <p class="vx-cap" id="capVX"></p>
+        <div class="vx-bars" id="barsVX" role="img" aria-label="Average SPY return over the next 13 weeks for each fifth of the ratio, since 2021 and in 2009 to 2012"></div>
+        <p class="legend" id="lgBarsVX"></p>
+        <p class="eli5 vx-eli5"><b>In one line</b>A high ratio has been a signal for when to lean in after fear, not for when to get out.</p>
+        <div class="box">
+          <div class="box-row"><b>How to read it</b><span id="howVX"></span></div>
+          <div class="box-row"><b>Right now</b><span id="nowVX"></span></div>
+          <div class="box-row"><b>The study</b><span id="studyVX"></span></div>
+        </div>
+        <p class="kdj-honest" id="honestVX"></p>
+      </div>
+    </section>
 
 
     <section class="card" id="idx" aria-labelledby="t2">
@@ -389,6 +433,34 @@
     </section>
 
 
+    <section class="card" id="idxkdj" aria-labelledby="tik">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tik">SPY &amp; QQQ · KDJ on 4 candle sizes</h2>
+          <p class="sub">The KDJ of the price itself, on daily, weekly, 2-week and monthly candles. Each open candle is drawn as if it closed at the last close.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asofIK"></p>
+      <p class="banner banner-warn" id="errIK" hidden></p>
+      <div id="bodyIK" hidden>
+        <div class="ik-grid-wrap"><div class="ik-grid" id="gridIK" role="table" aria-label="KDJ status of SPY and QQQ on four candle sizes"></div></div>
+        <div class="controls ik-controls">
+          <div class="seg ik-seg" role="group" aria-label="Ticker for the four charts">
+            <button type="button" data-iks="SPY" aria-pressed="true">SPY</button>
+            <button type="button" data-iks="QQQ" aria-pressed="false">QQQ</button>
+          </div>
+          <span class="ik-close" id="closeIK"></span>
+        </div>
+        <div class="ik-panels" id="panelsIK"></div>
+        <p class="legend" id="lgIK"></p>
+        <div class="box">
+          <div class="box-row"><b>How to read it</b><span id="howIK"></span></div>
+          <div class="box-row"><b>Right now</b><span id="nowIK"></span></div>
+        </div>
+        <p class="kdj-honest" id="honestIK"></p>
+      </div>
+    </section>
+
     <details class="card table-card">
       <summary>The numbers as a table</summary>
       <div class="table-scroll"><table id="tfTable"></table></div>
@@ -430,6 +502,8 @@
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
 <script src="breadth.js" defer></script>
+<script src="vixts.js?v=1" defer></script>
+<script src="idxkdj.js?v=1" defer></script>
 <script src="kdjwash.js?v=7" defer></script>
 </body>
 </html>

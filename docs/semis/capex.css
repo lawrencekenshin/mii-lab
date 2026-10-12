@@ -1,0 +1,17 @@
+
+
+
+#tilesCx{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:560px){#tilesCx{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#capex .controls{margin:8px 0 2px}
+#roCx{min-height:4.5em}
+#roCx .cx-r{overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+@media (max-width:719px){#roCx{min-height:7.4em}}
+#roCx .up{color:var(--up);font-weight:600} #roCx .down{color:var(--down);font-weight:600}
+.cx-sw{position:relative;display:inline-block;width:18px;height:0;border-top:2px solid;flex:0 0 auto}
+.cx-swd{position:absolute;left:5px;top:-5px;width:8px;height:8px;border-radius:50%}
+.cx-hol{display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;border:1.6px solid var(--text);background:var(--panel)}
+.cx-up,.cx-dn{display:inline-block;flex:0 0 auto;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent}
+.cx-up{border-bottom:9px solid var(--up)} .cx-dn{border-top:9px solid var(--down)}
+.cx-band{display:inline-block;flex:0 0 auto;width:16px;height:10px;background:#272B3A;border:1px solid var(--line)}
+#capex .box ul{padding-left:16px}

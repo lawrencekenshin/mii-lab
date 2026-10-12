@@ -11,6 +11,7 @@
 <title>Semis tracking</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="semis.css">
+<link rel="stylesheet" href="capex.css?v=1">
 </head>
 <body>
 <a class="skip" href="#now">Skip to the chart</a>
@@ -186,6 +187,37 @@
       <div class="box">
         <div class="box-row"><b>How to read it</b><span>The S&amp;P KDJ meter is a market-wide oversold gauge built from S&amp;P 500 members' weekly KDJ. A washout day is a day when very few S&amp;P 500 stocks are above their 50-day average. KDJ, MACD-V and OBV-MACD use closed weekly, 2-week and monthly candles; an intraday price is not a firing.</span></div>
         <div class="box-row"><b>What history says</b><span>Price and breadth signals told you <i>when</i> a market washout was happening, not <i>whether</i> the drop was over. Chart indicators fired within about 2 weeks of every low, and the same way at bounces that failed.<span class="box-m" id="macroNote"></span></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="capex" aria-labelledby="tcx">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tcx">Big-tech spending plans<span class="tsep"> · </span><span class="tspan" data-cxspan>2013 to now</span></h2>
+          <p class="sub">What Meta, Alphabet, Amazon and Oracle said in their SEC filings they plan to spend on data centres, servers and chips (capex), and what SMH did.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asofCx"></p>
+      <p class="banner banner-warn" id="errCx" hidden></p>
+      <div id="bodyCx" hidden>
+        <div class="readout readout-grid"><div class="rg" id="tilesCx"></div></div>
+        <div class="controls">
+          <div class="seg seg-range" role="group" aria-label="Spending-plan chart time window">
+            <button type="button" data-cxr="All" aria-pressed="true" aria-label="2013 to now">2013+</button>
+            <button type="button" data-cxr="2021" aria-pressed="false" aria-label="Since 2021">2021+</button>
+            <button type="button" data-cxr="2024" aria-pressed="false" aria-label="Since 2024">2024+</button>
+          </div>
+        </div>
+        <div class="readout" id="roCx" aria-live="polite"></div>
+        <div class="chart" id="chartCx" role="img" aria-label="Capex plan paths, raises and cuts per quarter, and SMH with raise and cut days, on one time axis"></div>
+        <p class="legend" id="lgCx"></p>
+        <div class="box">
+          <div class="box-row"><b>How to read it</b><span id="howCx"></span></div>
+          <div class="box-row"><b>Right now</b><span id="nowCx"></span></div>
+          <div class="box-row"><b>What history says</b><span id="histCx"></span></div>
+        </div>
+        <p class="honest" id="honestCx"></p>
       </div>
     </section>
 
@@ -558,5 +590,6 @@
 
 <noscript><p class="wrap noscript">This page needs JavaScript for the current readings, the calendar and the charts.</p></noscript>
 <script src="semis.js" defer></script>
+<script src="capex.js?v=1" defer></script>
 </body>
 </html>
