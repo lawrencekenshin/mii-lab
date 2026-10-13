@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Turning Points: three published studies on today's prices. Greenwood boom watch for tech, Goetzmann crash context for the S&amp;P 500, and Martin's expected-return bound from S&amp;P 500 options.">
+<title>Turning Points · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="tp.css?v=202610131702">
+</head>
+<body class="antialiased">
+<a class="skip" href="#root">Skip to the models</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Turning Points</span><span class="t-short">Turns</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+
+<div id="root"></div>
+<noscript><p class="wrap">This page needs JavaScript to draw the charts.</p></noscript>
+<script>
+
+
+(function () {
+  var f = window.fetch.bind(window), MAX = 4, STALL = 8000, TRIES = 6, active = 0, queue = [], NULL_BODY = [101, 204, 205, 304];
+  function pump() {
+    while (active < MAX && queue.length) { var job = queue.shift(); active++; job().then(done, done); }
+  }
+  function done() { active--; pump(); }
+  function attempt(input, init) {
+    var ctl = new AbortController(), outer = init && init.signal, last = Date.now(), bytes = 0;
+    var dog = setInterval(function () { if (Date.now() - last > STALL) ctl.abort(); }, 500);
+    function onOuter() { ctl.abort(); }
+    if (outer) outer.addEventListener('abort', onOuter);
+    return f(input, Object.assign({}, init || {}, {signal: ctl.signal})).then(function (r) {
+      last = Date.now();
+      if (!r.body || NULL_BODY.indexOf(r.status) >= 0) return {r: r, body: null};
+      var reader = r.body.getReader(), parts = [];
+      function pull() {
+        return reader.read().then(function (x) {
+          if (x.done) return;
+          parts.push(x.value); bytes += x.value.length; last = Date.now();
+          return pull();
+        });
+      }
+      return pull().then(function () {
+        var body = new Uint8Array(bytes), o = 0;
+        parts.forEach(function (p) { body.set(p, o); o += p.length; });
+        return {r: r, body: body};
+      });
+    }).finally(function () { clearInterval(dog); if (outer) outer.removeEventListener('abort', onOuter); });
+  }
+  function run(input, init, n) {
+    var outer = init && init.signal;
+    if (outer && outer.aborted) return Promise.reject(outer.reason);
+    return attempt(input, init).then(function (x) {
+      return new Response(x.body, {status: x.r.status, statusText: x.r.statusText, headers: x.r.headers});
+    }, function (e) {
+      if (outer && outer.aborted) throw outer.reason;
+      if (n + 1 >= TRIES) throw e;
+      return new Promise(function (r) { setTimeout(r, Math.min(3000, 400 * (n + 1))); }).then(function () { return run(input, init, n + 1); });
+    });
+  }
+  window.fetch = function (input, init) {
+    return new Promise(function (resolve, reject) {
+      queue.push(function () { var p = run(input, init, 0); p.then(resolve, reject); return p; });
+      pump();
+    });
+  };
+})();
+</script>
+<script src="tp.js?v=202610131702"></script>
+</body>
+</html>

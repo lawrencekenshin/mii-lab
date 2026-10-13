@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Which stocks are building one-sided call or put positions, ranked over a day, a week, two weeks and a month.">
+<title>Skew Tracker · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="skew.css?v=20261013k">
+</head>
+<body>
+<a class="skip" href="#list">Skip to the list</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Skew Tracker</span><span class="t-short">Skew</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+
+
+<main class="wrap">
+  <section class="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Fetching the latest numbers…</span>
+    </div>
+    <p class="status-line" id="statusLine"></p>
+  </section>
+
+  <div id="banners" aria-live="polite"></div>
+
+  <div class="head">
+    <div class="head-row">
+      <h1>Skew Tracker</h1>
+    </div>
+    <p class="sub">Which stocks are piling into calls or into puts: new option positions on one side, as a share of each stock's own options, over a day, a week, two weeks and a month.</p>
+  </div>
+
+  <div class="controls" role="group" aria-label="What to show">
+    <div class="ctl">
+      <span class="ctl-k" id="lblWin">Time frame</span>
+      <span class="seg" role="group" aria-labelledby="lblWin" id="winSeg">
+        <button type="button" data-w="1d" aria-pressed="true">1D</button>
+        <button type="button" data-w="1w" aria-pressed="false">1W</button>
+        <button type="button" data-w="2w" aria-pressed="false">2W</button>
+        <button type="button" data-w="1m" aria-pressed="false">1M</button>
+      </span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-k" id="lblSide">Leaning to</span>
+      <span class="seg" role="group" aria-labelledby="lblSide" id="sideSeg">
+        <button type="button" data-s="C" aria-pressed="true" class="s-c">Calls ↑</button>
+        <button type="button" data-s="P" aria-pressed="false" class="s-p">Puts ↓</button>
+      </span>
+    </div>
+    <div class="ctl">
+      <label class="ctl-k" for="listSel">List</label>
+      <select id="listSel" class="sel">
+        <option value="all">Whole list</option>
+        <option value="spx">S&amp;P 500</option>
+        <option value="ndx">Nasdaq 100</option>
+        <option value="wl">Watchlist 1</option>
+        <option value="ai">AI companies</option>
+      </select>
+    </div>
+    <div class="ctl ctl-q">
+      <label class="ctl-k" for="q">Find a stock</label>
+      <input id="q" class="q" type="search" placeholder="Ticker or name" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    </div>
+  </div>
+
+  <div class="controls rankrow" role="group" aria-label="How to rank the list">
+    <div class="ctl">
+      <span class="ctl-k" id="lblRank">Rank by</span>
+      <span class="seg seg-rank" role="group" aria-labelledby="lblRank" id="rankSeg">
+        <button type="button" data-r="skew" aria-pressed="true">Skew</button>
+        <button type="button" data-r="kd" aria-pressed="false">King distance</button>
+        <button type="button" data-r="kz" aria-pressed="false">King size</button>
+        <button type="button" data-r="bz" aria-pressed="false">Business</button>
+      </span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-k" id="lblKf">Filter</span>
+      <button type="button" class="tog" id="kSide" aria-pressed="false">King on the lean's side</button>
+    </div>
+  </div>
+
+  <section class="study today" id="tiles" aria-label="Summary"></section>
+
+  <section class="card list-card" id="list" aria-labelledby="listH">
+    <div class="list-head">
+      <h2 id="listH">Call-heavy · 1D</h2>
+      <p class="sub" id="listSub"></p>
+    </div>
+    <div class="tbl" id="tbl" role="table" aria-describedby="listSub"></div>
+    <p class="empty" id="empty" hidden></p>
+    <div id="others" hidden>
+      <h3 class="h3">Other names we track</h3>
+      <div class="tbl" id="tblOthers" role="table"></div>
+    </div>
+  </section>
+
+  <section class="card" id="tapeCard" hidden aria-labelledby="tapeH">
+    <h2 id="tapeH">Traded but not settled yet</h2>
+    <p class="sub" id="tapeSub"></p>
+    <div class="tbl" id="tblTape" role="table"></div>
+    <p class="empty" id="tapeEmpty" hidden></p>
+  </section>
+
+  <section class="card" aria-labelledby="covH">
+    <details class="table-card" id="covBox">
+      <summary id="covH">Days on record</summary>
+      <p class="src">How many stocks each day's numbers cover. Days marked “net only” come from an older daily snapshot that kept the overall tilt but not calls and puts separately; days marked “joined” fold two or three sessions together because the days between were never saved.</p>
+      <div class="table-scroll"><table id="covTbl"><thead><tr><th>Day</th><th>Stocks</th><th>Full detail</th><th>Net only</th><th>Joined</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+
+  <footer class="foot">
+    <p><b>Reading it.</b> Open interest is the number of option contracts still open after each day. A stock ranks here when far more new contracts opened on one side (calls or puts) than the other, measured against that stock's own options, so a big name and a small one can sit on the same list. The time frames add up each day's new positions.</p>
+    <p><b>Opened is not the same as bought.</b> Every option has a buyer and a seller. “Read” looks at where the last trades sat against the price quoted at the close: near the asking price usually means buyers were in a hurry, near the bid means sellers were. Calls sold at the bid are often stock owners writing calls, not a bet on a rise.</p>
+    <p><b>Timing.</b> Open interest is posted the morning after each session, so the newest full day is always one session behind. The “traded but not settled” section uses the newest session's trading: where more contracts traded than were open that morning, the difference has to be new positions.</p>
+    <noscript><p class="noscript">This page needs JavaScript.</p></noscript>
+  </footer>
+</main>
+
+<script src="skew.js?v=20261013k"></script>
+</body>
+</html>

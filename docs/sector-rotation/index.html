@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="The S&amp;P 500 sectors and industry groups side by side: where money is rotating, the fear meter and breadth of each, and the options (gamma) map of each fund and its members, after each US close.">
+<title>Sector Rotation · live</title>
+<link rel="stylesheet" href="sr.css?v=20261013b">
+</head>
+<body>
+<a class="skip" href="#app">Skip to the board</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <section class="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-closed" id="chip">LOADING</span>
+      <span class="asof" id="asof"></span>
+      <span class="grow"></span>
+      <div class="switches">
+        <div class="seg seg-fam" role="group" aria-label="Sectors or industry groups">
+          <button type="button" data-f="sectors" aria-pressed="true">Sectors</button>
+          <button type="button" data-f="industries" aria-pressed="false">Industries</button>
+        </div>
+        <div class="seg seg-view" role="group" aria-label="View">
+          <button type="button" data-view="simple" aria-pressed="true">Simple</button>
+          <button type="button" data-view="full" aria-pressed="false">Full</button>
+        </div>
+      </div>
+    </div>
+    <p class="status-line muted" id="vintage"></p>
+    <p class="behind" id="behind" role="status" hidden></p>
+  </section>
+  <div id="app"><p class="loading">Loading the board…</p></div>
+  <footer class="foot" id="foot"></footer>
+</main>
+
+<noscript><p class="wrap loading">This page needs JavaScript to draw the board.</p></noscript>
+<script src="sr.js?v=20261013b"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+
+
+.top{border-bottom:1px solid #2A2E39;position:sticky;top:0;background:rgba(19,23,34,.94);backdrop-filter:blur(6px);z-index:6}
+.top .topbar{display:flex;align-items:center;gap:14px;height:48px}
+.top .brand{color:#8A8E99;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap;padding:13px 0}
+.top .tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.top .tabs::-webkit-scrollbar{display:none}
+.top .tab{color:#8A8E99;text-decoration:none;font-size:14px;font-weight:600;padding:13px 10px;border-bottom:2px solid transparent;white-space:nowrap}
+.top .tab[aria-current=page]{color:#FFFFFF;border-bottom-color:#7E57C2}
+.top .t-long{display:inline}
+.top .t-short{display:none}
+@media (max-width:799px){.top .topbar{gap:10px}.top .tabs{gap:0}.top .tab{padding:13px 6px;font-size:13.5px;letter-spacing:-.01em}
+  .top .t-long{display:none}.top .t-short{display:inline}}
+@media (max-width:420px){.top .topbar{gap:8px}.top .tab{padding:13px 4px;font-size:13px;letter-spacing:-.015em}}
+@media (max-width:359px){.top .topbar{gap:6px}.top .brand{font-size:11.5px}.top .tab{padding:13px 2.5px;font-size:12px}}

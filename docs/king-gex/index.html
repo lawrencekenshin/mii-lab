@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="King nodes - the biggest gamma strikes on each stock's option map - tracked session by session, with the strongest kings ranked and paired with option skews.">
+<title>King GEX Tracker · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css?v=20261013k">
+</head>
+<body>
+<header class="top">
+  <div class="topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">King GEX Tracker</span><span class="t-short">King</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div id="bar">
+  <span id="brand">KING GEX</span>
+  <button id="topBtn" class="chip">★ Top kings</button>
+  <button id="skewBtn" class="chip" title="Highest-ranked call and put skews, paired with their king nodes"><svg width="14" height="9" viewBox="0 0 14 9"><rect x="0" y="1.5" width="9" height="6" rx="1" fill="#26a69a"/><rect x="9" y="1.5" width="5" height="6" rx="1" fill="#ef5350"/></svg>Skew × King</button>
+  <button id="pileBtn" class="chip" title="Highest-ranked call and put skews, paired with their biggest positive-GEX piles"><svg width="12" height="11" viewBox="0 0 12 11"><rect x="0" y="7" width="12" height="3.2" rx="1" fill="#f5d63d"/><rect x="1.5" y="3.5" width="9" height="3.2" rx="1" fill="#f5d63d" opacity=".75"/><rect x="3.5" y="0" width="5" height="3.2" rx="1" fill="#f5d63d" opacity=".5"/></svg>Skew × Pile</button>
+  <div id="qwrap"><input id="q" placeholder="Ticker or name" autocomplete="off" spellcheck="false" aria-label="Find a ticker or name"><div id="qlist" hidden></div></div>
+  <span id="chips"></span>
+  <button id="movedBtn" class="chip" hidden></button>
+  <span id="status"><b></b><span></span></span>
+</div>
+<div id="moved" hidden></div>
+<main id="app"><div class="empty">Loading…</div></main>
+<script src="app.js?v=20261013k"></script>
+</body>
+</html>

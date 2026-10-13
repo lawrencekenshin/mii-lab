@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="AI Pulse: which parts of the AI supply chain are growing faster than three months ago and which are slowing, in plain words, with the date every number became public.">
+<title>AI Pulse · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="ai-pulse.css?v=1">
+</head>
+<body>
+<a class="skip" href="#now">Skip to the summary</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">AI Pulse</span><span class="t-short">AI</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="status" id="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Fetching the latest numbers…</span>
+    </div>
+    <p class="status-line" id="statusLine"></p>
+    <p class="status-line tagline" id="tagLine"></p>
+  </section>
+
+  <div id="banners" aria-live="assertive"></div>
+
+  <div id="content" hidden>
+    <div class="controls">
+      <div class="seg seg-range" role="group" aria-label="Time window for the history table and the charts" id="ranges">
+        <button type="button" data-range="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+        <button type="button" data-range="2Y" aria-pressed="true" aria-label="Last 2 years">2Y</button>
+        <button type="button" data-range="3Y" aria-pressed="false" aria-label="Last 3 years">3Y</button>
+      </div>
+      <p class="hint ctl-hint">The window for the history table and the charts</p>
+    </div>
+
+
+    <section class="card" id="now" aria-labelledby="t1">
+      <div class="card-head hero-head">
+        <div class="card-title">
+          <h1 id="t1">AI right now</h1>
+          <p class="lead" id="lead1"></p>
+          <p class="lead2" id="lead2"></p>
+        </div>
+        <div class="hero" id="hero">
+          <div class="hero-num"><span id="heroV">–</span> <span class="hero-k">parts speeding up</span></div>
+          <div class="dots" id="dots" role="img" aria-label="How many parts are speeding up, steady and slowing"></div>
+          <div class="dot-labs" id="dotLabs"></div>
+          <div class="hero-date" id="heroDate"></div>
+        </div>
+      </div>
+      <p class="key" id="key1"></p>
+      <div class="lanes" id="lanes"></div>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span id="howTo"></span></div>
+        <div class="box-row"><b>Right now</b><span id="rightNow"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="week" aria-labelledby="tw" hidden>
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tw">This week<span class="tsep"> · </span><span class="tspan">daily and weekly readings</span></h2>
+          <p class="lead" id="wkLead"></p>
+          <p class="lead2" id="wkSub"></p>
+        </div>
+      </div>
+      <div class="wk-pills" id="wkPills"></div>
+      <p class="wk-asof" id="wkAsof"></p>
+      <p class="wk-tag" id="wkTag"></p>
+      <div class="wk-grid" id="wkGrid"></div>
+      <button type="button" class="more" id="wkMore" hidden aria-expanded="false">Show all parts</button>
+      <p class="legend wk-legend" id="wkLegend"></p>
+      <div class="wk-use" id="wkUse" hidden></div>
+      <div class="wk-two">
+        <div class="wk-col">
+          <h3 class="wk-ct">What changed since last week</h3>
+          <ol class="wk-chg" id="wkChg"></ol>
+        </div>
+        <div class="wk-col">
+          <h3 class="wk-ct">Biggest share-price moves this week</h3>
+          <p class="hint wk-mvnote" id="wkMvNote"></p>
+          <div class="wk-mv" id="wkMv"></div>
+        </div>
+      </div>
+      <div class="wk-next">
+        <h3 class="wk-ct">Next fast numbers</h3>
+        <ol class="wk-nx cal" id="wkNext"></ol>
+      </div>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span id="wkHow"></span></div>
+        <div class="box-row"><b>Keep in mind</b><span id="wkMind"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="history" aria-labelledby="t2">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t2">How each part changed<span class="tsep"> · </span><span class="tspan" data-span>last 2 years</span></h2>
+          <p class="lead" id="lead3"></p>
+          <p class="lead2" id="heatOrder"></p>
+        </div>
+      </div>
+      <div class="heat-head">
+        <p class="legend" id="heatLegend"></p>
+        <p class="hint swipe" id="heatHint">Swipe sideways for earlier quarters</p>
+      </div>
+      <div class="heat-wrap" id="heatWrap">
+        <div class="heat-scroll" id="heatScroll">
+          <table class="heat" id="heat" aria-describedby="heatLegend"></table>
+          <div class="today-ring" id="todayRing" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="card" id="movers" aria-labelledby="t3">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t3">Biggest moves in single companies</h2>
+          <p class="lead" id="lead4"></p>
+        </div>
+      </div>
+      <div class="mv-grid">
+        <div class="mv-col"><h3 class="mv-t"><span class="arw acc" aria-hidden="true"></span>Speeding up most</h3><ol class="mv-list" id="mvUp"></ol></div>
+        <div class="mv-col"><h3 class="mv-t mv-t-slow"><span class="arw slw" aria-hidden="true"></span>Slowing most</h3><ol class="mv-list" id="mvDown"></ol></div>
+      </div>
+      <button type="button" class="more" id="mvMore" hidden aria-expanded="false">Show more</button>
+    </section>
+
+
+    <div id="groups"></div>
+
+
+    <section class="card" id="calendar" aria-labelledby="t9">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="t9">When the numbers change next</h2>
+          <p class="lead" id="lead9"></p>
+        </div>
+      </div>
+      <ol class="cal cal-cols" id="cal"></ol>
+      <details class="cal-more" id="calMore" hidden><summary id="calMoreSum">Later releases</summary><ol class="cal cal-later" id="cal3"></ol></details>
+      <p class="hint" id="calNote"></p>
+    </section>
+
+    <details class="card table-card" id="allMembers">
+      <summary>Every company and trade figure</summary>
+      <p class="hint" id="allHint"></p>
+      <div class="table-scroll"><table class="allm" id="allTable"></table></div>
+    </details>
+
+    <details class="card table-card" id="gaps">
+      <summary>What is missing or estimated</summary>
+      <ul class="gap-list" id="gapList"></ul>
+    </details>
+
+    <details class="card table-card" id="readNotes">
+      <summary>How the numbers are put together</summary>
+      <div class="prose" id="notesBody"></div>
+    </details>
+
+    <details class="card table-card" id="sources">
+      <summary>Sources</summary>
+      <div class="prose">
+        <ul>
+          <li><b>Company results:</b> quarterly results, outlooks and filings (US SEC filings and company releases).</li>
+          <li><b>Taiwan exports:</b> customs export statistics, Ministry of Finance.</li>
+          <li><b>Korea exports:</b> the trade ministry's monthly memory and system-chip exports.</li>
+          <li><b>US imports:</b> US Census Bureau international trade data (general imports, monthly value).</li>
+          <li><b>Japan chip-tool exports:</b> Japan customs data, from a free public trade database.</li>
+          <li><b>Share prices:</b> delayed daily closes, in US dollars. “Chip stocks” means SMH, a fund that holds the big chip stocks.</li>
+          <li><b>This week’s readings:</b> Korea Customs Service 10-day export counts (공공누리, attribution 관세청); Taiwan Stock Exchange and Taipei Exchange open data; Wikimedia page views (CC0); Hacker News via HN Search by Algolia; Hugging Face Hub; GitHub; Indeed Hiring Lab job postings (CC BY 4.0); npm public download counts; cloud providers’ public GPU price lists.</li>
+        </ul>
+        <p id="censusLine"></p>
+      </div>
+    </details>
+  </div>
+
+  <footer class="foot">
+    <p id="footTag"></p>
+    <p id="footCensus"></p>
+    <p>Derived values only: growth rates and changes from public filings and statistics, each with the date it became public; share prices are delayed daily closes. No cookies, no tracking.</p>
+  </footer>
+</main>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the tables and charts.</p></noscript>
+<script src="ai-pulse.js?v=1" defer></script>
+</body>
+</html>

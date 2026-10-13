@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="US inflation in plain words: the best guess for the next CPI or PCE release, what is pushing prices, what bond markets expect, what a CPI surprise does to SPY and QQQ, and a track record of every past call.">
+<title>Inflation Lab · live</title>
+<link rel="stylesheet" href="app.css?v=89f0ed63f4">
+<link rel="stylesheet" href="site.css?v=89f0ed63f4">
+<link rel="stylesheet" href="pub.css?v=89f0ed63f4">
+</head>
+<body class="m-simple">
+<a class="skip" href="#forecast">Skip to the forecast</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Inflation Lab</span><span class="t-short">Inflation</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+
+<div class="gbar" id="gbar">
+  <div class="wrap gbar-in">
+    <div class="ctl ctl-head">
+      <h1 class="pg-title">Inflation <b>Lab</b></h1>
+      <div class="seg seg-mode" role="group" aria-label="Page view" id="cMode">
+        <button type="button" data-v="simple">Simple</button>
+        <button type="button" data-v="track" aria-label="Track record"><span class="m-long">Track record</span><span class="m-short">Track</span></button>
+      </div>
+    </div>
+    <div class="ctl-row2">
+      <div class="ctl">
+        <span class="ctl-lab" id="lAsset">Asset</span>
+        <div class="seg" role="group" aria-labelledby="lAsset" id="cAsset">
+          <button type="button" data-v="SPY">SPY</button>
+          <button type="button" data-v="QQQ">QQQ</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <span class="ctl-lab" id="lWhen">Stocks</span>
+        <div class="seg" role="group" aria-labelledby="lWhen" id="cWhen">
+          <button type="button" data-v="63" aria-label="Next 3 months"><span class="t-long">Next 3 months</span><span class="t-short">3 months</span></button>
+          <button type="button" data-v="21" aria-label="Next month"><span class="t-long">Next month</span><span class="t-short">1 month</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <p class="sline" id="sline">Fetching the latest numbers…</p>
+  <section class="fc notrack" id="forecast" aria-label="The forecast"></section>
+  <div id="simple" class="simple-only" aria-label="Simple view"></div>
+  <div id="track" class="track-only" aria-label="Track record"></div>
+  <footer class="foot" id="foot">
+    <p>Inflation data: U.S. Bureau of Labor Statistics (CPI) and U.S. Bureau of Economic Analysis (PCE), retrieved from FRED and ALFRED, Federal Reserve Bank of St. Louis (CPIAUCSL, CPILFESL, CPIAUCNS, CPILFENS, PCEPI, PCEPILFE). Treasury yields: Board of Governors of the Federal Reserve System, retrieved from FRED (DGS2, DGS10, DFII10). The economic-data model's other inputs are FRED series too (BLS, Federal Reserve Bank of Chicago, U.S. Energy Information Administration).</p>
+    <p>Inflation nowcasts: Federal Reserve Bank of Cleveland. Supply- and demand-driven PCE inflation: Federal Reserve Bank of San Francisco (Shapiro). Multivariate Core Trend: Federal Reserve Bank of New York. Risk-free rate: Kenneth R. French Data Library. Bond-stock beta method: Campbell, Pflueger and Viceira (2026), Annual Review of Financial Economics; Pflueger (2025), Journal of Financial Economics.</p>
+    <p>SPY and QQQ appear only as returns (with dividends) and as this page's own model results. Release dates: BLS and BEA published schedules. Times are New York time.</p>
+  </footer>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drTitle" hidden>
+  <div class="dr-head">
+    <h2 id="drTitle">How this is worked out</h2>
+    <button type="button" class="dr-x" id="drClose" aria-label="Close">✕</button>
+  </div>
+  <div class="dr-body" id="drBody" tabindex="-1"></div>
+</aside>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="charts.js?v=89f0ed63f4" defer></script>
+<script src="simple.js?v=89f0ed63f4" defer></script>
+<script src="track.js?v=89f0ed63f4" defer></script>
+<script src="pub.js?v=89f0ed63f4" defer></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+
+.ctl-head{gap:10px}
+.pg-title{margin:0;font-size:15px;font-weight:700;color:#FFFFFF;letter-spacing:.02em;white-space:nowrap}
+.pg-title b{color:var(--light);font-weight:700}
+.gbar .seg-mode{margin-left:0}
+@media (max-width:719px){.ctl-head{justify-content:space-between}.ctl-head .seg-mode{margin-left:auto}}
+.note .def{margin:4px 0 0;color:var(--text);line-height:1.45}
+.sline.bad{color:var(--amber)}

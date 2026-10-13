@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="The whole market on one page: how many stocks join in, whether money is easier or tighter, what leads across assets, and how far SPY usually moves.">
+<title>Market Board · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="board.css?v=1">
+</head>
+<body>
+<a class="skip" href="#glance">Skip to the board</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Market Board</span><span class="t-short">Board</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="status" id="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Fetching the board…</span>
+    </div>
+    <p class="status-line" id="statusLine"></p>
+  </section>
+
+  <div id="banners" aria-live="assertive"></div>
+
+  <div id="content" hidden>
+
+    <section class="card glance" id="glance" aria-labelledby="tg">
+      <div class="card-head">
+        <div class="card-title">
+          <h1 id="tg">Market Board</h1>
+          <p class="sub">The whole market in five short reads, from the last close.</p>
+        </div>
+      </div>
+      <div class="readout readout-grid"><div class="rg" id="tiles"></div></div>
+    </section>
+
+
+    <section class="card" id="breadth" aria-labelledby="tb">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tb">Breadth &amp; participation</h2>
+          <p class="sub">How many S&amp;P 500 stocks are joining in · each gauge vs its own last year</p>
+        </div>
+      </div>
+      <div class="score-row" id="bScore"></div>
+      <p class="panel-asof" id="bAsof"></p>
+      <div class="gauges" id="bGauges" role="list"></div>
+      <p class="ctx-line" id="bCtx"></p>
+      <h3 class="mini-h">Score, last 60 sessions</h3>
+      <div class="readout" id="bRo" aria-live="polite"></div>
+      <div class="chart" id="bChart" role="img" aria-label="Breadth score for the last 60 sessions, 0 to 10"></div>
+      <p class="legend" id="bLg"></p>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span id="bHow"></span></div>
+        <div class="box-row"><b>Right now</b><span id="bNow"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="liquidity" aria-labelledby="tl">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tl">Liquidity backdrop</h2>
+          <p class="sub">Is money getting easier or tighter? Three gauges, each ranked against its own last 6 months</p>
+        </div>
+      </div>
+      <div class="score-row" id="lScore"></div>
+      <p class="panel-asof" id="lAsof"></p>
+      <div class="gauges" id="lGauges" role="list"></div>
+      <h3 class="mini-h">The three gauges and the composite, last 65 sessions</h3>
+      <div class="readout" id="lRo" aria-live="polite"></div>
+      <div class="chart" id="lChart" role="img" aria-label="Liquidity ranks for the last 65 sessions"></div>
+      <p class="legend" id="lLg"></p>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span id="lHow"></span></div>
+        <div class="box-row"><b>Right now</b><span id="lNow"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="regime" aria-labelledby="tr">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tr">Cross-asset regime</h2>
+          <p class="sub">Are stocks beating gold, commodities and the dollar? Trend and KDJ on three weekly ratios</p>
+        </div>
+      </div>
+      <div class="rg-gauge" id="rGauge"></div>
+      <p class="panel-asof" id="rAsof"></p>
+      <div class="pairs" id="rPairs"></div>
+      <p class="legend" id="rLg"></p>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span id="rHow"></span></div>
+        <div class="box-row"><b>Right now</b><span id="rNow"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="weather" aria-labelledby="tw">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tw">Risk weather</h2>
+          <p class="sub">How far SPY and QQQ usually move, and the odds of a rough patch</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="wAsof"></p>
+      <div class="wx">
+        <div class="wx-col">
+          <h3 class="mini-h">Where price lands in a month</h3>
+          <div id="wRanges"></div>
+          <p class="legend" id="wLg"></p>
+        </div>
+        <div class="wx-col">
+          <h3 class="mini-h">Chance of a storm</h3>
+          <div class="storm" id="wStorm"></div>
+          <p class="mini-note" id="wStormNote"></p>
+        </div>
+        <div class="wx-col">
+          <h3 class="mini-h">Up or down?</h3>
+          <div id="wDir"></div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-row"><b>How to read it</b><span id="wHow"></span></div>
+        <div class="box-row"><b>Right now</b><span id="wNow"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="spy" aria-labelledby="ts">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="ts">SPY: the chances</h2>
+          <p class="sub">Odds for the days and weeks ahead, from the last close</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="sAsof"></p>
+      <p class="s-head" id="sHead"></p>
+      <div class="fblock">
+        <h3 class="fb-h">Will SPY be higher?</h3>
+        <div class="prob" id="sHigher"></div>
+        <p class="fb-note" id="sHigherNote"></p>
+      </div>
+      <div class="fblock">
+        <h3 class="fb-h">Where could SPY close?</h3>
+        <div id="sRanges"></div>
+        <p class="legend" id="sLg"></p>
+        <p class="fb-note" id="sRangeNote"></p>
+      </div>
+      <div class="fblock">
+        <h3 class="fb-h" id="sBumpyH">How bumpy?</h3>
+        <div class="prob" id="sBumpy"></div>
+        <p class="fb-note" id="sBumpyNote"></p>
+      </div>
+      <div class="fblock" id="sSigBlock">
+        <h3 class="fb-h" id="sSigH">Washout signal</h3>
+        <div class="prob" id="sSig"></div>
+        <p class="fb-note" id="sSigNote"></p>
+      </div>
+      <div class="box">
+        <div class="box-row"><b>How well it has held</b><span id="sTrust"></span></div>
+        <div class="box-row"><b>Right now</b><span id="sNow"></span></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <p>Breadth from the daily closes of today’s S&amp;P 500 members. Net liquidity from the Fed’s balance sheet and the Treasury’s daily statement. The dollar is the Fed’s broad dollar index and the high-yield spread is the extra yield on junk bonds; both are shown only as ranks. The cross-asset lines are ratios of ETF closes. Ranges and odds use the VIX close and past index moves. No live quotes and no option data on this page.</p>
+    <p id="footBuilt">Rebuilt after each close.</p>
+  </footer>
+</main>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="board.js?v=1" defer></script>
+</body>
+</html>
