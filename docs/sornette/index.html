@@ -7,13 +7,13 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#131722">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="Sornette Dashboard: three separate questions (bubble shape, runaway price, weakening) answered in plain words, every reading dated.">
+<meta name="description" content="Sornette: do several fitting windows agree that prices are accelerating toward a turning point? Bubble and panic confidence, smoothness and its KDJ for eight markets, after each US close.">
 <title>Sornette · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="sornette.css?v=20261013pub2">
+<link rel="stylesheet" href="sornette.css?v=202610140158">
 </head>
-<body>
-<a class="skip" href="#now">Skip to today's answers</a>
+<body class="antialiased">
+<a class="skip" href="#root">Skip to the readings</a>
 
 <header class="top">
   <div class="wrap topbar">
@@ -32,163 +32,59 @@
   </div>
 </header>
 
-<section class="wrap hero" aria-labelledby="h1">
-  <h1 id="h1">Sornette Dashboard</h1>
-  <p class="method">Bubble shape, unusual regimes, and observed weakening, with every reading dated.</p>
-</section>
+<div id="root"></div>
+<noscript><p class="wrap">This page needs JavaScript to draw the charts.</p></noscript>
+<script>
 
 
-<div class="symbar" id="symbar">
-  <div class="wrap symbar-in">
-    <label class="sym-pick">
-      <span class="sym-face" aria-hidden="true"><b id="faceT">&nbsp;</b><small id="faceN">&nbsp;</small></span>
-      <span class="sym-caret" aria-hidden="true">▾</span>
-      <select id="symSelect" aria-label="Instrument"></select>
-    </label>
-    <div class="picker" id="symChips" role="group" aria-label="Instrument"></div>
-    <div class="quote" id="quote" aria-live="polite"><span class="sub">Loading the readings...</span></div>
-  </div>
-</div>
-
-<main class="wrap" id="main">
-  <p class="meta" id="meta">Loading the readings...</p>
-  <div id="banners" aria-live="polite"></div>
-
-  <div class="grid" id="grid">
-
-
-    <section class="card now" id="now" aria-labelledby="t-now">
-      <h2 id="t-now">Right now</h2>
-      <p class="lede">Three separate answers, each one dated.</p>
-      <ol class="answers" id="answers"></ol>
-    </section>
-
-
-    <section class="card price" id="price" aria-labelledby="t-price">
-      <div class="price-head">
-        <h2 id="t-price">Price and indicators, every reading dated</h2>
-        <div class="seg" role="group" aria-label="Chart range" id="rangeSeg">
-          <button type="button" data-r="1y" aria-pressed="false">1Y</button>
-          <button type="button" data-r="3y" aria-pressed="false">3Y</button>
-          <button type="button" data-r="5y" aria-pressed="true">5Y</button>
-          <button type="button" data-r="2013" aria-pressed="false">2013+</button>
-          <button type="button" data-r="all" aria-pressed="false">All</button>
-        </div>
-      </div>
-      <div class="pane-toggles" id="paneToggles" role="group" aria-label="Indicator panes"></div>
-      <p class="readout hero-readout" id="heroReadout" aria-live="polite"></p>
-      <div class="tvbox" id="heroTV" tabindex="0" role="application" aria-roledescription="chart" aria-label="Price with indicator panes below it. Use the left and right arrow keys to step through days (Shift for 20 days), Home and End for the first and last day in view, Escape to go back to the latest day."></div>
-      <p class="sr-only" id="heroSr" aria-live="polite"></p>
-      <div class="svgbox hero-chart" id="heroChart" hidden></div>
-      <p class="tvhint" id="tvHint"></p>
-      <div class="key" id="heroKey"></div>
-      <div class="caption" id="heroCaption"></div>
-      <div class="fine" id="heroFine"></div>
-    </section>
-
-
-    <section class="card" id="bubble" aria-labelledby="t-bubble">
-      <div class="card-head"><span class="num">1</span><h2 class="qh" id="t-bubble">Does the climb look like a bubble?</h2></div>
-      <div class="split">
-        <div class="col-l">
-          <div class="verdict" id="bubVerdict"></div>
-          <div class="misses" id="bubMisses"></div>
-        </div>
-        <div class="col-r">
-          <div class="dots13" id="bubDots" role="group" aria-label="The 13 time scales"></div>
-          <div class="scale" aria-hidden="true" id="bubScale"></div>
-          <p class="dots-note" id="bubDotNote" aria-live="polite"></p>
-          <div class="history" id="bubHistory"></div>
-        </div>
-      </div>
-      <div class="fine" id="bubFine"></div>
-      <details class="why" id="bubWhy">
-        <summary><span>Why? How the bubble-shape test works</span></summary>
-        <div class="why-body" id="bubWhyBody"></div>
-      </details>
-    </section>
-
-
-    <section class="card" id="runaway" aria-labelledby="t-run">
-      <div class="card-head"><span class="num">2</span><h2 class="qh" id="t-run">Is the price running away?</h2></div>
-      <div class="split">
-        <div class="col-l">
-          <div class="verdict" id="runVerdict"></div>
-          <p class="context" id="runContext"></p>
-        </div>
-        <div class="col-r">
-          <div class="chart-head">
-            <span class="readout" id="runReadout"></span>
-            <div class="seg" role="group" aria-label="Gauge range" id="runRange">
-              <button type="button" data-r="5y" aria-pressed="false">5Y</button>
-              <button type="button" data-r="2013" aria-pressed="true">2013+</button>
-              <button type="button" data-r="all" aria-pressed="false">All</button>
-            </div>
-          </div>
-          <div class="svgbox gauge-chart" id="runChart"></div>
-        </div>
-      </div>
-      <div class="fine" id="runFine"></div>
-      <details class="why" id="runWhy">
-        <summary><span>Why? What this gauge measures</span></summary>
-        <div class="why-body" id="runWhyBody"></div>
-      </details>
-    </section>
-
-
-    <section class="card" id="weak" aria-labelledby="t-weak">
-      <div class="card-head"><span class="num">3</span><h2 class="qh" id="t-weak">Has the price started to weaken?</h2></div>
-      <div class="split">
-        <div class="col-l">
-          <div class="verdict" id="weakVerdict"></div>
-          <ul class="facts" id="weakFacts"></ul>
-          <p class="ctxline" id="weakCtx"></p>
-        </div>
-        <div class="col-r mid">
-          <div class="pic" id="weakPic"></div>
-        </div>
-      </div>
-      <div class="fine" id="weakFine"></div>
-      <details class="why" id="weakWhy">
-        <summary><span>Why? The rule, and every recent close below it</span></summary>
-        <div class="why-body" id="weakWhyBody"></div>
-      </details>
-    </section>
-
-
-    <section class="card" id="trend" aria-labelledby="t-trend">
-      <div class="card-head"><span class="num num-x">+</span><h2 class="qh" id="t-trend">Is the bubble reading heating up or cooling down?</h2></div>
-      <div class="split">
-        <div class="col-l">
-          <div class="verdict" id="trendVerdict"></div>
-          <p class="context" id="trendInput"></p>
-        </div>
-        <div class="col-r mid">
-          <div class="tf4" id="trendTiles"></div>
-        </div>
-      </div>
-      <div class="fine" id="trendFine"></div>
-      <details class="why" id="trendWhy">
-        <summary><span>Why? Show the chart</span></summary>
-        <div class="why-body" id="trendWhyBody"></div>
-      </details>
-    </section>
-
-
-    <section class="card" id="overview" aria-labelledby="t-ov">
-      <div class="ov-head"><h2 id="t-ov">All eight at a glance</h2><span class="head-note">Tap a row to open it</span></div>
-      <div class="ov" id="ovList" role="list"></div>
-      <div class="fine"><p>Fixed order. Each index moves with the ETF above it.</p></div>
-    </section>
-
-  </div>
-
-  <footer class="foot">
-    <p id="footData">End-of-day data.</p>
-  </footer>
-</main>
-
-<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
-<script src="sornette.js?v=20261013pub2" defer></script>
+(function () {
+  var f = window.fetch.bind(window), MAX = 4, STALL = 8000, TRIES = 6, active = 0, queue = [], NULL_BODY = [101, 204, 205, 304];
+  function pump() {
+    while (active < MAX && queue.length) { var job = queue.shift(); active++; job().then(done, done); }
+  }
+  function done() { active--; pump(); }
+  function attempt(input, init) {
+    var ctl = new AbortController(), outer = init && init.signal, last = Date.now(), bytes = 0;
+    var dog = setInterval(function () { if (Date.now() - last > STALL) ctl.abort(); }, 500);
+    function onOuter() { ctl.abort(); }
+    if (outer) outer.addEventListener('abort', onOuter);
+    return f(input, Object.assign({}, init || {}, {signal: ctl.signal})).then(function (r) {
+      last = Date.now();
+      if (!r.body || NULL_BODY.indexOf(r.status) >= 0) return {r: r, body: null};
+      var reader = r.body.getReader(), parts = [];
+      function pull() {
+        return reader.read().then(function (x) {
+          if (x.done) return;
+          parts.push(x.value); bytes += x.value.length; last = Date.now();
+          return pull();
+        });
+      }
+      return pull().then(function () {
+        var body = new Uint8Array(bytes), o = 0;
+        parts.forEach(function (p) { body.set(p, o); o += p.length; });
+        return {r: r, body: body};
+      });
+    }).finally(function () { clearInterval(dog); if (outer) outer.removeEventListener('abort', onOuter); });
+  }
+  function run(input, init, n) {
+    var outer = init && init.signal;
+    if (outer && outer.aborted) return Promise.reject(outer.reason);
+    return attempt(input, init).then(function (x) {
+      return new Response(x.body, {status: x.r.status, statusText: x.r.statusText, headers: x.r.headers});
+    }, function (e) {
+      if (outer && outer.aborted) throw outer.reason;
+      if (n + 1 >= TRIES) throw e;
+      return new Promise(function (r) { setTimeout(r, Math.min(3000, 400 * (n + 1))); }).then(function () { return run(input, init, n + 1); });
+    });
+  }
+  window.fetch = function (input, init) {
+    return new Promise(function (resolve, reject) {
+      queue.push(function () { var p = run(input, init, 0); p.then(resolve, reject); return p; });
+      pump();
+    });
+  };
+})();
+</script>
+<script src="sornette.js?v=202610140158"></script>
 </body>
 </html>
