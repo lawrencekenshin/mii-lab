@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="SPY, SPX, QQQ, NDX, IWM and RUT options through the day: expected move, gamma levels, kings and piles, volume, implied vol and skew, the VIX options and the megacaps.">
+<title>Index Flow · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css?v=20261013d">
+<link rel="stylesheet" href="site.css?v=20261013d">
+</head>
+<body>
+<header class="top">
+  <div class="topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<header id="bar">
+  <div class="brand">INDEX<b>FLOW</b></div>
+  <nav id="tabs"></nav>
+  <div id="px"><span class="last">—</span><span class="chg"></span></div>
+  <div class="seg" id="lx" title="Simple: the key numbers, a plain summary, the chart and the strip · Full: every panel"><button data-lx="simple">Simple</button><button data-lx="full">Full</button></div>
+  <div id="status"><span id="dot"></span><span id="stxt">loading…</span></div>
+</header>
+<div id="banner" hidden></div>
+<div id="snaps"></div>
+<main id="grid">
+  <section id="tiles" class="tiles"></section>
+
+  <section class="card c-plain">
+    <header><h2>In plain words</h2></header>
+    <ul id="plain"></ul>
+  </section>
+
+  <section class="card c-kp">
+    <header><h2 id="kp-title">Kings &amp; piles</h2><span class="sub" id="kp-sub" style="margin-left:auto"></span></header>
+    <div id="kp"></div>
+  </section>
+
+  <section class="card c-mega">
+    <header><h2>Megacaps · options</h2>
+      <span class="sub" style="margin:0 0 0 auto">the biggest Nasdaq-100 and S&amp;P weights, AI chips, and the chip and Korea / Taiwan ETFs · today = premium traded, held = open interest</span></header>
+    <div id="mega"></div>
+  </section>
+
+  <section class="card c-price">
+    <header><h2>Price, expected move and gamma levels</h2>
+      <div class="seg" id="views" style="margin-left:auto"></div>
+      <div class="seg tog" id="pricetog" style="margin-left:0"><button data-t="bands" title="Eagle Eye's multi-timeframe BMSB bands (4H, D, W, 2W, M, 3M) and the 50 / 100 / 200-day and 200-week MAs">MTF bands</button><button data-t="gex" title="Gamma by strike drawn on the price chart (follows the Net / All / 0DTE switch)">GEX overlay</button><button data-t="kp" title="The + / − king lines and the listed piles as markers at the right edge">Kings &amp; piles</button></div>
+      <div class="seg zoom" id="zoom" style="margin-left:0"><button data-z="out" title="Zoom out (or scroll the wheel over the chart)">−</button><button data-z="in" title="Zoom in">+</button><button data-z="fit" title="Fit the whole view (and turn auto-scale back on)">Fit</button><button data-z="fs" title="Full screen (or double-click the chart); Esc to leave">⤢</button></div></header>
+    <div id="bandrow" class="bandbar" hidden></div>
+    <div id="pricewrap" class="chart"><div id="price"></div><canvas id="gexov"></canvas><div id="mtfbox" hidden></div></div>
+    <div id="price-legend" class="legend"></div>
+    <div id="bands-legend" class="legend" hidden></div>
+    <div id="kp-legend" class="legend" hidden></div>
+  </section>
+
+  <section class="card c-gex">
+    <header><h2>Gamma by strike</h2>
+      <div class="seg" id="gexmode"><button data-m="net" class="on">Net</button><button data-m="mass">All</button><button data-m="d0">0DTE</button></div></header>
+    <div id="gex"></div>
+    <p class="note" id="gexnote"></p>
+  </section>
+
+  <section class="card c-flow">
+    <header><h2>Options volume per window</h2>
+      <div class="seg" id="flowb"><button data-b="all" class="on">All</button><button data-b="d0">0DTE</button><button data-b="wk">≤1 wk</button><button data-b="lg">Longer</button></div></header>
+    <div id="flow" class="chart short"></div>
+    <div id="flow-legend" class="legend"></div>
+  </section>
+
+  <section class="card c-top">
+    <header><h2>Biggest contracts, last window</h2></header>
+    <div id="top"></div>
+  </section>
+
+  <section class="card c-stress">
+    <header><h2>Stress gauge</h2></header>
+    <div id="stress"></div>
+  </section>
+
+  <section class="card c-iv">
+    <header><h2>Implied volatility through the day</h2></header>
+    <div id="iv" class="chart short"></div>
+    <div id="iv-legend" class="legend"></div>
+  </section>
+
+  <section class="card c-skew">
+    <header><h2>Put skew · 1 month</h2></header>
+    <div id="skew" class="chart short"></div>
+    <p class="note" id="skewnote"></p>
+  </section>
+
+  <section class="card c-vix">
+    <header><h2>VIX options · hedging demand</h2></header>
+    <div id="vix"></div>
+  </section>
+
+  <section class="card c-rec">
+    <header><h2>Expected-move record</h2></header>
+    <div id="rec"></div>
+  </section>
+
+  <section class="card c-cal">
+    <header><h2>Calendar · next 4 weeks</h2></header>
+    <div id="cal"></div>
+  </section>
+</main>
+<footer id="foot"></footer>
+<div id="tip" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="ifdata.js?v=20261013d"></script>
+<script src="app.js?v=20261013d"></script>
+</body>
+</html>
