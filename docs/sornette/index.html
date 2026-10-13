@@ -10,7 +10,7 @@
 <meta name="description" content="Sornette: do several fitting windows agree that prices are accelerating toward a turning point? Bubble and panic confidence, smoothness and its KDJ for eight markets, after each US close.">
 <title>Sornette · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="sornette.css?v=202610140158">
+<link rel="stylesheet" href="sornette.css?v=202610140208">
 </head>
 <body class="antialiased">
 <a class="skip" href="#root">Skip to the readings</a>
@@ -37,15 +37,20 @@
 <script>
 
 
+
 (function () {
-  var f = window.fetch.bind(window), MAX = 4, STALL = 8000, TRIES = 6, active = 0, queue = [], NULL_BODY = [101, 204, 205, 304];
+  var f = window.fetch.bind(window), MAX = 4, STALL = 8000, SLOW_AFTER = 4000, MIN_RATE = 16 * 1024, STRICT_TRIES = 3,
+    TRIES = 10, active = 0, queue = [], NULL_BODY = [101, 204, 205, 304];
   function pump() {
     while (active < MAX && queue.length) { var job = queue.shift(); active++; job().then(done, done); }
   }
   function done() { active--; pump(); }
-  function attempt(input, init) {
-    var ctl = new AbortController(), outer = init && init.signal, last = Date.now(), bytes = 0;
-    var dog = setInterval(function () { if (Date.now() - last > STALL) ctl.abort(); }, 500);
+  function attempt(input, init, strict) {
+    var ctl = new AbortController(), outer = init && init.signal, start = Date.now(), last = start, bytes = 0;
+    var dog = setInterval(function () {
+      var now = Date.now();
+      if (now - last > STALL || (strict && now - start > SLOW_AFTER && bytes * 1000 / (now - start) < MIN_RATE)) ctl.abort();
+    }, 500);
     function onOuter() { ctl.abort(); }
     if (outer) outer.addEventListener('abort', onOuter);
     return f(input, Object.assign({}, init || {}, {signal: ctl.signal})).then(function (r) {
@@ -69,12 +74,12 @@
   function run(input, init, n) {
     var outer = init && init.signal;
     if (outer && outer.aborted) return Promise.reject(outer.reason);
-    return attempt(input, init).then(function (x) {
+    return attempt(input, init, n < STRICT_TRIES).then(function (x) {
       return new Response(x.body, {status: x.r.status, statusText: x.r.statusText, headers: x.r.headers});
     }, function (e) {
       if (outer && outer.aborted) throw outer.reason;
-      if (n + 1 >= TRIES) throw e;
-      return new Promise(function (r) { setTimeout(r, Math.min(3000, 400 * (n + 1))); }).then(function () { return run(input, init, n + 1); });
+      if (n >= TRIES) throw e;
+      return new Promise(function (r) { setTimeout(r, Math.min(2000, 300 * (n + 1))); }).then(function () { return run(input, init, n + 1); });
     });
   }
   window.fetch = function (input, init) {
@@ -85,6 +90,6 @@
   };
 })();
 </script>
-<script src="sornette.js?v=202610140158"></script>
+<script src="sornette.js?v=202610140208"></script>
 </body>
 </html>
