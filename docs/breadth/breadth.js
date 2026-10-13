@@ -96,7 +96,13 @@
     var hm = (p.h < 10 ? '0' : '') + p.h + ':' + (p.mi < 10 ? '0' : '') + p.mi;
     return (withDay === false ? '' : p.wd + ' ' + MON[p.mo - 1] + ' ' + p.d + ', ') + hm + ' ' + label;
   }
-  function etAndTpe(epoch) { return fmtTz(epoch, 'America/New_York', 'ET') + ' · ' + fmtTz(epoch, 'Asia/Taipei', 'Taipei'); }
+
+  var LOCAL_TZ = (function () { try { var z = new Intl.DateTimeFormat().resolvedOptions().timeZone; tzParts(0, z); return z || ''; } catch (e) { return ''; } })();
+  function localTail(epoch, withDay) {
+    if (!LOCAL_TZ || tzOffsetMin(epoch, LOCAL_TZ) === tzOffsetMin(epoch, 'America/New_York')) return '';
+    return ' · ' + fmtTz(epoch, LOCAL_TZ, 'your time', withDay);
+  }
+  function etAndLocal(epoch) { return fmtTz(epoch, 'America/New_York', 'ET') + localTail(epoch); }
   function tzOffsetMin(epoch, tz) {
     var e = Math.floor(epoch / 6e4) * 6e4, p = tzParts(e, tz);
     return Math.round((Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi) - e) / 6e4);
@@ -289,7 +295,7 @@
     var t = now(), asof = Date.parse(doc.live.asof_utc), age = t - asof, live = doc.live;
     var sess = dayNum(live.session_date || doc.as_of.session), s = { age: age, asof: asof };
     var calNote = sess >= dayNum(CAL_END) ? ' (The page calendar ends ' + CAL_END + '; extend it.)' : '';
-    var refEt = live.refresh_et || '17:45', refTpe = live.refresh_tpe || '05:45';
+    var refEt = live.refresh_et || '17:45';
     var refresh = live.refresh_utc ? Date.parse(live.refresh_utc) : etEpoch(sess, 17, 45);
     var closeAt = etEpoch(sess, closeHour(sess), 0);
     if (asof - t > 10 * 6e4) {
@@ -317,9 +323,9 @@
       var lateAt = refresh + 105 * 6e4, staleAt = etEpoch(nextSession(sess), 10, 15);
       if (t < lateAt) {
         s.chip = 'AFTER CLOSE'; s.cls = 'after';
-        s.line = 'Market closed ' + (live.close_et || '16:00') + ' ET. These are the delayed-feed closing numbers (preliminary); final numbers come with the evening refresh ~' + refEt + ' ET · ' + refTpe + ' Taipei.';
+        s.line = 'Market closed ' + (live.close_et || '16:00') + ' ET. These are the delayed-feed closing numbers (preliminary); final numbers come with the evening refresh ~' + refEt + ' ET' + localTail(refresh, false) + '.';
       }
-      else if (t < staleAt) { s.chip = 'LATE'; s.cls = 'late'; s.line = 'The evening close refresh (usually ~' + refEt + ' ET · ' + refTpe + ' Taipei) has not arrived yet. These are the preliminary delayed-feed closing numbers.'; }
+      else if (t < staleAt) { s.chip = 'LATE'; s.cls = 'late'; s.line = 'The evening close refresh (usually ~' + refEt + ' ET' + localTail(refresh, false) + ') has not arrived yet. These are the preliminary delayed-feed closing numbers.'; }
       else { s.chip = 'STALE'; s.cls = 'stale'; s.line = 'These are the closing numbers of ' + fmtDay(sess, true, true) + ', and newer data should exist by now.'; s.expected = staleAt; }
       return s;
     }
@@ -327,7 +333,7 @@
     var nxt = nextSession(sess), firstTick = etEpoch(nxt, 9, 45), late2 = etEpoch(nxt, 10, 15), stale2 = etEpoch(nxt, 11, 0);
     if (t < late2) {
       s.chip = 'CLOSED'; s.cls = 'closed';
-      s.line = 'Final close of ' + fmtDay(sess, true, true) + '. Next update after the open: ' + etAndTpe(firstTick) + '.' + calNote;
+      s.line = 'Final close of ' + fmtDay(sess, true, true) + '. Next update after the open: ' + etAndLocal(firstTick) + '.' + calNote;
     } else if (t < stale2) {
       s.chip = 'LATE'; s.cls = 'late';
       s.line = 'The market has opened (' + fmtDay(nxt, false, true) + ') but the first live update has not arrived. Numbers below are the close of ' + fmtDay(sess, false, true) + '.' + calNote;
@@ -346,11 +352,11 @@
     var sessDn = dayNum(doc.live.session_date || doc.as_of.session), L0 = doc.live, head;
     if (doc.state === 'LIVE' && !L0.session_closed) {
       var pr = L0.prices_asof_utc ? Date.parse(L0.prices_asof_utc) : s.asof - 15 * 6e4;
-      head = 'Today so far · prices ~' + hm(pr) + ' ET (15-min delayed) · built ' + hm(s.asof) + ' ET · ' + fmtTz(s.asof, 'Asia/Taipei', 'Taipei', false);
+      head = 'Today so far · prices ~' + hm(pr) + ' ET (15-min delayed) · built ' + hm(s.asof) + ' ET' + localTail(s.asof, false);
     } else if (doc.state === 'LIVE') {
-      head = 'Close of ' + fmtDay(sessDn, false, true) + ' (preliminary) · built ' + etAndTpe(s.asof);
+      head = 'Close of ' + fmtDay(sessDn, false, true) + ' (preliminary) · built ' + etAndLocal(s.asof);
     } else {
-      head = 'Close of ' + fmtDay(sessDn, false, true) + ' · built ' + etAndTpe(s.asof);
+      head = 'Close of ' + fmtDay(sessDn, false, true) + ' · built ' + etAndLocal(s.asof);
     }
     $('asof').textContent = head;
     $('statusLine').textContent = s.line;
@@ -377,15 +383,15 @@
 
     var b = $('banners'); clear(b);
     if (preview) b.appendChild(banner('info', 'Preview data', 'Numbers below come from ' + preview + ', not the live feed.'));
-    if (nowOverride) b.appendChild(banner('info', 'Clock override', 'The page is pretending it is ' + etAndTpe(now()) + '.'));
+    if (nowOverride) b.appendChild(banner('info', 'Clock override', 'The page is pretending it is ' + etAndLocal(now()) + '.'));
     var calLeft = dayNum(CAL_END) - etDayNum(now());
     if (calLeft < 60) b.appendChild(banner('warn', 'Market calendar ends ' + CAL_END, 'After that the page assumes every weekday is a trading day, so the CLOSED / LATE labels can be wrong on holidays until the calendar is extended.'));
     if (s.cls === 'stale') {
-      b.appendChild(banner('bad', 'These numbers are old', 'Last update ' + etAndTpe(s.asof) + ' (' + ago(s.age) + '). ' + s.line +
+      b.appendChild(banner('bad', 'These numbers are old', 'Last update ' + etAndLocal(s.asof) + ' (' + ago(s.age) + '). ' + s.line +
         ' Do not read them as current.'));
     }
-    if (lastErr) b.appendChild(banner('warn', 'Refresh failed', 'Tried at ' + fmtTz(lastErr.at, 'Asia/Taipei', 'Taipei', false) + ' (' + lastErr.msg +
-      '). The numbers below are still the ones from ' + etAndTpe(s.asof) + '.'));
+    if (lastErr) b.appendChild(banner('warn', 'Refresh failed', 'Tried at ' + hm(lastErr.at) + ' ET' + localTail(lastErr.at, false) + ' (' + lastErr.msg +
+      '). The numbers below are still the ones from ' + etAndLocal(s.asof) + '.'));
   }
   function banner(kind, title, text, btn) {
     var d = document.createElement('div'); d.className = 'banner banner-' + kind;
@@ -435,7 +441,7 @@
     $('rightNow').textContent = parts.join(' ');
     renderStackText(cn, live, sessDn);
     $('footData').textContent = 'Derived values only (counts of stocks; SPY, QQQ and IWM closes); no member prices are published. Prices about 15 minutes delayed during the session. Built ' +
-      etAndTpe(doc.generated_epoch * 1000) + '. No cookies, no tracking.';
+      etAndLocal(doc.generated_epoch * 1000) + '. No cookies, no tracking.';
     renderLegends();
     renderTables();
     renderAfter();
@@ -2525,7 +2531,7 @@
       },
       text: function (k) {
         var e = ev[k];
-        return [['d', gzDay(e.date, true)], ['', ' · ' + (e.study ? 'TradingView ' : 'our line ')], ['v', pct1(e.r)], ['', ' · IWM ' + (e.pending ? 'so far ' : '3 months later ')],
+        return [['d', gzDay(e.date, true)], ['', ' · our line '], ['v', e.r == null ? '–' : pct1(e.r)], ['', ' · IWM ' + (e.pending ? 'so far ' : '3 months later ')],
           [e.v >= 0 ? 'g' : 'r', sgn(e.v)]];
       },
       rest: function () { return [['', 'Typical (median) '], ['v', sgn(G.median, 0)], ['', G.rest], ['m', HOVER ? ' · hover a thrust' : ' · tap a thrust']]; }

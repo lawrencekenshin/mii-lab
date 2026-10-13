@@ -109,7 +109,7 @@ function renderHead() {
     .map(([k, v]) => `<span class="err">${esc(k)}: ${esc(v)}</span>`).join(' · ');
   const pubTxt = m.published ? ` · updated after each close${m.published.live ? ', this ticker every 15 min in the session (hourly charts after the close)' : ''}` : '';
   $('ind').innerHTML = `Eagle Eye Technicals · Desktop Integrated + GEX · options: ${m.kind === 'crypto' ? 'none yet for crypto' : 'saved Cboe chain ' + (d ? esc(d.build_et) : '—')} · price: ${esc(srcName(m.price))}${m.published ? pubTxt : ', every ' + cadence(m.poll_s)}` +
-    ' · estimates from public data, not a trading signal · charts: <a class="credit" href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>' +
+    ' · charts: <a class="credit" href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>' +
     (errs ? '<br>' + errs : '');
   const ib = $('infobtn'); if (ib) ib.classList.toggle('err', !!errs);
 }

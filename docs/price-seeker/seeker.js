@@ -22,7 +22,15 @@
   var FONT = (getComputedStyle(document.documentElement).getPropertyValue('--font') || '').trim() || 'sans-serif';
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  var NY = 'America/New_York', TPE = 'Asia/Taipei';
+  var NY = 'America/New_York', LOC = viewerZone();
+  function viewerZone() {
+    try {
+      var z = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!z) return null;
+      new Intl.DateTimeFormat('en-US', { timeZone: z });
+      return z;
+    } catch (e) { return null; }
+  }
 
 
   var HOLIDAYS = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03',
@@ -177,9 +185,10 @@
   function curYear() { return tzParts(now(), NY).y; }
   function hm12(epoch, tz) { var p = tzParts(epoch, tz), h = p.h % 12 || 12; return h + ':' + pad2(p.mi) + ' ' + (p.h < 12 ? 'am' : 'pm'); }
   function etHm(epoch) { return hm12(epoch, NY) + ' ET'; }
-  function tpeHmWd(epoch) { return hm12(epoch, TPE) + ' ' + tzParts(epoch, TPE).wd + ' Taipei'; }
+  function locSame(epoch) { return !LOC || tzOffsetMin(epoch, LOC) === tzOffsetMin(epoch, NY); }
+  function locHmWd(epoch) { return locSame(epoch) ? null : hm12(epoch, LOC) + ' ' + tzParts(epoch, LOC).wd + ' your time'; }
   function fullTz(epoch, tz, label) { var p = tzParts(epoch, tz); return p.wd + ' ' + MON[p.mo - 1] + ' ' + p.d + ', ' + hm12(epoch, tz) + ' ' + label; }
-  function etAndTpe(epoch) { return fullTz(epoch, NY, 'ET') + ' · ' + fullTz(epoch, TPE, 'Taipei'); }
+  function etAndLoc(epoch) { return fullTz(epoch, NY, 'ET') + (locSame(epoch) ? '' : ' · ' + fullTz(epoch, LOC, 'your time')); }
   function ago(ms) {
     var m = Math.round(ms / 6e4);
     if (m < 1) return 'just now';
@@ -532,7 +541,8 @@
     var nxt = nextSession(pdn), late = etEpoch(nxt, 9, 55), stale = etEpoch(nxt, 11, 0);
     if (t < late) {
       s.chip = 'CLOSED'; s.cls = 'closed';
-      s.line = 'Next price update after the open: ' + wmd(nxt) + ', 9:40 am ET · ' + tpeHmWd(etEpoch(nxt, 9, 40)) + '.';
+      var lt = locHmWd(etEpoch(nxt, 9, 40));
+      s.line = 'Next price update after the open: ' + wmd(nxt) + ', 9:40 am ET' + (lt ? ' · ' + lt : '') + '.';
     } else if (t < stale) {
       s.chip = 'LATE'; s.cls = 'late';
       s.line = 'The market has opened but the first live update hasn’t arrived. Numbers below are the close of ' + monD(pdn) + '.';
@@ -542,7 +552,7 @@
     }
     return s;
   }
-  function segText(parent, parts) { parts.forEach(function (p, i) { if (i) parent.appendChild(document.createTextNode(' · ')); parent.appendChild(span('seg-t', p)); }); }
+  function segText(parent, parts) { parts.filter(function (p) { return p != null; }).forEach(function (p, i) { if (i) parent.appendChild(document.createTextNode(' · ')); parent.appendChild(span('seg-t', p)); }); }
   function renderStatus() {
     renderBanners();
     if (!P) return;
@@ -552,9 +562,9 @@
     var pdn = d.prices_day ? dayNum(d.prices_day) : etDayNum(P.gen);
     if (d.state === 'LIVE') {
       var pa = d.prices_asof && !isNaN(Date.parse(d.prices_asof)) ? Date.parse(d.prices_asof) : P.gen - 15 * 6e4;
-      segText(a, [wmd(pdn), 'prices ' + etHm(pa) + ' (about 15 min delayed)', tpeHmWd(pa)]);
+      segText(a, [wmd(pdn), 'prices ' + etHm(pa) + ' (about 15 min delayed)', locHmWd(pa)]);
     } else {
-      segText(a, ['Close of ' + wmd(pdn), 'built ' + etHm(P.gen), tpeHmWd(P.gen)]);
+      segText(a, ['Close of ' + wmd(pdn), 'built ' + etHm(P.gen), locHmWd(P.gen)]);
     }
     $('statusLine').textContent = s.line;
     var pl = $('pilesLine'); clear(pl);
@@ -576,15 +586,15 @@
     var list = [];
     if (previewHost) list.push(['info', 'Preview data:', 'numbers come from ' + previewHost + ', not the live feed.', null, true]);
     if (PREVIEW_PAGE) list.push(['info', 'PREVIEW:', 'not linked from the other pages yet.', null, true]);
-    if (nowOverride) list.push(['info', 'Clock override:', 'the page is pretending it is ' + etAndTpe(now()) + '.', null, true]);
+    if (nowOverride) list.push(['info', 'Clock override:', 'the page is pretending it is ' + etAndLoc(now()) + '.', null, true]);
     if (dayNum(CAL_END) - etDayNum(now()) < 60) list.push(['warn', 'Market calendar ends ' + CAL_END, 'After that the page assumes every weekday is a trading day, so the CLOSED / LATE labels can be wrong on holidays until the calendar is extended.']);
     if (S.day) list.push(['saved', 'You’re looking at ' + wS(S.day) + (dayInfo(S.day) && dayInfo(S.day).rebuilt ? ' (rebuilt)' : '') + ',',
       'as it was at that day’s close: the same list, piles, odds and records' + (dayInfo(S.day) && dayInfo(S.day).rebuilt ? ', rebuilt from the option archive.' : ' the page showed then.'),
       { label: 'Back to today →', fn: function () { setDay(null); } }, true]);
     if (P) {
       var s = status();
-      if (s.cls === 'stale' && !S.day) list.push(['bad', 'These numbers are old.', 'Last update ' + etAndTpe(P.gen) + ' (' + ago(s.age) + '). Don’t read them as current.', null, true]);
-      if (lastErr) list.push(['warn', 'Refresh failed', 'at ' + hm12(lastErr.at, TPE) + ' ' + tzParts(lastErr.at, TPE).wd + ' Taipei (' + lastErr.msg + '). The numbers below are still from ' + fullTz(P.gen, NY, 'ET') + '.', null, true]);
+      if (s.cls === 'stale' && !S.day) list.push(['bad', 'These numbers are old.', 'Last update ' + etAndLoc(P.gen) + ' (' + ago(s.age) + '). Don’t read them as current.', null, true]);
+      if (lastErr) list.push(['warn', 'Refresh failed', 'at ' + etHm(lastErr.at) + (locHmWd(lastErr.at) ? ' · ' + locHmWd(lastErr.at) : '') + ' (' + lastErr.msg + '). The numbers below are still from ' + fullTz(P.gen, NY, 'ET') + '.', null, true]);
       var pdn = P.doc.prices_day ? dayNum(P.doc.prices_day) : null;
       if (pdn && P.newest && dayNum(P.newest) < prevSession(pdn))
         list.push(['warn', 'Option piles are from ' + dS(P.newest) + ':', 'today’s open interest hasn’t arrived. Distances and odds still use the latest prices.', null, true]);
@@ -1717,7 +1727,7 @@
       default: return 'pile at or ' + w.away + ' the price';
     }
   }
-  var CHG_GROUP = { far: 'Closer than 10% now: on to Closing in', reach: 'Out of reach now', persist: 'The pile moved', calls: 'Not mostly one side now',
+  var CHG_GROUP = { far: 'Close to the pile now: on to Closing in', reach: 'Out of reach now', persist: 'The pile moved', calls: 'Not mostly one side now',
     big: 'The pile got small', below: 'The pile is at or past the price', above: 'The pile is at or past the price' };
   function chgSym(sym) { var b = btn('linkbtn chg-tk', sym); b.addEventListener('click', function () { openLinked(sym); }); return b; }
   function chgRow(sym, parts) { var r = div('chg-r'); r.appendChild(chgSym(sym)); parts.forEach(function (p) { if (p) r.appendChild(typeof p === 'string' ? span('chg-m', p) : p); }); return r; }
@@ -1774,7 +1784,7 @@
       .concat((K.cut || []).slice(0, 1).map(function (o) { return chgRow(o.sym, [span('chg-m down', gxSK(o.n) + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.pc) ? ' (' + sp1(o.pc) + ')' : '') + ' · biggest cut']); })));
     col2('Odds that moved', (K.odds || []).map(function (o) { return chgRow(o.sym, [p0(o.o0) + ' → ' + p0(o.o1), o.e0 !== o.e1 ? span('chg-m amber', 'main expiry rolled ' + dS(o.e0) + ' → ' + dS(o.e1)) : span('chg-m', 'the price moved')]); }));
     c.appendChild(two2);
-    c.appendChild(para('src', 'Compared with the saved list of ' + wS(CHG.data.vs) + '. A name leaves when one of the five checks stops passing; the price moving inside 10% of its pile moves it to Closing in.'));
+    c.appendChild(para('src', 'Compared with the saved list of ' + wS(CHG.data.vs) + '. A name leaves when one of the five checks stops passing; the price coming close to its pile moves it to Closing in.'));
     if (scroll) scrollToEl(c);
   }
 
@@ -3247,11 +3257,8 @@
     var ts = typeof bd.start === 'string' ? dayNum(bd.start) : null;
     $('testBox').textContent = 'The test, written down Sat Oct 3, 2026: from ' + (ts ? wmd(ts) : 'Mon Oct 5') + ' on, every pile that joins the list is scored against the odds it had that day. ' +
       'Once enough piles have resolved, we compare how many were reached with what the odds said, overall and by tier. Piles from before ' + (ts ? monD(ts) : 'Oct 5') + ' are shown above but not scored.';
-    var closed = num(bd.closed) ? bd.closed : 0, need = num(bd.need) && bd.need > 0 ? bd.need : null;
-    $('progT').textContent = 'Scored so far: ' + closed + ' of the ' + (need != null ? need : '–') + ' we need';
-    var pg = $('prog'); pg.setAttribute('aria-valuemax', need != null ? String(need) : ''); pg.setAttribute('aria-valuenow', String(closed));
-    pg.setAttribute('aria-label', 'Scored so far: ' + closed + ' of ' + (need != null ? need : '–'));
-    pg.firstChild.style.width = (need ? Math.min(100, closed / need * 100) : 0).toFixed(1) + '%';
+    var closed = num(bd.closed) ? bd.closed : 0;
+    $('progT').textContent = 'Scored so far: ' + closed + (closed === 1 ? ' pile' : ' piles');
     renderScoreTable();
   }
   function renderScoreTable() {

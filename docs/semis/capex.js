@@ -148,12 +148,12 @@
     function li2(b, t) { var x = document.createElement('li'); x.appendChild(bold(b)); x.appendChild(document.createTextNode(t)); u2.appendChild(x); }
     li2('Next quarter: ', 'raises did not tell you where SMH went. After quarters with more raises than cuts, SMH averaged ' + sp(s.q_pos, 1) + ' the next quarter (' + s.q_npos +
       ' quarters); after more cuts ' + sp(s.q_neg, 1) + ' (' + s.q_nneg + '); after no change ' + sp(s.q_zero, 1) + ' (' + s.q_nzero + '). Rank correlation ' +
-      (s.q_spearman < 0 ? '−' : '+') + Math.abs(s.q_spearman).toFixed(2) + ' (n=' + s.q_n + ', p=' + s.q_p.toFixed(2) + '): no link.');
+      (s.q_spearman < 0 ? '−' : '+') + Math.abs(s.q_spearman).toFixed(2) + ' (n=' + s.q_n + '): no link.');
     li2('On the day: ', 'SMH averaged ' + sp(s.raise_smh, 2) + ' on raise days (' + s.raise_n + ') and ' + sp(s.cut_smh, 2) + ' on cut days (' + s.cut_n +
-      '), no different from other big-tech results days (p=' + s.raise_p.toFixed(2) + ' and ' + s.cut_p.toFixed(2) + '). The company’s own stock tended to go the other way: ' +
+      '), no different from other big-tech results days. The company’s own stock tended to go the other way: ' +
       sp(s.cut_stock, 1) + ' vs the S&P 500 after a cut (all Meta), ' + sp(s.raise_stock, 1) + ' after a raise.');
     li2('Meta’s first plan vs SMH over the next 12 months: ', 'the biggest plans came before weak SMH years (' + ex('2018') + ', ' + ex('2022') + '); small ones before strong years (' +
-      ex('2023') + ', ' + ex('2024') + '). Rank correlation −' + Math.abs(s.mf_spearman).toFixed(2) + ' (n=' + s.mf_n + ', p=' + s.mf_p.toFixed(2) + '), not significant. ' +
+      ex('2023') + ', ' + ex('2024') + '). Rank correlation −' + Math.abs(s.mf_spearman).toFixed(2) + ' (n=' + s.mf_n + '). ' +
       '2026’s first plan was ' + sp(mf['2026'].g, 0) + '.');
     li2('Meta trimmed most years: ', 'before mid-2023 the filings show ' + s.pre_cuts + ' cuts and ' + s.pre_raises + ' raises, even in 2014–2018 when its actual capex grew fast. A cut was routine, not a warning.');
     h.appendChild(u2);

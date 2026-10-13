@@ -14,6 +14,18 @@
     vthin: ['#F2B04B', 0.15], thin: ['#F3D28F', 0.11], normal: ['#B39DDB', 0], broad: ['#7FD1C7', 0.11], vbroad: ['#26A69A', 0.15] };
   var PX = { spy: C.white, qqq: '#4FC3F7' };
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function builtTxt(s) {
+    var t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(s || '') ? new Date(s) : null, o = {};
+    if (!t || isNaN(t)) return '';
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(t).forEach(function (p) { o[p.type] = p.value; });
+      return o.month + ' ' + o.day + ', ' + o.hour + ':' + o.minute + ' ET';
+    } catch (e) {
+      return MON[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + String(t.getUTCHours()).padStart(2, '0') + ':' + String(t.getUTCMinutes()).padStart(2, '0') + ' UTC';
+    }
+  }
   var RANGES = { '1Y': 252, '2Y': 504, '5Y': 1260, '10Y': 2520, 'All': Infinity };
   var OVS = ['SPY', 'QQQ', 'Both', 'Off'];
   var D = null, range = '5Y', ov = 'SPY', hoverI = null, geo = null;
@@ -39,7 +51,7 @@
   function renderTop() {
     var n = D.now, t = D.text, z = nowZone(), zc = ZC[z.key][0];
     $('tbSub').textContent = t.sub;
-    $('tbAsof').textContent = D.asof_label + ' close · ' + D.now.n + ' S&P 500 stocks · ' + Math.round(D.d.length / 252) + ' years of history · updated after each US close · built ' + D.built;
+    $('tbAsof').textContent = D.asof_label + ' close · ' + D.now.n + ' S&P 500 stocks · ' + Math.round(D.d.length / 252) + ' years of history · updated after each US close' + (builtTxt(D.built) ? ' · built ' + builtTxt(D.built) : '');
 
     var now = clear($('tbNow'));
     add(now, h('div', 'tb-k', 'Stocks climbing right now'));

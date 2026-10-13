@@ -129,7 +129,18 @@
     return (withDay === false ? '' : p.wd + ' ' + MON[p.mo - 1] + ' ' + p.d + ', ') + hm0 + ' ' + label;
   }
   function hm(epoch) { return fmtTz(epoch, 'America/New_York', '', false).trim(); }
-  function etAndTpe(epoch) { return fmtTz(epoch, 'America/New_York', 'ET') + ' · ' + fmtTz(epoch, 'Asia/Taipei', 'Taipei'); }
+
+  var LTZ = (function () {
+    try {
+      var z = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!z || z === 'America/New_York') return '';
+      new Intl.DateTimeFormat('en-US', { timeZone: z });
+      return z;
+    } catch (e) { return ''; }
+  })();
+  function localTz(epoch, withDay) { return LTZ ? fmtTz(epoch, LTZ, 'your time', withDay) : ''; }
+  function etAndLocal(epoch) { var l = localTz(epoch); return fmtTz(epoch, 'America/New_York', 'ET') + (l ? ' · ' + l : ''); }
+  function hmEtLocal(epoch) { var l = localTz(epoch, false); return hm(epoch) + ' ET' + (l ? ' (' + l + ')' : ''); }
   function tzOffsetMin(epoch, tz) {
     var e = Math.floor(epoch / 6e4) * 6e4, p = tzParts(e, tz);
     return Math.round((Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi) - e) / 6e4);
@@ -1107,8 +1118,8 @@
   }
 
 
-  function taipeiToday() { var t = new Date(nowMs() + 8 * 36e5); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) / 864e5; }
-  function calState(e) { var a = dayNum(e.d0), b = dayNum(e.d1), now = taipeiToday(); return now > b ? 'past' : now >= a ? 'today' : 'next'; }
+  function twToday() { var t = new Date(nowMs() + 8 * 36e5); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) / 864e5; }
+  function calState(e) { var a = dayNum(e.d0), b = dayNum(e.d1), now = twToday(); return now > b ? 'past' : now >= a ? 'today' : 'next'; }
   function calWhen(e) {
     var a = dayNum(e.d0), b = dayNum(e.d1), da = dnDate(a), db = dnDate(b), when = fmtDay(a, false), wd = WD[da.getUTCDay()];
     if (b !== a) { when += '–' + (da.getUTCMonth() === db.getUTCMonth() ? db.getUTCDate() : fmtDay(b, false)); wd += '–' + WD[db.getUTCDay()]; }
@@ -1135,10 +1146,16 @@
     for (var i = 0; i < 4; i++) { d = nextSession(d); if (etEpoch(d, 10, 15) <= t) n++; else break; }
     return n;
   }
+
+
+  function utcOn(sess, h, m) { return sess * 864e5 + h * 36e5 + m * 6e4; }
   function closingDue(sess) {
-    var c = etEpoch(sess, closeHour(sess), 0), tp = new Date(c + 8 * 36e5);
-    var due = Date.UTC(tp.getUTCFullYear(), tp.getUTCMonth(), tp.getUTCDate(), 7, 30) - 8 * 36e5;
+    var c = etEpoch(sess, closeHour(sess), 0), due = utcOn(sess, 23, 30);
     return due > c ? due : due + 864e5;
+  }
+  function refreshWords(sess) {
+    var a = utcOn(sess, 21, 45), b = utcOn(sess, 22, 40), la = localTz(a, false), lb = localTz(b, false);
+    return '~' + hm(a) + '–' + hm(b) + ' ET' + (la && lb ? ', ' + la.replace(/ your time$/, '') + '–' + lb : '');
   }
   function nextTick(t) {
     var nu = J.next_update && J.next_update.utc ? Date.parse(J.next_update.utc) : NaN;
@@ -1153,7 +1170,12 @@
   function whenWords(at, t) {
     if (at <= t) return 'due any minute';
     if (etDayNum(at) === etDayNum(t)) return '~' + hm(at) + ' ET';
-    return '~' + hm(at) + ' ET ' + fmtDay(etDayNum(at), false, true) + ' (' + fmtTz(at, 'Asia/Taipei', 'Taipei', false) + ')';
+    var l = localTz(at, false);
+    return '~' + hm(at) + ' ET ' + fmtDay(etDayNum(at), false, true) + (l ? ' (' + l + ')' : '');
+  }
+  function builtWords() {
+    var g = J && typeof J.generated_at === 'number' && isFinite(J.generated_at) ? J.generated_at * 1000 : NaN;
+    return isFinite(g) ? etAndLocal(g) : String(J && J.built || '');
   }
   function status() {
     var t = nowMs(), s = { chip: 'CLOSED', cls: 'closed', line: '' };
@@ -1161,7 +1183,7 @@
       s.chip = 'SNAPSHOT'; s.cls = 'snap';
       if (loading && !SRC.why) { s.line = 'Showing the bundled snapshot while the live feed loads…'; return s; }
       s.line = 'Live feed unavailable (' + whyWords(SRC.why) + '). Showing the bundled snapshot' +
-        (J.built ? ' (built ' + J.built + ')' : '') + '; it does not update by itself. Retrying every ' +
+        (J.built || J.generated_at ? ' (built ' + builtWords() + ')' : '') + '; it does not update by itself. Retrying every ' +
         (pollMs >= 6e4 ? Math.round(pollMs / 6e4) + ' min' : Math.round(pollMs / 1000) + ' s') + '.';
       return s;
     }
@@ -1204,10 +1226,10 @@
         s.line = upd + ' · no update yet for ' + fmtDay(nextSession(sess), false, true) + '; the numbers below are the preliminary close of ' + sessW + '.';
       } else if (t < closingDue(sess)) {
         s.chip = 'AFTER CLOSE'; s.cls = 'after';
-        s.line = upd + ' · preliminary close; the final close usually lands ~05:45–06:40 Taipei · next live update ' + whenWords(nextTick(t), t);
+        s.line = upd + ' · preliminary close; the final close usually lands ' + refreshWords(sess) + ' · next live update ' + whenWords(nextTick(t), t);
       } else {
         s.chip = 'LATE'; s.cls = 'late';
-        s.line = upd + ' · the final close (usually ~05:45–06:40 Taipei) has not arrived; these are the preliminary closing numbers.';
+        s.line = upd + ' · the final close (usually ' + refreshWords(sess) + ') has not arrived; these are the preliminary closing numbers.';
       }
       return s;
     }
@@ -1254,7 +1276,7 @@
     var s = status();
     var chip = $('chip'); chip.className = 'chip chip-' + s.cls; chip.textContent = s.chip;
     var line = s.line;
-    if (isLive() && refreshTrouble()) line += ' · Refresh failed ' + fmtTz(SRC.lastErr.at, 'Asia/Taipei', 'Taipei', false) +
+    if (isLive() && refreshTrouble()) line += ' · Refresh failed ' + hmEtLocal(SRC.lastErr.at) +
       ' (' + whyWords(SRC.lastErr.msg) + '); the numbers are the ones built ' + hm(s.at) + ' ET.';
     $('statusLine').textContent = line;
     $('statusLine').title = !isLive() ? (SRC.why || '') : refreshTrouble() ? SRC.lastErr.msg : '';
@@ -1284,10 +1306,10 @@
     if (preview) frag.appendChild(banner('info', 'Preview data', isLive() ? 'Numbers below come from ' + preview + ', not the live feed.' :
       loading && !SRC.why ? 'The page is reading ' + preview + ' instead of the live feed; the bundled snapshot is shown meanwhile.' :
       'The page tried ' + preview + ' instead of the live feed; it was unavailable, so the bundled snapshot is shown.'));
-    if (nowOverride) frag.appendChild(banner('info', 'Clock override', 'The page is pretending it is ' + etAndTpe(nowMs()) + '.'));
+    if (nowOverride) frag.appendChild(banner('info', 'Clock override', 'The page is pretending it is ' + etAndLocal(nowMs()) + '.'));
     if (isLive() && dayNum(CAL_END) - etDayNum(nowMs()) < 60) frag.appendChild(banner('warn', 'Market calendar ends ' + CAL_END,
       'After that the page assumes every weekday is a trading day, so the CLOSED / LATE / STALE labels can be wrong on holidays until the calendar is extended.'));
-    if (s.cls === 'stale') frag.appendChild(banner('bad', 'The market numbers are old', 'Last update ' + etAndTpe(s.at) + ': SMH, breadth and the chart signals are from ' +
+    if (s.cls === 'stale') frag.appendChild(banner('bad', 'The market numbers are old', 'Last update ' + etAndLocal(s.at) + ': SMH, breadth and the chart signals are from ' +
       fmtDay(s.sess, true, true) + '. Do not read them as current; each monthly reading keeps its own public date.'));
     var k = frag.textContent;
     if (b.getAttribute('data-k') !== k) { clear(b); b.appendChild(frag); b.setAttribute('data-k', k); }
@@ -1308,7 +1330,7 @@
   var CAL_SHOW = 6;
   function renderCal() {
     var ul = $('cal'), ul2 = $('cal2'); clear(ul); clear(ul2);
-    var now = taipeiToday(), main = [], more = [], old = 0, cal = D.cal;
+    var now = twToday(), main = [], more = [], old = 0, cal = D.cal;
 
 
     var ahead = cal.filter(function (e) { return calState(e) !== 'past'; });
@@ -1596,7 +1618,7 @@
     try { renderKorea(); } catch (e) { koreaFailed(e); }
     renderHardwareText();
     renderSignals(); renderCal(); renderRallies(); renderCands(); renderTables();
-    $('built').textContent = 'Page data built ' + J.built + (isLive() ? ' (live feed)' : ' (the snapshot bundled with the page)') + '. Derived values, plus public list prices, US Census totals and SMH weekly closes for context. No cookies, no tracking.';
+    $('built').textContent = 'Page data built ' + builtWords() + (isLive() ? ' (live feed)' : ' (the snapshot bundled with the page)') + '. Derived values, plus public list prices, US Census totals and SMH weekly closes for context. No cookies, no tracking.';
   }
 
 

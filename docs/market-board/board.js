@@ -98,13 +98,18 @@
   }
 
 
-  function tpe(b) {
-    var t = new Date(b.getTime() + 8 * 36e5);
-    return MON[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + String(t.getUTCHours()).padStart(2, '0') + ':' + String(t.getUTCMinutes()).padStart(2, '0');
+  var ETF = (function () {
+    try { return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (e) { return null; }
+  })();
+  function etStamp(b) {
+    if (!ETF) return MON[b.getUTCMonth()] + ' ' + b.getUTCDate() + ', ' + String(b.getUTCHours()).padStart(2, '0') + ':' + String(b.getUTCMinutes()).padStart(2, '0') + ' UTC';
+    var o = {};
+    ETF.formatToParts(b).forEach(function (p) { o[p.type] = p.value; });
+    return o.month + ' ' + o.day + ', ' + o.hour + ':' + o.minute + ' ET';
   }
   function renderStatus() {
     var chip = $('chip'), b = new Date(D.built_utc), age = (Date.now() - dd(D.session).getTime()) / 864e5;
-    var old = age > 5, when = isNaN(b) ? '' : tpe(b) + ' Taipei';
+    var old = age > 5, when = isNaN(b) ? '' : etStamp(b);
     chip.className = 'chip ' + (old ? 'chip-stale' : 'chip-closed');
     chip.textContent = old ? 'OLD DATA' : 'CLOSE';
     chip.title = 'Rebuilt after each US close.';
@@ -544,15 +549,15 @@
     $('wStormNote').textContent = 'What actually happened on past days with the VIX at ' + w.bucket.replace('-', '–') + ', 2013–2026. On any day: SPY ' + P(sp.base2d) + ' and ' + P(sp.basedd) +
       ', QQQ ' + P(qq.base2d) + ' and ' + P(qq.basedd) + '.';
     var dg = $('wDir'); clear(dg);
-    var stressAt = D.ln.s, inStress = w.ratio >= stressAt;
+    var inStress = w.stress === true;
     var g = h('div', 'dirg', null, dg); g.setAttribute('role', 'img'); g.setAttribute('aria-label', 'VIX divided by VIX3M: ' + w.ratio.toFixed(2) + (inStress ? ', in the stress zone' : ', in the calm zone'));
-    var lo = 0.75, hi = 1.15, xp = function (v) { return (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo) * 100; };
-    var za = add(g, 'z za', ''); za.style.width = 'calc(' + xp(stressAt) + '% - 1px)';
-    var zb = add(g, 'z zb', ''); zb.style.width = 'calc(' + (100 - xp(stressAt)) + '% - 1px)';
-    var ar = add(g, 'ar', ''); ar.style.left = xp(w.ratio) + '%';
-    var av = add(g, 'av', w.ratio.toFixed(2)); av.style.left = xp(w.ratio) + '%';
+    var at = inStress ? 75 : 25;
+    var za = add(g, 'z za', ''); za.style.width = 'calc(50% - 1px)';
+    var zb = add(g, 'z zb', ''); zb.style.width = 'calc(50% - 1px)';
+    var ar = add(g, 'ar', ''); ar.style.left = at + '%';
+    var av = add(g, 'av', w.ratio.toFixed(2)); av.style.left = at + '%';
     var l0 = add(g, 'zl', 'calm'); l0.style.left = '0';
-    var l1 = add(g, 'zl', 'stress'); l1.style.left = xp(stressAt) + '%';
+    var l1 = add(g, 'zl', 'stress'); l1.style.left = '50%';
     var p = h('p', 'dir-txt', null, dg);
     txt(p, 'VIX ÷ VIX3M (short-term fear over 3-month fear) = ' + w.ratio.toFixed(2) + ': ');
     bold(p, inStress ? 'stress zone' : 'calm zone');
@@ -619,9 +624,6 @@
       h('p', 'fb-note', 'Not enough S&P 500 stocks are beaten down right now (' + Math.round((sg.share || 0) * 100) + '%) for a washout reading.', sb);
       $('sSigNote').textContent = '';
     }
-    var tr = f.trust;
-    $('sTrust').textContent = 'Over ' + tr.n_years + ' years (' + tr.from + '–' + tr.to + ') the 90% zone caught the S&P 500’s close ' + Math.round(tr.lo * 100) + '–' + Math.round(tr.hi * 100) +
-      '% of the time; its worst year was ' + tr.worst_year + ' at ' + Math.round(tr.worst * 100) + '%.';
     var up = f.higher[f.higher.length - 1];
     var s = 'Direction: normal odds (' + P(up.p) + ' higher in a month). The ride looks ' + bu.word + ': ' + P(top.p) + ' chance of a big 3-day swing vs ' + P(top.normal) + ' normally.';
     if (sg.on) s += ' The washout signal is on: ' + P(sg.up13) + ' up over 3 months vs ' + P(sg.up13_normal) + ' normally, and a ' + P(sg.dip) + ' chance of another 5% dip first.';

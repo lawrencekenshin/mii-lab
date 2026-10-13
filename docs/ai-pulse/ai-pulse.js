@@ -83,14 +83,22 @@
   function whenTxt(e) { return (e.est ? 'about ' : '') + fmtSpan(e.d0, e.d1); }
   function wdSpan(d0, d1) { var a = WDN[dOf(dn(d0)).getUTCDay()]; return !d1 || d1 === d0 ? a : a + NDASH + WDN[dOf(dn(d1)).getUTCDay()]; }
   var nowOverride = (function () { var v = qs('now'); return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? dn(v) : null; })();
-  function taipeiToday() {
+  function twToday() {
     if (nowOverride != null) return nowOverride;
     var t = new Date(Date.now() + 8 * 36e5); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) / 864e5;
   }
+  var ETF = (function () {
+    try { return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (e) { return null; }
+  })();
   function builtEpoch(b) {
-    var m = /^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2}))?/.exec(b || '');
-    if (!m) return null;
-    return Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) - 8 * 36e5;
+    var t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(b || '') ? Date.parse(b) : NaN;
+    return isNaN(t) ? null : t;
+  }
+  function builtTxt(ms) {
+    var d = new Date(ms), o = {};
+    if (!ETF) return fmtN(Math.floor(ms / 864e5), false, true) + ', ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0') + ' UTC';
+    ETF.formatToParts(d).forEach(function (p) { o[p.type] = p.value; });
+    return o.weekday + ' ' + o.month + ' ' + o.day + ', ' + o.hour + ':' + o.minute + ' ET';
   }
   function ago(ms) {
     var h = ms / 36e5;
@@ -215,13 +223,12 @@
     chip.className = 'chip ' + (old ? 'chip-late' : 'chip-closed');
     chip.textContent = old ? 'NOT UPDATED' : 'UPDATED';
     var asof = $('asof'); clear(asof);
-    var bm = /^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})/.exec(J.built || '');
-    add(asof, 'Built ' + (bm ? fmtD(bm[1], false, true) + ', ' + bm[2] + ' Taipei' : J.built || NDASH) + (age != null && nowOverride == null ? ' (' + ago(age) + ')' : ''));
+    add(asof, 'Built ' + (be != null ? builtTxt(be) : NDASH) + (age != null && nowOverride == null ? ' (' + ago(age) + ')' : ''));
     var newest = J.segments.map(function (s) { return s.freshest; }).filter(function (f) { return f && f.date; })
       .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; })[0];
     var sl = $('statusLine'); clear(sl);
     if (newest) add(sl, node('b', '', 'Newest number: '), fmtD(newest.date) + ' · ' + newest.what);
-    var nx = upcoming(taipeiToday()).filter(function (e) { return !watchOnly(e) && dn(e.d0) >= taipeiToday(); })[0];
+    var nx = upcoming(twToday()).filter(function (e) { return !watchOnly(e) && dn(e.d0) >= twToday(); })[0];
     if (nx) add(sl, span('sep', '·'), node('b', '', 'Next: '), whenTxt(nx) + ' · ' + calWhat(nx));
     $('tagLine').textContent = J.tagline || '';
     if (old) banner('warn', 'These numbers are ' + Math.round(age / 864e5) + ' days old.', ' The page has not been rebuilt since ' + fmtD(J.asof, true) + '; newer releases in the calendar are not in it yet.');
@@ -482,7 +489,7 @@
   }
   function nextFor(prefix) {
     var re = prefix === 'kr' ? /^Korea's/ : prefix === 'tw' ? /^Taiwan's/ : /^US import/;
-    return upcoming(taipeiToday()).filter(function (e) { return re.test(e.what || '') && (e.parts || []).indexOf('trade') >= 0; })[0] || null;
+    return upcoming(twToday()).filter(function (e) { return re.test(e.what || '') && (e.parts || []).indexOf('trade') >= 0; })[0] || null;
   }
   function fact(k, v, s, vcls) { var d = node('div', 'fx'); add(d, span('k', k), span('v' + (vcls ? ' ' + vcls : ''), v), s ? span('s', s) : null); return d; }
   function chartKey() {
@@ -801,7 +808,7 @@
 
 
   function renderCal() {
-    var today = taipeiToday(), list = upcoming(today);
+    var today = twToday(), list = upcoming(today);
     var partName = function (id) { return SEG[id] ? shortL(SEG[id]) : id; };
     function item(e) {
       var a = dn(e.d0), b = dn(e.d1 || e.d0), now = today >= a && today <= b, li = node('li', (now ? 'today' : '') + (watchOnly(e) ? ' watch' : ''));
@@ -832,7 +839,7 @@
     });
     $('lead9').textContent = 'A part only changes when new numbers come out. Here ' + (phone ? 'are the next two weeks' : 'is the next month') + ', in date order; later dates are folded below.';
     var nf = J.segments.filter(function (s) { return s.next_update && !s.next_update.d0 && s.next_update.what; });
-    $('calNote').textContent = 'Taiwan items in Taipei dates, Korea in Seoul dates, US in US dates. “About” = the date is not confirmed yet.' +
+    $('calNote').textContent = 'Taiwan items in Taiwan dates, Korea in Korea dates, US in US dates. “About” = the date is not confirmed yet.' +
       (nf.length ? ' ' + nf.map(function (s) { return label(s) + ': ' + s.next_update.what.replace(/^No fixed date[:.]?\s*/i, 'no fixed date; '); }).join(' ') : '');
   }
 
@@ -1039,9 +1046,9 @@
       var x = span('wp ' + p[0]); add(x, fa(p[0] === 'acc' ? 'up' : p[0] === 'slw' ? 'down' : p[0] === 'std' ? 'flat' : 'none'), span('wp-n', String(p[1])), span('wp-w', p[2]));
       pills.appendChild(x);
     });
-    var ad = attDate(), bm = /^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})/.exec(F.built || '');
+    var ad = attDate(), fb = builtEpoch(F.built);
     $('wkAsof').textContent = 'Share prices to the ' + fmtD(F.market_through, false, true) + ' close' + (ad ? ' · reading interest to ' + fmtD(ad, false, true) : '') +
-      (bm ? ' · built ' + fmtD(bm[1], false, true) + ', ' + bm[2] + ' Taipei' : '');
+      (fb != null ? ' · built ' + builtTxt(fb) : '');
     $('wkTag').textContent = F.tagline || '';
 
     var g = $('wkGrid'); clear(g);
@@ -1134,7 +1141,7 @@
       var li0 = node('li'), dc = span('dchip');
       if (e.est) dc.appendChild(span('ab', 'about '));
       dc.appendChild(document.createTextNode(fmtD(e.date)));
-      var lc = node('div'); add(lc, dc, span('wd', dn(e.date) === taipeiToday() ? 'today' : WDN[dOf(dn(e.date)).getUTCDay()]));
+      var lc = node('div'); add(lc, dc, span('wd', dn(e.date) === twToday() ? 'today' : WDN[dOf(dn(e.date)).getUTCDay()]));
       var body = node('div'); add(body, node('div', 'w', e.what || ''));
       var tags = node('div', 'n'); (e.parts || []).forEach(function (p) { if (SEG[p] || FSEG[p]) tags.appendChild(span('tag', SEG[p] ? shortL(SEG[p]) : FSEG[p].short || p)); });
       body.appendChild(tags);

@@ -54,6 +54,18 @@
   }
   function dlong(iso) { var p = iso.split('-'); return MON[+p[1] - 1] + ' ' + (+p[2]) + ', ' + p[0]; }
   function dshort(iso) { var p = iso.split('-'); return MON[+p[1] - 1] + ' ' + (+p[2]); }
+
+  function builtTxt(s) {
+    var t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(s || '') ? new Date(s) : null, o = {};
+    if (!t || isNaN(t)) return '';
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(t).forEach(function (p) { o[p.type] = p.value; });
+      return o.month + ' ' + o.day + ', ' + o.hour + ':' + o.minute + ' ET';
+    } catch (e) {
+      return MON[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + String(t.getUTCHours()).padStart(2, '0') + ':' + String(t.getUTCMinutes()).padStart(2, '0') + ' UTC';
+    }
+  }
   function signed(v, nd) { var s = Math.abs(v).toFixed(nd); if (+s === 0) return (0).toFixed(nd); return (v < 0 ? '−' : '+') + s; }
   function pct1(v) { return (v * 100).toFixed(1) + '%'; }
 
@@ -598,7 +610,7 @@
     var chip = $('chip'), p = D.asof.split('-'), age = (Date.now() - Date.UTC(+p[0], +p[1] - 1, +p[2])) / 864e5;
     var late = age > LATE_DAYS;
     chip.className = 'chip ' + (late ? 'chip-late' : 'chip-closed'); chip.textContent = late ? 'LATE' : 'DAILY';
-    $('asof').textContent = 'TET Radar · ' + D.asof_label + ' close · week since ' + dshort(D.week_ago) + ' · built ' + D.built;
+    $('asof').textContent = 'TET Radar · ' + D.asof_label + ' close · week since ' + dshort(D.week_ago) + (builtTxt(D.built) ? ' · built ' + builtTxt(D.built) : '');
     $('statusLine').textContent = D.status + (late ? ' · the newest close is missing: this is the last one we have' : '');
   }
   function fail(msg) {
