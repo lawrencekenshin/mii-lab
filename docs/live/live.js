@@ -1308,6 +1308,271 @@
 
 
 
+
+
+
+
+  var VXC = { vix: '#FFB74D', gapLine: '#B39DDB', yel: '#FFD84D' };
+  var VIX_CAP = 50;
+  var VIX_URL = preview || /(^|\.)github\.io$/i.test(location.hostname) ? base + 'vix.json' : 'data/vix.pub.json';
+  var vdoc = null, VX = null, vixErr = null, vixSha = null;
+  hover.cv = null; GEO.cv = null;
+  function vixValidate(v) {
+    if (!v || typeof v !== 'object' || v.schema !== 2 || v.kind !== 'vix' || !v.daily || !Array.isArray(v.daily.v)) return false;
+    var w = v.view, n = w && w.n;
+    if (!w || w.v !== 1 || typeof w.d0 !== 'string' || typeof w.last !== 'string' || typeof n !== 'number' || n < 300) return false;
+    if (v.daily.v.length !== n || !arr(w.imp, n) || !arr(w.gap, n) || !arr(w.gr, n) || !arr(w.gnz) || !arr(w.flag) || !arr(w.lv, 3)) return false;
+    return !!(w.now && typeof w.now === 'object');
+  }
+  function fearAt(i) { return i === D.d.length - 1 ? doc.stats['1D'].latest : D.v[i]; }
+
+  function prepareVix() {
+    if (!vdoc || !D) { VX = null; return; }
+    var w = vdoc.view, n = D.d.length, m = w.n, off = lowerBound(D.d, dayNum(w.d0)), i, j;
+    if (D.d[off] !== dayNum(w.d0) || off + m > n || D.d[off + m - 1] !== dayNum(w.last)) throw new Error('the VIX days do not match the fear days');
+    var open = !!doc.stats['1D'].open, closed = open ? n - 1 : n;
+    var o = { v: new Array(n), imp: new Array(n), gap: new Array(n), neg: new Array(n), gr: new Array(n), flag: new Array(n), lv: w.lv,
+      closed: closed, open: open, lastClose: -1, imp0: null, gap0: null, gneg: false };
+    for (i = 0; i < n; i++) {
+      j = i - off;
+      var ok = j >= 0 && j < m, x = ok ? vdoc.daily.v[j] : null;
+      o.v[i] = i < closed && x != null ? x / 100 : null;
+      o.imp[i] = ok && w.imp[j] != null ? w.imp[j] / 10 : null;
+      o.gap[i] = ok && w.gap[j] != null ? w.gap[j] / 10 : null;
+      o.neg[i] = ok && w.gap[j] != null && w.gap[j] < 0;
+      o.gr[i] = ok && w.gr[j] != null ? w.gr[j] : null;
+      o.flag[i] = false;
+    }
+    w.gnz.forEach(function (q) { if (q + off < n) o.neg[q + off] = true; });
+    w.flag.forEach(function (q) { if (q + off < n) o.flag[q + off] = true; });
+    if (open) { o.imp[n - 1] = o.gap[n - 1] = o.gr[n - 1] = null; o.neg[n - 1] = o.flag[n - 1] = false; }
+    for (i = closed - 1; i >= 0; i--) if (o.v[i] != null && o.imp[i] != null) { o.lastClose = i; break; }
+
+    var N = w.now || {};
+    if (o.lastClose >= 0 && typeof N.i === 'number' && N.i + off === o.lastClose) { o.imp0 = N.imp0; o.gap0 = N.gap0; o.gneg = !!N.gneg; }
+    VX = o;
+  }
+  function gapRank(i) { return rankWords(VX.gr[i], i >= VX.closed); }
+  function signed(x, d) { var s = Math.abs(x).toFixed(d || 0); return (x >= 0 ? '+' : '−') + s; }
+  function gapText(i) { return (VX.neg[i] ? '−' : '+') + Math.abs(VX.gap[i]).toFixed(1); }
+
+  function renderVixText() {
+    var head = $('vxHead'), asof = $('asofV'), err = $('vxErr'), lg = $('lgV');
+    clear(head); clear(asof); clear(lg);
+    var ok = !!(VX && vdoc);
+    $('chartV').hidden = !ok; $('roV').hidden = !ok; $('vix').querySelector('.zoombar').hidden = !ok;
+    err.hidden = ok;
+    if (!ok) {
+      err.textContent = (!VIX_URL || (vixErr && /HTTP 404/.test(vixErr)) ? 'The VIX data is not in this feed' : 'The VIX data could not be loaded') +
+        '. The fear meter above and below is not affected.';
+      return;
+    }
+    var n = D.d.length, last = n - 1, cn = closedNow(), lc = VX.lastClose, want = VX.closed - 1;
+    var sf = VX.open ? (cn ? ' (prelim.)' : ' so far') : '';
+    head.appendChild(span('vh-f', 'fear ' + lat0(doc.stats['1D']) + sf));
+    head.appendChild(span('vh-s', ' · '));
+    if (lc >= 0) {
+      var R = gapRank(lc), imp0 = VX.imp0 != null ? VX.imp0 : Math.round(VX.imp[lc]);
+      var g0 = VX.gap0 != null ? (VX.gneg ? '−' : '+') + Math.abs(VX.gap0) : signed(fearAt(lc) - VX.imp[lc]);
+      head.appendChild(span('vh-v', 'VIX ' + VX.v[lc].toFixed(1) + (lc === last ? '' : ' (' + fmtDay(D.d[lc], false) + ' close)')));
+      head.appendChild(span('vh-s', ' · '));
+      head.appendChild(span('', 'the VIX usually means ~' + imp0 + '% → '));
+      head.appendChild(span('vh-g', 'gap ' + g0 + (lc === last ? '' : ' that day') + (R ? ' (' + R.ord + ' percentile)' : '')));
+    } else head.appendChild(span('vh-v', 'VIX: no close yet'));
+
+    var lw = lc >= 0 ? fmtDay(D.d[lc], false, true) : '–';
+    if (lc < want) {
+      asof.appendChild(span('chip chip-late', 'VIX LATE'));
+      asof.appendChild(span('', 'VIX close not in yet for ' + fmtDay(D.d[want], false, true) + '; newest VIX close ' + lw));
+    } else if (VX.open) asof.appendChild(span('', 'VIX as daily closes · the gap is shown up to the ' + lw + ' close'));
+    else asof.appendChild(span('', 'VIX close of ' + lw));
+    function item(cls, text) { var s = span('lg-i', ''); s.appendChild(span(cls, '')); s.appendChild(document.createTextNode(text)); return s; }
+    lg.appendChild(item('lg-bar', 'fear % (left axis)'));
+    lg.appendChild(item('lg-vix', 'VIX close (right axis)'));
+    lg.appendChild(item('lg-now', 'fear now'));
+    if (VX.v[last] != null) lg.appendChild(item('lg-ring', 'latest VIX close'));
+    lg.appendChild(item('lg-gap', 'gap = fear − VIX-implied fear'));
+    lg.appendChild(item('lg-pl', '90th · 95th · 99th percentile of the gap since 2013'));
+    lg.appendChild(item('lg-pk', 'fear high, VIX calm'));
+  }
+  function geoV(Wraw) { var W = Math.max(300, Math.round(Wraw)), narrow = W < 640, L = narrow ? 26 : 44, R = narrow ? 26 : 40; return { W: W, narrow: narrow, L: L, R: R, pw: W - L - R }; }
+  function vixAxis(vmax, px) {
+    var top = Math.min(VIX_CAP, Math.max(20, vmax * 1.08)), step = 50;
+    [5, 10, 20, 25].some(function (st) { if (st / top * px >= 27) { step = st; return true; } return false; });
+    top = Math.min(VIX_CAP, Math.ceil(top / step - 1e-9) * step);
+    var t = []; for (var v = 0; v <= top + 1e-9; v += step) t.push(Math.round(v * 100) / 100);
+    return { top: top, ticks: t };
+  }
+  function drawChartV(Wraw, tu, hFs) {
+    var holder = $('chartV');
+    if (!VX || !vdoc) { clear(holder); GEO.cv = null; return; }
+    var gm = geoV(Wraw), W = gm.W, narrow = gm.narrow, L = gm.L, pw = gm.pw;
+    var mH = narrow ? 228 : 320, gap = narrow ? 10 : 16, sH = narrow ? 104 : 124;
+    if (hFs) { gap = hFs < 420 ? 8 : narrow ? 10 : 14; var av = hFs - 24 - gap; sH = Math.max(56, Math.round(av * 0.3)); mH = av - sH; }
+    var H = mH + gap + sH + 24, sTop = mH + gap;
+    var x0 = view.x0, x1 = view.x1, span = x1 - x0, X = lin(x0, x1, L, L + pw);
+    var svg = svgFor(holder, W, H), ticks = timeTicks(x0, x1, X, 11, tu), n = D.d.length, last = n - 1;
+    var todayIn = D.last >= x0 && D.last <= x1, vi = visIdx(D.d, x0, x1), fmax = 0, vmax = 0, vmaxI = -1, i;
+    for (i = vi.i0; i <= vi.i1; i++) { fmax = Math.max(fmax, fearAt(i)); if (VX.v[i] != null && VX.v[i] > vmax) { vmax = VX.v[i]; vmaxI = i; } }
+
+    var g = el('g', {}, svg);
+    panelRect(g, L, 0, pw, mH);
+    var fa = niceAxis(Math.min(100, Math.max(fmax * 1.1, 10)), mH - 6, narrow ? 28 : 34);
+    var Yf = lin(0, fa.top, mH, 6), va = vixAxis(vmax, mH - 6), Yv = lin(0, va.top, mH, 6);
+    yTicks(g, Yf, fa.ticks, L + pw, L, function (v) { return narrow ? String(v) : v + '%'; }, 'left', 0);
+    Array.prototype.forEach.call(g.querySelectorAll('text'), function (t) { t.setAttribute('fill', C.light); if (narrow) t.setAttribute('font-size', 10.5); });
+    va.ticks.forEach(function (v) { var py = Yv(v); if (py < 6) return; tx(g, L + pw + 5, py + 3.5, String(v), { fill: VXC.vix, 'font-size': narrow ? 10.5 : 11, 'text-anchor': 'start' }); });
+    timeGrid(g, X, ticks, 0, mH);
+    var clip = clipFor(svg, L, 0, pw, mH);
+    var nVis = vi.i1 - vi.i0 + 1, bars = el('g', { 'clip-path': clip }, g);
+    if (nVis > 0 && pw / nVis >= 2.2) {
+      var bw = Math.max(1, Math.min(9, pw / span * 0.7)), dd = '';
+      for (i = Math.max(0, vi.i0 - 1); i <= Math.min(last, vi.i1 + 1); i++) {
+        var bx = X(D.d[i]) - bw / 2, by = Yf(fearAt(i));
+        dd += 'M' + bx.toFixed(1) + ' ' + mH + 'V' + by.toFixed(1) + 'h' + bw.toFixed(1) + 'V' + mH + 'Z';
+      }
+      el('path', { d: dd, fill: C.fear, 'fill-opacity': 0.8 }, bars);
+    } else {
+      var cols = {};
+      for (i = Math.max(0, vi.i0 - 1); i <= Math.min(last, vi.i1 + 1); i++) { var cx = Math.floor(X(D.d[i])); cols[cx] = Math.max(cols[cx] || 0, fearAt(i)); }
+      var dc = '';
+      Object.keys(cols).forEach(function (cx) { dc += 'M' + cx + ' ' + mH + 'V' + Yf(cols[cx]).toFixed(1) + 'h1V' + mH + 'Z'; });
+      el('path', { d: dc, fill: C.fear, 'fill-opacity': 0.8 }, bars);
+    }
+    var P = decimate(D.d, VX.v, Math.max(0, bsearchLE(D.d, x0)), Math.min(last, lowerBound(D.d, x1)), X);
+
+    el('path', { d: pathOf(P, Yv), fill: 'none', stroke: VXC.vix, 'stroke-width': lineWidth(span, narrow) + 0.3, 'stroke-linejoin': 'round', 'clip-path': clip }, g);
+    var noteBox = null;
+    if (vmax > va.top && vmaxI >= 0) {
+      var nt = 'VIX off scale (peak ' + Math.round(vmax) + ', ' + fmtMonYear(D.d[vmaxI]) + ')', nfs = narrow ? 10.5 : 11.5, nw = textW(nt, nfs);
+      var nx = Math.max(L + 4, Math.min(L + pw - 4 - nw, X(D.d[vmaxI]) + 6));
+      tx(g, nx, 15, nt, withHalo({ fill: VXC.vix, 'font-size': nfs }));
+      noteBox = { x: nx - 2, y: 3, w: nw + 4, h: nfs + 5 };
+    }
+
+    var rNow = narrow ? 4.5 : 5.5, nowG = el('g', {}, svg), snap = [];
+    if (todayIn) {
+      var fxp = X(D.last), fyp = Yf(fearAt(last));
+      nowDot(nowG, fxp, fyp, rNow); snap.push({ x: fxp, y: fyp, dn: D.last });
+      if (VX.v[last] != null && VX.v[last] <= va.top) {
+        var vyp = Yv(VX.v[last]);
+        el('circle', { cx: fxp, cy: vyp, r: rNow + 1.5, fill: C.bg, 'fill-opacity': 0.55, stroke: VXC.vix, 'stroke-width': 2.2 }, nowG);
+        snap.push({ x: fxp, y: vyp, dn: D.last });
+      }
+    }
+
+    var g2 = el('g', {}, svg);
+    panelRect(g2, L, sTop, pw, sH);
+    var lo = 0, hi = 0;
+    for (i = vi.i0; i <= vi.i1; i++) if (VX.gap[i] != null) { lo = Math.min(lo, VX.gap[i]); hi = Math.max(hi, VX.gap[i]); }
+    hi = Math.max(hi, VX.lv[1] || 0, 10); lo = Math.min(lo, -5);
+    var pad = (hi - lo) * 0.06, titleH = narrow ? 15 : 17, Yg = lin(lo - pad, hi + pad, sTop + sH - 2, sTop + titleH + 2);
+    timeGrid(g2, X, ticks, sTop, sTop + sH);
+    el('line', { x1: L, x2: L + pw, y1: Yg(0), y2: Yg(0), stroke: C.muted, 'stroke-width': 1 }, g2);
+    tx(g2, L - 5, Yg(0) + 3.5, '0', { fill: C.muted, 'font-size': narrow ? 10.5 : 11, 'text-anchor': 'end' });
+    var clip2 = clipFor(svg, L, sTop, pw, sH);
+    var PG = decimate(D.d, VX.gap, Math.max(0, bsearchLE(D.d, x0)), Math.min(last, lowerBound(D.d, x1)), X);
+    if (PG.px.length) {
+      var gl = pathOf(PG, Yg), z = Yg(0).toFixed(1);
+      el('path', { d: gl + 'L' + PG.px[PG.px.length - 1].toFixed(1) + ' ' + z + 'L' + PG.px[0].toFixed(1) + ' ' + z + 'Z', fill: VXC.gapLine, 'fill-opacity': 0.22, 'clip-path': clip2 }, g2);
+      el('path', { d: gl, fill: 'none', stroke: VXC.gapLine, 'stroke-width': narrow ? 0.9 : 1.1, 'stroke-linejoin': 'round', 'clip-path': clip2 }, g2);
+    }
+    var ttl = 'gap: fear − VIX-implied fear (pts)';
+    tx(g2, L + 6, sTop + titleH - 3, ttl, withHalo({ fill: C.text, 'font-size': narrow ? 11 : 12 }));
+    var obs = [{ x: L + 4, y: sTop + 2, w: textW(ttl, narrow ? 11 : 12) + 6, h: titleH }];
+
+    var rD = narrow ? 2.8 : 3.4, cands = [], gNow = null;
+    if (todayIn && VX.gap[last] != null) gNow = { x: X(D.last), y: Math.max(sTop + 6, Math.min(sTop + sH - 4, Yg(VX.gap[last]))) };
+    for (i = vi.i0; i <= vi.i1; i++) if (VX.flag[i]) {
+      var gx = X(D.d[i]); if (gx < L + rD || gx > L + pw - rD) continue;
+      cands.push({ i: i, v: VX.gap[i], x: gx, y: Math.max(sTop + rD + 1, Yg(VX.gap[i])) });
+    }
+    cands.sort(function (a, b) { return b.v - a.v; });
+    var dotsV = thinDots(cands, rD, gNow ? [nowBox(gNow.x, gNow.y, rNow - 1)] : []);
+    dotsV.forEach(function (d) { obs.push(dotBox(d.x, d.y, rD)); });
+    if (gNow) obs.push(pulseBox(gNow.x, gNow.y, rNow - 1));
+
+
+    var tags = [], above = [], fsT = narrow ? 10 : 11, placed = [];
+    PCT_LEVELS.forEach(function (q, qi) {
+      var v = VX.lv[qi]; if (v == null) return;
+      var y = Yg(v), s = ordinal(q) + ' ' + signed(v);
+      if (y < sTop + titleH) { above.push(s); return; }
+      el('line', { x1: L, x2: L + pw, y1: y.toFixed(1), y2: y.toFixed(1), stroke: PL[q].c, 'stroke-opacity': PL[q].op, 'stroke-width': PL[q].w, 'stroke-dasharray': PL_DASH, 'data-vpl': q }, g2);
+      tags.push({ q: q, y: y, s: s });
+    });
+    function spot(str, yMid) {
+      var w = textW(str, fsT, 600) + 8, xs = [L + pw - w - 2, L + 2], x;
+      for (x = L + pw - w - 40; x > L + 2; x -= 40) xs.push(x);
+      for (var k = 0; k < xs.length * 3; k++) {
+        var b = { x: xs[k % xs.length], y: yMid - 7 + [0, -9, 9][Math.floor(k / xs.length)], w: w, h: 14 };
+        if (b.y < sTop + 1 || b.y + b.h > sTop + sH - 1) continue;
+        if (!obs.some(function (o) { return overlaps(o, b); }) && !placed.some(function (o) { return overlaps(o, b); })) return b;
+      }
+      return null;
+    }
+    tags.sort(function (a, b) { return b.q - a.q; }).forEach(function (t) {
+      var b = spot(t.s, t.y); if (!b) return;
+      placed.push(b);
+      el('rect', { x: b.x.toFixed(1), y: b.y.toFixed(1), width: b.w.toFixed(1), height: b.h, rx: 2, fill: C.panel, 'fill-opacity': 0.88 }, g2);
+      tx(g2, b.x + b.w / 2, b.y + 10.6, t.s, { fill: PL[t.q].c, 'font-size': fsT, 'font-weight': 600, 'text-anchor': 'middle', 'data-vpt': t.q });
+    });
+    if (above.length) {
+      var as = '↑ ' + above.join(' · '), ab = spot(as, sTop + 9);
+      if (ab) { placed.push(ab); tx(g2, ab.x + ab.w / 2, ab.y + 10.6, as, { fill: PL[99].c, 'font-size': fsT, 'font-weight': 600, 'text-anchor': 'middle', 'data-vpt': 'above' }); }
+    }
+    var dg = el('g', {}, svg);
+    dotsV.forEach(function (d) { peakDot(dg, d.x, d.y, rD); snap.push({ x: d.x, y: d.y, dn: D.d[d.i] }); });
+    if (gNow) { nowDot(dg, gNow.x, gNow.y, rNow - 1); snap.push({ x: gNow.x, y: gNow.y, dn: D.last }); }
+    timeAxis(svg, X, ticks, H - 4, 0, W);
+    var cross = crossLayer(svg);
+    function set(dn) {
+      clear(cross);
+      var j = dn == null ? last : bsearchLE(D.d, dn);
+      if (dn != null && D.d[j] >= x0 && D.d[j] <= x1) {
+        var px = X(D.d[j]);
+        el('line', { x1: px, x2: px, y1: 0, y2: sTop + sH, stroke: C.muted, 'stroke-width': 1, 'stroke-dasharray': '2 2' }, cross);
+        el('circle', { cx: px, cy: Yf(fearAt(j)), r: 4, fill: C.light, stroke: '#fff', 'stroke-width': 1.1 }, cross);
+        if (VX.v[j] != null && VX.v[j] <= va.top) el('circle', { cx: px, cy: Yv(VX.v[j]), r: 3.8, fill: VXC.vix, stroke: C.bg, 'stroke-width': 1.4 }, cross);
+        if (VX.gap[j] != null) el('circle', { cx: px, cy: Math.max(sTop + 2, Yg(VX.gap[j])), r: 3.4, fill: VXC.gapLine, stroke: C.bg, 'stroke-width': 1.3 }, cross);
+      }
+      readoutV(j, dn != null);
+    }
+    GEO.cv = { W: W, L: L, pw: pw, X: X, set: set, snap: snap };
+    set(hover.cv);
+  }
+  function readoutV(i, picked) {
+    var ro = $('roV'); clear(ro);
+    var isLast = i === D.d.length - 1, open = isLast && VX.open, tag = open ? (closedNow() ? ' (close, prelim.)' : ' (so far)') : '';
+    ro.appendChild(span('d', fmtDay(D.d[i], true, true) + tag));
+    ro.appendChild(span('', ' · fear '));
+    ro.appendChild(span('p', pct1(fearAt(i))));
+    if (VX.v[i] == null) {
+      ro.appendChild(span('', open ? ' · VIX close not in yet' : ' · VIX –'));
+    } else {
+      var R = gapRank(i);
+      ro.appendChild(span('', ' · '));
+      ro.appendChild(span('vx', 'VIX ' + VX.v[i].toFixed(2)));
+      ro.appendChild(span('', ' · VIX-implied ~' + pct1(VX.imp[i]) + ' · '));
+      ro.appendChild(span('pc', 'gap ' + gapText(i) + (R ? ' = ' + R.ord + ' percentile' + (R.open ? (closedNow() ? ' (prelim.)' : ' so far') : '') : '')));
+      if (VX.flag[i]) ro.appendChild(span('pk', ' · fear high, VIX calm'));
+    }
+    if (!picked) ro.appendChild(span('muted', ' · ' + TAP + ' the chart for any day'));
+  }
+  function loadVix() {
+    if (!VIX_URL) return Promise.resolve();
+    return getJSON('vix.json', VIX_URL).then(function (v) {
+      if (!vixValidate(v)) throw pubErr('the VIX data looked broken');
+      vdoc = v; vixErr = null;
+    }).catch(function (e) { if (!vdoc) vixErr = errWords(e); });
+  }
+  function vixRefresh() {
+    try { prepareVix(); } catch (e) { VX = null; vixErr = errWords(e); }
+    try { renderVixText(); } catch (e) { VX = null; $('vxErr').hidden = false; errWords(e); $('vxErr').textContent = 'The VIX section could not be drawn.'; }
+    requestRender();
+  }
+
+
   function setAttr(n, k, v) { if (n.getAttribute(k) !== v) n.setAttribute(k, v); }
   function renderViewUi() {
     if (!D) return;
@@ -1346,6 +1611,7 @@
     view = D ? rangeView(chip) : { chip: chip, x0: 0, x1: 0, custom: false };
     try { localStorage.setItem('fearRange', chip); } catch (e) { }
     hover.c1 = hover.c2 = null;
+    hover.cv = null;
     if (doc) requestRender(); else renderViewUiChips();
   }
   function renderViewUiChips() {
@@ -2231,6 +2497,11 @@
         head: sec.querySelector('.card-head'), ro: $(one ? 'ro1' : 'ro2'), bar: sec.querySelector('.zoombar'),
         chart: $(one ? 'chart1' : 'chart2'), legend: $(one ? 'lg1' : 'lg2'), chips: $('ranges') };
     }
+    if (key === 'cv') {
+      var sv = $('vix');
+      return { label: 'Fear meter vs the VIX, full screen', kicker: '', head: sv.querySelector('.card-head'), note: $('vxHead'),
+        ro: $('roV'), bar: sv.querySelector('.zoombar'), chart: $('chartV'), legend: $('lgV'), chips: $('ranges') };
+    }
     var k = key.slice(1), B = KB[k];
     return { label: K_NAME[k] + ' candles, fear meter KDJ, full screen', kicker: 'Fear meter · KDJ',
       head: B.root.querySelector('.kb-head'), note: B.note, ro: B.ro, bar: B.root.querySelector('.kb-bar'), chart: B.chart,
@@ -2240,6 +2511,7 @@
     var short = window.innerHeight <= 540;
     if (key === 'c1') return short ? 180 : 220;
     if (key === 'c2') return fsSlot('chart').clientWidth >= 600 ? (short ? 204 : 260) : 470;
+    if (key === 'cv') return short ? 190 : 260;
     return short ? 176 : 236;
   }
   function fsSize() { if (FS.key) { var m = fsMinH(FS.key) + 'px'; if (fsSlot('chart').style.flexBasis !== m) fsSlot('chart').style.flexBasis = m; } }
@@ -2386,11 +2658,15 @@
   function drawCharts() {
     var c1 = $('chart1'), c2 = $('chart2'), w1 = c1.clientWidth, w2 = c2.clientWidth, h1 = fsHeight(c1), h2 = fsHeight(c2);
     var keys = ['c1', 'c2'], skip2 = FS.key === 'c1';
+    var cV = $('chartV'), wV = cV.clientWidth || w1, hV = fsHeight(cV);
+    keys.push('cv'); skip2 = skip2 || FS.key === 'cv';
     keys.forEach(function (k) { if (hover[k] != null && (hover[k] < view.x0 || hover[k] > view.x1)) hover[k] = null; });
 
     var tu = FS.key === 'c1' ? tickUnit(geo1(w1).pw) : FS.key === 'c2' ? tickUnit(geo2(w2).pw) : Math.max(tickUnit(geo1(w1).pw), tickUnit(geo2(w2).pw));
+    if (FS.key === 'cv') tu = tickUnit(geoV(wV).pw); else if (FS.key !== 'c1' && FS.key !== 'c2' && VX) tu = Math.max(tu, tickUnit(geoV(wV).pw));
 
     drawChart1(w1, tu, FS.key === 'c1' ? null : geo2(w2).pw, h1);
+    if (!FS.key || FS.key === 'cv') { try { drawChartV(wV, tu, hV); } catch (e) { GEO.cv = null; clear(cV); $('vxErr').hidden = false; errWords(e); $('vxErr').textContent = 'The VIX chart could not be drawn.'; } }
     if (!skip2) drawChart2(w2, tu, h2);
     layoutGauge();
     renderViewUi();
@@ -2399,6 +2675,7 @@
     if (!doc) return;
     $('content').hidden = false;
     renderStatus(); renderText();
+    try { renderVixText(); } catch (e) { VX = null; $('vxErr').hidden = false; errWords(e); $('vxErr').textContent = 'The VIX section could not be drawn.'; }
     try { drawCharts(); }
     catch (e) { errWords(e); showFatal('The charts could not be drawn.'); return; }
     try { renderKdjText(); } catch (e) { var er = $('kdjErr'); er.hidden = false; errWords(e); er.textContent = 'The KDJ section could not be drawn.'; }
@@ -2454,12 +2731,14 @@
       var hadView = !!D, wasLatest = hadView ? atLatest(view) : true, prevN = {}, prevS = {};
       TFS.forEach(function (k) { prevN[k] = KN[k]; prevS[k] = D && D.tf[k] ? D.tf[k].s : null; });
       doc = d; D = prepare(d); loadedAt = now(); lastErr = null;
+      try { prepareVix(); } catch (e) { VX = null; }
       TFS.forEach(function (k) { KN[k] = D.kdj[k].n; });
       kdjAfterLoad(prevN, prevS);
 
       if (!hadView || !view.custom) view = rangeView(view.chip);
       else view = wasLatest ? toLatest(view, view.x0) : clampView(view);
       if (changed) renderAll(); else renderStatus();
+      if (changed || !vdoc) loadVix().then(vixRefresh);
     }).catch(function (e) {
       var w = errWords(e);
       if (!doc) showFatal('Could not load the data (' + w + ').');
@@ -2473,6 +2752,9 @@
       var changed = !m || m.generated_at !== doc.generated_epoch;
       if (changed) load();
       else { lastErr = null; renderStatus(); }
+      var vs = m && m.files && m.files['vix.json'] ? m.files['vix.json'].sha256 : null;
+      if (!changed && vs && vs !== vixSha) loadVix().then(vixRefresh);
+      if (vs) vixSha = vs;
     }).catch(function (e) { lastErr = { at: now(), msg: errWords(e) }; renderStatus(); });
   }
 
@@ -2505,6 +2787,7 @@
   initFs();
   attachGestures($('chart1'), 'c1');
   attachGestures($('chart2'), 'c2');
+  attachGestures($('chartV'), 'cv');
   initKdjBlocks();
   if ('ResizeObserver' in window) {
     var lastW = 0;
