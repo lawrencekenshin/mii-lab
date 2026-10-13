@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Boom tracker: is tech in a boom, since when, how close to a new one, and how close to the end of this one.">
+<title>Boom tracker · live</title>
+<link rel="stylesheet" href="boom.css?v=20261013a">
+</head>
+<body>
+<a class="skip" href="#boom">Skip to the tracker</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../semis/"><span class="t-long">Semis Tracking</span><span class="t-short">Semis</span></a>
+      <a class="tab" href="../price-seeker/"><span class="t-long">Price Seeker</span><span class="t-short">Seeker</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Boom tracker</span><span class="t-short">Boom</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="lab wrap" id="main">
+  <section class="status" aria-label="Data status">
+    <div class="status-row">
+      <span class="chip chip-muted" id="chip">LOADING</span>
+      <span class="asof" id="asof">Loading prices…</span>
+      <span class="muted" id="built"></span>
+    </div>
+    <div id="err"></div>
+  </section>
+  <div class="controls"><div class="seg" role="group" aria-label="Range" id="range"></div></div>
+  <section class="card boom" id="boom" aria-live="polite"><h1>Loading…</h1></section>
+  <footer>Prices: daily closes, updated after each US close.</footer>
+</main>
+
+<noscript><p class="wrap">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="boom.js?v=20261013b"></script>
+</body>
+</html>

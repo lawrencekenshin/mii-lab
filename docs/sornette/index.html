@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Sornette Dashboard: three separate questions (bubble shape, runaway price, weakening) answered in plain words, every reading dated.">
+<title>Sornette · live</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="sornette.css?v=20261013pub2">
+</head>
+<body>
+<a class="skip" href="#now">Skip to today's answers</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../semis/"><span class="t-long">Semis Tracking</span><span class="t-short">Semis</span></a>
+      <a class="tab" href="../price-seeker/"><span class="t-long">Price Seeker</span><span class="t-short">Seeker</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Sornette</span><span class="t-short">Sornette</span></a>
+    </nav>
+  </div>
+</header>
+
+<section class="wrap hero" aria-labelledby="h1">
+  <h1 id="h1">Sornette Dashboard</h1>
+  <p class="method">Bubble shape, unusual regimes, and observed weakening, with every reading dated.</p>
+</section>
+
+
+<div class="symbar" id="symbar">
+  <div class="wrap symbar-in">
+    <label class="sym-pick">
+      <span class="sym-face" aria-hidden="true"><b id="faceT">&nbsp;</b><small id="faceN">&nbsp;</small></span>
+      <span class="sym-caret" aria-hidden="true">▾</span>
+      <select id="symSelect" aria-label="Instrument"></select>
+    </label>
+    <div class="picker" id="symChips" role="group" aria-label="Instrument"></div>
+    <div class="quote" id="quote" aria-live="polite"><span class="sub">Loading the readings...</span></div>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <p class="meta" id="meta">Loading the readings...</p>
+  <div id="banners" aria-live="polite"></div>
+
+  <div class="grid" id="grid">
+
+
+    <section class="card now" id="now" aria-labelledby="t-now">
+      <h2 id="t-now">Right now</h2>
+      <p class="lede">Three separate answers, each one dated.</p>
+      <ol class="answers" id="answers"></ol>
+    </section>
+
+
+    <section class="card price" id="price" aria-labelledby="t-price">
+      <div class="price-head">
+        <h2 id="t-price">Price and indicators, every reading dated</h2>
+        <div class="seg" role="group" aria-label="Chart range" id="rangeSeg">
+          <button type="button" data-r="1y" aria-pressed="false">1Y</button>
+          <button type="button" data-r="3y" aria-pressed="false">3Y</button>
+          <button type="button" data-r="5y" aria-pressed="true">5Y</button>
+          <button type="button" data-r="2013" aria-pressed="false">2013+</button>
+          <button type="button" data-r="all" aria-pressed="false">All</button>
+        </div>
+      </div>
+      <div class="pane-toggles" id="paneToggles" role="group" aria-label="Indicator panes"></div>
+      <p class="readout hero-readout" id="heroReadout" aria-live="polite"></p>
+      <div class="tvbox" id="heroTV" tabindex="0" role="application" aria-roledescription="chart" aria-label="Price with indicator panes below it. Use the left and right arrow keys to step through days (Shift for 20 days), Home and End for the first and last day in view, Escape to go back to the latest day."></div>
+      <p class="sr-only" id="heroSr" aria-live="polite"></p>
+      <div class="svgbox hero-chart" id="heroChart" hidden></div>
+      <p class="tvhint" id="tvHint"></p>
+      <div class="key" id="heroKey"></div>
+      <div class="caption" id="heroCaption"></div>
+      <div class="fine" id="heroFine"></div>
+    </section>
+
+
+    <section class="card" id="bubble" aria-labelledby="t-bubble">
+      <div class="card-head"><span class="num">1</span><h2 class="qh" id="t-bubble">Does the climb look like a bubble?</h2></div>
+      <div class="split">
+        <div class="col-l">
+          <div class="verdict" id="bubVerdict"></div>
+          <div class="misses" id="bubMisses"></div>
+        </div>
+        <div class="col-r">
+          <div class="dots13" id="bubDots" role="group" aria-label="The 13 time scales"></div>
+          <div class="scale" aria-hidden="true" id="bubScale"></div>
+          <p class="dots-note" id="bubDotNote" aria-live="polite"></p>
+          <div class="history" id="bubHistory"></div>
+        </div>
+      </div>
+      <div class="fine" id="bubFine"></div>
+      <details class="why" id="bubWhy">
+        <summary><span>Why? How the bubble-shape test works</span></summary>
+        <div class="why-body" id="bubWhyBody"></div>
+      </details>
+    </section>
+
+
+    <section class="card" id="runaway" aria-labelledby="t-run">
+      <div class="card-head"><span class="num">2</span><h2 class="qh" id="t-run">Is the price running away?</h2></div>
+      <div class="split">
+        <div class="col-l">
+          <div class="verdict" id="runVerdict"></div>
+          <p class="context" id="runContext"></p>
+        </div>
+        <div class="col-r">
+          <div class="chart-head">
+            <span class="readout" id="runReadout"></span>
+            <div class="seg" role="group" aria-label="Gauge range" id="runRange">
+              <button type="button" data-r="5y" aria-pressed="false">5Y</button>
+              <button type="button" data-r="2013" aria-pressed="true">2013+</button>
+              <button type="button" data-r="all" aria-pressed="false">All</button>
+            </div>
+          </div>
+          <div class="svgbox gauge-chart" id="runChart"></div>
+        </div>
+      </div>
+      <div class="fine" id="runFine"></div>
+      <details class="why" id="runWhy">
+        <summary><span>Why? What this gauge measures</span></summary>
+        <div class="why-body" id="runWhyBody"></div>
+      </details>
+    </section>
+
+
+    <section class="card" id="weak" aria-labelledby="t-weak">
+      <div class="card-head"><span class="num">3</span><h2 class="qh" id="t-weak">Has the price started to weaken?</h2></div>
+      <div class="split">
+        <div class="col-l">
+          <div class="verdict" id="weakVerdict"></div>
+          <ul class="facts" id="weakFacts"></ul>
+          <p class="ctxline" id="weakCtx"></p>
+        </div>
+        <div class="col-r mid">
+          <div class="pic" id="weakPic"></div>
+        </div>
+      </div>
+      <div class="fine" id="weakFine"></div>
+      <details class="why" id="weakWhy">
+        <summary><span>Why? The rule, and every recent close below it</span></summary>
+        <div class="why-body" id="weakWhyBody"></div>
+      </details>
+    </section>
+
+
+    <section class="card" id="trend" aria-labelledby="t-trend">
+      <div class="card-head"><span class="num num-x">+</span><h2 class="qh" id="t-trend">Is the bubble reading heating up or cooling down?</h2></div>
+      <div class="split">
+        <div class="col-l">
+          <div class="verdict" id="trendVerdict"></div>
+          <p class="context" id="trendInput"></p>
+        </div>
+        <div class="col-r mid">
+          <div class="tf4" id="trendTiles"></div>
+        </div>
+      </div>
+      <div class="fine" id="trendFine"></div>
+      <details class="why" id="trendWhy">
+        <summary><span>Why? Show the chart</span></summary>
+        <div class="why-body" id="trendWhyBody"></div>
+      </details>
+    </section>
+
+
+    <section class="card" id="overview" aria-labelledby="t-ov">
+      <div class="ov-head"><h2 id="t-ov">All eight at a glance</h2><span class="head-note">Tap a row to open it</span></div>
+      <div class="ov" id="ovList" role="list"></div>
+      <div class="fine"><p>Fixed order. Each index moves with the ETF above it.</p></div>
+    </section>
+
+  </div>
+
+  <footer class="foot">
+    <p id="footData">End-of-day data.</p>
+  </footer>
+</main>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="sornette.js?v=20261013pub2" defer></script>
+</body>
+</html>

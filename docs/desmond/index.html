@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Paul Desmond's 90% Days: has selling become extreme, and has strong demand followed? Rebuilt every evening from the closes and volumes of NYSE-listed stocks, with a live reading through the trading day.">
+<title>Desmond Panic &amp; Demand · live</title>
+<link rel="stylesheet" href="desmond.css?v=20261013a">
+</head>
+<body>
+<a class="skip" href="#charts">Skip to the charts</a>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../semis/"><span class="t-long">Semis Tracking</span><span class="t-short">Semis</span></a>
+      <a class="tab" href="../price-seeker/"><span class="t-long">Price Seeker</span><span class="t-short">Seeker</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Desmond Panic &amp; Demand</span><span class="t-short">Desmond</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" aria-labelledby="h1">
+    <h1 id="h1">Desmond Panic &amp; Demand</h1>
+    <p class="method">Paul F. Desmond's 90% Days, from his 2002 Charles H. Dow Award paper · rebuilt independently from stock-level closes and volumes · not a Lowry product</p>
+    <div class="status-row">
+      <span class="chip chip-wait" id="chip">LOADING</span>
+      <span class="asof" id="asof">Loading…</span>
+    </div>
+    <div id="banners" aria-live="polite"></div>
+  </section>
+
+
+  <section class="card" id="now" aria-labelledby="t1">
+    <div class="card-head">
+      <h2 id="t1">Right now</h2>
+      <div class="seg" role="group" aria-label="Method">
+        <button type="button" data-mode="full" aria-pressed="true">Four-component</button>
+        <button type="button" data-mode="proxy" aria-pressed="false">Volume only</button>
+      </div>
+    </div>
+    <p class="sub" id="modeLine"></p>
+    <div class="answer" id="answer"></div>
+    <div class="live" id="live" hidden aria-live="polite"></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+
+  <section class="card" id="charts" aria-labelledby="t2">
+    <div class="card-head">
+      <h2 id="t2">Price, panic days and demand</h2>
+      <div class="seg seg-range" role="group" aria-label="Time range">
+        <button type="button" data-range="1y" aria-pressed="false">1Y</button>
+        <button type="button" data-range="3y" aria-pressed="true">3Y</button>
+        <button type="button" data-range="2013" aria-pressed="false">2013+</button>
+        <button type="button" data-range="all" aria-pressed="false">All</button>
+      </div>
+    </div>
+    <div class="toggles" role="group" aria-label="Panels">
+      <label><input type="checkbox" id="tgAgree" checked> Agreement panel</label>
+      <label><input type="checkbox" id="tgAvg"> 30-day averages</label>
+      <label><input type="checkbox" id="tgBands" checked> Panic-window bands</label>
+    </div>
+    <div class="readout" id="readout" aria-live="off"></div>
+    <div class="legend" id="legend"></div>
+    <div class="chartbox" id="chart" role="img" aria-label="SPY price with panic and demand markers, and the component panels below"></div>
+    <p class="small" id="chartNote"></p>
+  </section>
+
+
+  <section class="card" id="near" aria-labelledby="tn" hidden>
+    <div class="card-head">
+      <h2 id="tn">Near panic <span class="chip chip-amber" style="vertical-align:3px">OUR RULE</span></h2>
+      <div class="seg seg-range" role="group" aria-label="Near-panic range">
+        <button type="button" data-nrange="2026" aria-pressed="true">2026</button>
+        <button type="button" data-nrange="3y" aria-pressed="false">3Y</button>
+        <button type="button" data-nrange="2021" aria-pressed="false">2021+</button>
+        <button type="button" data-nrange="all" aria-pressed="false">All</button>
+      </div>
+    </div>
+    <p class="sub" id="nearIntro"></p>
+    <div class="readout" id="nearReadout"></div>
+    <div class="legend" id="nearLegend"></div>
+    <div class="chartbox chartbox-near" id="nearChart" role="img" aria-label="SPY with pullbacks, panic and near-panic days, and the daily panic score"></div>
+    <div class="answer" id="nearAnswer"></div>
+    <h3 class="tt">The trade-off: where you draw the line</h3>
+    <p class="small" id="nearTradeNote"></p>
+    <div class="tbl-wrap"><table class="rt" id="nearTrade"></table></div>
+    <h3 class="tt">Every 7%+ pullback since 2021</h3>
+    <div class="tbl-wrap"><table class="rt" id="nearSwings"></table></div>
+    <h3 class="tt">What followed the first day of each cluster</h3>
+    <div class="tbl-wrap"><table class="rt" id="nearFollow"></table></div>
+    <p class="small" id="nearFoot"></p>
+  </section>
+
+
+  <section class="card" id="episodes" aria-labelledby="t3">
+    <div class="card-head">
+      <h2 id="t3">Every panic episode and what followed</h2>
+      <div class="seg" role="group" aria-label="Era">
+        <button type="button" data-era="2021" aria-pressed="true">2021+</button>
+        <button type="button" data-era="2013" aria-pressed="false">2013+</button>
+        <button type="button" data-era="all" aria-pressed="false">All</button>
+      </div>
+    </div>
+    <p class="sub">An episode opens on a 90% down day and ends when demand confirms, the panic window runs out, or data break. Moves after are SPY close to close.</p>
+    <div class="summary" id="epSummary"></div>
+    <p class="swipe">Swipe the table sideways for more columns →</p>
+    <div class="tbl-wrap"><table class="rt" id="epTable"></table></div>
+    <p class="small" id="epNote"></p>
+  </section>
+
+
+  <section class="card" id="years" aria-labelledby="t4">
+    <h2 id="t4">Raw days by year</h2>
+    <p class="sub">How often each extreme happened in these stocks. They move together more than the whole exchange, so they log more 90% days than Lowry's published NYSE counts.</p>
+    <div class="tbl-wrap"><table class="rt" id="yrTable"></table></div>
+  </section>
+
+
+  <section class="card" id="howto" aria-labelledby="t5">
+    <h2 id="t5">How to read it</h2>
+    <div class="two-col">
+      <div class="panel" id="howRules"></div>
+      <div class="panel" id="howLabels"></div>
+    </div>
+    <div class="panel" id="dataPanel"></div>
+  </section>
+
+  <footer class="foot">
+    <p>Rules: Paul F. Desmond, <i>Identifying Bear Market Bottoms and New Bull Markets</i> (2002 Charles H. Dow Award); Lowry Research (2016); Lowry OnDemand 30-day component averages. Independent software, not affiliated with Lowry Research or CFRA.</p>
+    <p id="footData">End-of-day data. Derived values only.</p>
+  </footer>
+</main>
+
+<noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="desmond.js?v=20261013a" defer></script>
+<script src="near.js?v=20261013a" defer></script>
+</body>
+</html>
