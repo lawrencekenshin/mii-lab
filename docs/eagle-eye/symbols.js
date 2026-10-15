@@ -28,7 +28,7 @@ function renderSymList() {
   const L = $('symlist'), q = $('symin').value.trim();
   symHits = symMatches(q);
   if (!symHits.length) {
-    L.innerHTML = `<div class="none">${esc(q.toUpperCase())}: ${window.EET_STATIC ? `not on this page's list of ${SYMLIST.length} tickers` : `not one of the ${SYMLIST.length} tickers with a saved option chain`}</div>`;
+    L.innerHTML = `<div class="none">${esc(q.toUpperCase())}: ${window.EET_STATIC ? `not on this page's list of ${SYMLIST.length} tickers` : `not one of the ${SYMLIST.length} tickers on this dashboard`}</div>`;
   } else {
     symSel = Math.max(0, Math.min(symSel, symHits.length - 1));
     L.innerHTML = symHits.map(([s, n], i) => `<div data-s="${esc(s)}"${i === symSel ? ' class="on"' : ''}><b>${esc(s)}</b><span>${esc(n)}</span></div>`).join('');

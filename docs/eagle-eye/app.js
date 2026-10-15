@@ -119,8 +119,8 @@ function renderLayerPanel() {
   PANES.forEach(P => { html += `<label><input type="checkbox" data-k="pane_${P.id}"${paneOn(P.id) ? ' checked' : ''}>${P.label}</label>`; });
   html += `<label><input type="checkbox" data-k="side"${sideOn() ? ' checked' : ''}>Table &amp; washout box (right)</label>`;
   html += `<div class="grp">Scale</div><label><input type="checkbox" data-k="fitPrice"${fitCandlesOnly() ? ' checked' : ''}>Fit scale to candles only (far lines run off-screen)</label>`;
-  html += `<label><input type="checkbox" data-k="panLink"${layerState.panLink !== false ? ' checked' : ''}>Drag price &amp; indicators together</label>`;
-  html += `<label><input type="checkbox" data-k="linkAxes"${layerState.linkAxes ? ' checked' : ''}>…and zoom them together too</label>`;
+  html += `<label><input type="checkbox" data-k="lockAxes"${axesLocked() ? ' checked' : ''}>One time axis: indicators scroll &amp; zoom with the price chart</label>`;
+  html += `<label${axesLocked() ? ' class="off"' : ''}><input type="checkbox" data-k="panLink"${layerState.panLink !== false ? ' checked' : ''}${axesLocked() ? ' disabled' : ''}>Unlocked: still drag them together (zoom stays separate)</label>`;
   html += `<div class="acts"><button data-act="all">All on</button><button data-act="none">Price only</button></div>`;
   $('layers').innerHTML = html;
 }
@@ -132,9 +132,7 @@ $('layers').addEventListener('change', e => {
   if (k === 'panes_all') { PANES.forEach(P => { layerState['pane_' + P.id] = e.target.checked; }); saveLayers(); renderLayerPanel(); applyLayers(true); return; }
   layerState[k] = e.target.checked;
   if (k.startsWith('pane_')) { saveLayers(); renderLayerPanel(); applyLayers(true); return; }
-  if (k === 'linkAxes' && e.target.checked && chart && dchart) {
-    const r = chart.timeScale().getVisibleRange(); if (r) { try { dchart.timeScale().setVisibleRange(r); } catch (x) {  } }
-  }
+  if (k === 'lockAxes') { saveLayers(); renderLayerPanel(); applyLayers(); if (e.target.checked) syncAxes('p'); return; }
   saveLayers(); applyLayers();
 });
 $('layers').addEventListener('click', e => {
@@ -225,26 +223,53 @@ function makeChart() {
   dseries = {}; oseries = {}; guideLines = []; gexLines = []; markersApi = null; nBars = 0; gexKey = ''; topMargin = -1;
   chart.timeScale().subscribeVisibleLogicalRangeChange(r => { sig = ''; maybeLoadMore(r); });
   dchart.timeScale().subscribeVisibleLogicalRangeChange(r => { sig = ''; maybeLoadMore(r); });
-  prevR.p = prevR.d = null;
-  linkAxes();
+  prevR.p = prevR.d = null; scaleSym = '';
+  chart.timeScale().subscribeVisibleLogicalRangeChange(() => { if (leader() === 'p') syncAxes('p'); });
+  dchart.timeScale().subscribeVisibleLogicalRangeChange(() => syncAxes(leader()));
   panLink();
   hookDblClick();
+  linkCrosshairs();
 }
 
 
 const userAt = { p: 0, d: 0 }, prevR = { p: null, d: null };
-let progMove = false;
+let progMove = false, lastUser = 'p';
 function watchUser(el, k) {
-  el.addEventListener('pointerdown', () => { userAt[k] = Infinity; }, true);
+  el.addEventListener('pointerdown', () => { userAt[k] = Infinity; lastUser = k; }, true);
   const up = () => { if (userAt[k] === Infinity) userAt[k] = performance.now() + 1200; };
   el.addEventListener('pointerup', up, true); el.addEventListener('pointercancel', up, true); window.addEventListener('pointerup', up);
-  el.addEventListener('wheel', () => { userAt[k] = performance.now() + 400; }, { capture: true, passive: true });
+  el.addEventListener('wheel', () => { userAt[k] = performance.now() + 400; lastUser = k; }, { capture: true, passive: true });
 }
 watchUser($('chart'), 'p'); watchUser($('dchart'), 'd');
+
+
+
+let xhairSrc = null;
+[['chart', 'p'], ['dchart', 'd']].forEach(([el, k]) => {
+  $(el).addEventListener('mouseenter', () => { xhairSrc = k; });
+  $(el).addEventListener('mouseleave', () => {
+    if (xhairSrc !== k) return;
+    xhairSrc = null;
+    const other = k === 'p' ? dchart : chart;
+    if (other) other.clearCrosshairPosition();
+  });
+});
+const XH_FULL = { horzLine: { visible: true, labelVisible: true } }, XH_VERT = { horzLine: { visible: false, labelVisible: false } };
+function linkCrosshairs() {
+  [['p', chart], ['d', dchart]].forEach(([k, src]) => src.subscribeCrosshairMove(prm => {
+    if (xhairSrc !== k || !chart || !dchart) return;
+    const dst = k === 'p' ? dchart : chart;
+    const ser = k === 'p' ? Object.values(dseries)[0] : candles;
+    src.applyOptions({ crosshair: XH_FULL });
+    if (!prm || prm.time === undefined || !ser) { dst.clearCrosshairPosition(); return; }
+    dst.applyOptions({ crosshair: XH_VERT });
+    try { dst.setCrosshairPosition(0, prm.time, ser); } catch (e) { dst.clearCrosshairPosition(); }
+  }));
+}
 function panLink() {
   [['p', chart, () => dchart], ['d', dchart, () => chart]].forEach(([k, src, other]) => src.timeScale().subscribeVisibleLogicalRangeChange(r => {
     const prev = prevR[k]; prevR[k] = r;
-    if (!r || !prev || progMove || layerState.linkAxes || layerState.panLink === false || performance.now() > userAt[k]) return;
+    if (!r || !prev || progMove || axesLocked() || layerState.panLink === false || performance.now() > userAt[k]) return;
     const w0 = prev.to - prev.from, w1 = r.to - r.from, shift = r.from - prev.from;
     if (Math.abs(w1 - w0) > 1e-3 * Math.max(1, w0) || !shift) return;
     const dst = other(), o = dst && dst.timeScale().getVisibleLogicalRange();
@@ -260,15 +285,42 @@ function progSet(fn) {
   if (dchart) prevR.d = dchart.timeScale().getVisibleLogicalRange();
 }
 
-let syncing = false;
-function linkAxes() {
-  const pair = [[chart, dchart], [dchart, chart]];
-  pair.forEach(([src, dst]) => src.timeScale().subscribeVisibleTimeRangeChange(r => {
-    if (!layerState.linkAxes || syncing || !r) return;
-    syncing = true;
-    try { dst.timeScale().setVisibleRange(r); } catch (e) {  }
-    syncing = false;
-  }));
+
+
+const axesLocked = () => layerState.lockAxes !== false;
+const leader = () => (lastUser === 'd' && performance.now() <= userAt.d ? 'd' : 'p');
+function axisOffset() {
+  const pt = (state && state.di && state.di.panes && state.di.panes.t) || [];
+  if (!pt.length) return 0;
+  const T = pt[pt.length - 1], a = chart.timeScale().timeToIndex(T), b = dchart.timeScale().timeToIndex(T);
+  return a == null || b == null ? 0 : b - a;
+}
+let inSync = false;
+function syncAxes(from) {
+  if (inSync || !axesLocked() || !chart || !dchart || !nBars || diHidden()) return;
+
+
+  const s = (from === 'd' ? dchart : chart).timeScale(), d = (from === 'd' ? chart : dchart).timeScale(), r = s.getVisibleLogicalRange();
+  if (!r) return;
+  const off = axisOffset() * (from === 'd' ? -1 : 1), want = { from: r.from + off, to: r.to + off }, cur = d.getVisibleLogicalRange();
+  if (cur && Math.abs(cur.from - want.from) < 1e-3 && Math.abs(cur.to - want.to) < 1e-3) return;
+  inSync = true;
+  try { progSet(() => d.setVisibleLogicalRange(want)); } finally { inSync = false; }
+}
+
+
+let scaleSym = '';
+function matchScaleWidths() {
+  if (!chart || !dchart || !axesLocked() || maxPane !== null || diHidden()) return;
+  if (scaleSym !== sym + tf) {
+    scaleSym = sym + tf;
+    [chart, dchart].forEach(c => c.applyOptions({ rightPriceScale: { minimumWidth: 0 } }));
+    return;
+  }
+  const a = chart.priceScale('right').width(), b = dchart.priceScale('right').width();
+  if (!a || !b || a === b) return;
+  const w = Math.max(a, b);
+  [chart, dchart].forEach(c => c.applyOptions({ rightPriceScale: { minimumWidth: w } }));
 }
 
 function structureOf(di) {
@@ -386,11 +438,12 @@ function resetPriceView() {
 }
 function resetDiView() {
   if (!dchart) return;
+  if (axesLocked()) { syncAxes('p'); sig = ''; return; }
   progSet(() => { dchart.timeScale().applyOptions({ barSpacing: paneWidth() < 700 ? 4 : 7, rightOffset: 3 }); dchart.timeScale().scrollToRealTime(); });
   sig = '';
 }
 
-function render() { progSet(renderBody); }
+function render() { progSet(renderBody); syncAxes(leader()); }
 function renderBody() {
   const di = state.di || {};
   filterPanes(di);

@@ -76,6 +76,7 @@ body { padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 e
 #layers .grp { color:var(--sub); font-size:11px; text-transform:uppercase; letter-spacing:.5px; margin:8px 0 4px; }
 #layers .grp:first-child { margin-top:0; }
 #layers label { display:flex; align-items:center; gap:8px; padding:3px 0; cursor:pointer; white-space:nowrap; }
+#layers label.off { opacity:.45; cursor:default; }
 #layers .sw { width:14px; height:3px; border-radius:2px; display:inline-block; }
 #layers .acts { display:flex; gap:6px; margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
 #layers .acts button { flex:1; border:1px solid var(--line) !important; font-size:12px !important; }

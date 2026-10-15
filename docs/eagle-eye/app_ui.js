@@ -412,6 +412,7 @@ function fitCanvas(el, w, h, dpr) {
 function draw() {
   requestAnimationFrame(draw);
   if (!chart || !state) return;
+  matchScaleWidths();
   if (!nBars) {
     if (sig !== 'empty') {
       ['under', 'overlay'].forEach(id => { const c = $(id); c.getContext('2d').clearRect(0, 0, c.width, c.height); });
