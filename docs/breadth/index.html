@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="vixts.css?v=1">
 <link rel="stylesheet" href="idxkdj.css?v=1">
 <link rel="stylesheet" href="kdjwash.css?v=7">
+<link rel="stylesheet" href="newlows.css?v=4">
 </head>
 <body>
 <a class="skip" href="#daily">Skip to the chart</a>
@@ -194,6 +195,7 @@
     </section>
 
 
+
     <section class="card" id="vixts" aria-labelledby="tvx">
       <div class="card-head">
         <div class="card-title">
@@ -346,6 +348,43 @@
           <div class="box-row"><b>The study</b><span id="studyKW"></span></div>
         </div>
         <p class="kdj-honest" id="honestKW"></p>
+      </div>
+    </section>
+
+    <section class="card" id="newlows" aria-labelledby="tnl">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tnl">Nasdaq new lows<span class="tsep"> · </span><span class="tspan" data-nlspan>Daily · last 2 years</span></h2>
+          <p class="sub" id="subNL">How many Nasdaq listings (stocks, ETFs and funds) hit a new 52-week low that day.</p>
+        </div>
+        <div class="seg nl-tf" id="tfNL" role="group" aria-label="Candle size" hidden>
+          <button type="button" data-nlt="1D" aria-pressed="true">Daily</button>
+          <button type="button" data-nlt="1W" aria-pressed="false">Weekly</button>
+          <button type="button" data-nlt="2W" aria-pressed="false">2-week</button>
+          <button type="button" data-nlt="1M" aria-pressed="false">Monthly</button>
+        </div>
+      </div>
+      <p class="panel-asof" id="asofNL">Loading the new-lows count…</p>
+      <p class="banner banner-warn" id="errNL" hidden></p>
+      <div id="bodyNL" hidden>
+        <div class="nl-now" id="nowNL" aria-live="polite"></div>
+        <div class="controls nl-controls">
+          <div class="seg seg-range nl-range" role="group" aria-label="Nasdaq new lows time window">
+            <button type="button" data-nlr="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+            <button type="button" data-nlr="2Y" aria-pressed="true" aria-label="Last 2 years">2Y</button>
+            <button type="button" data-nlr="5Y" aria-pressed="false" aria-label="Last 5 years">5Y</button>
+            <button type="button" data-nlr="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+            <button type="button" data-nlr="All" aria-pressed="false" aria-label="Since 2013">All</button>
+          </div>
+        </div>
+        <div class="readout nl-ro" id="roNL" aria-live="polite"></div>
+        <div class="nl-chart" id="chartNL" role="img" aria-label="The Nasdaq Composite on top, the count of Nasdaq listings at a new 52-week low in the middle, the KDJ of that count below"></div>
+        <p class="legend" id="lgNL"></p>
+        <div class="box">
+          <div class="box-row"><b>How to read it</b><span id="howNL"></span></div>
+          <div class="box-row"><b>Right now</b><span id="rightNL"></span></div>
+        </div>
+        <p class="kdj-honest" id="defNL"></p>
       </div>
     </section>
 
@@ -507,5 +546,6 @@
 <script src="vixts.js?v=1" defer></script>
 <script src="idxkdj.js?v=1" defer></script>
 <script src="kdjwash.js?v=7" defer></script>
+<script src="newlows.js?v=4" defer></script>
 </body>
 </html>
