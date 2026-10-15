@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="idxkdj.css?v=1">
 <link rel="stylesheet" href="kdjwash.css?v=7">
 <link rel="stylesheet" href="newlows.css?v=4">
+<link rel="stylesheet" href="tbreadth.css?v=1">
 </head>
 <body>
 <a class="skip" href="#daily">Skip to the chart</a>
@@ -192,6 +193,49 @@
         </div>
         <p class="src gz-src" data-g="src" hidden></p>
       </article>
+    </section>
+
+
+    <section class="card" id="tbreadth" aria-labelledby="tbT">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tbT">Trend breadth<span class="tsep"> · </span><span class="tspan">how many stocks are climbing?</span></h2>
+          <p class="sub" id="tbSub"></p>
+          <p class="tbr-from">The same chart as on the <a href="../tet-radar/#tbreadth">TET Radar tab</a>: S&amp;P 500 stocks that pass the TET trend check.</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="tbAsof"></p>
+      <div class="tb-hero">
+        <div class="tb-now" id="tbNow"></div>
+        <div class="tb-pic" id="tbPic"></div>
+      </div>
+      <div class="box" id="tbBox"></div>
+      <h3 class="sh">The five zones <span class="q">· how often each happens</span></h3>
+      <div class="tb-zkey" id="tbZones"></div>
+      <div class="tb-controls">
+        <div class="seg seg-ov" role="group" aria-label="Price overlay">
+          <button type="button" data-tbo="SPY" aria-pressed="true">SPY</button>
+          <button type="button" data-tbo="QQQ" aria-pressed="false">QQQ</button>
+          <button type="button" data-tbo="Both" aria-pressed="false">Both</button>
+          <button type="button" data-tbo="Off" aria-pressed="false" aria-label="No price overlay">Off</button>
+        </div>
+        <div class="seg seg-rg" role="group" aria-label="Time window">
+          <button type="button" data-tbr="1Y" aria-pressed="false" aria-label="Last year">1Y</button>
+          <button type="button" data-tbr="2Y" aria-pressed="false" aria-label="Last 2 years">2Y</button>
+          <button type="button" data-tbr="5Y" aria-pressed="true" aria-label="Last 5 years">5Y</button>
+          <button type="button" data-tbr="10Y" aria-pressed="false" aria-label="Last 10 years">10Y</button>
+          <button type="button" data-tbr="All" aria-pressed="false" aria-label="All years since 2005">All</button>
+        </div>
+      </div>
+      <div class="readout" id="tbRo" aria-live="polite"></div>
+      <div class="chart" id="tbChart" role="img" aria-label="Share of S&amp;P 500 stocks climbing, coloured by zone, with SPY or QQQ on top"></div>
+      <p class="legend" id="tbLegend"></p>
+      <div class="tb-cases">
+        <h3 class="sh">Times like now <span class="q">· few stocks climbing while SPY sat near its high</span></h3>
+        <div class="tbl-wrap"><table class="rt tb-ct" id="tbCases"></table></div>
+        <p class="small" id="tbCasesNote"></p>
+      </div>
+      <p class="small" id="tbData"></p>
     </section>
 
 
@@ -514,6 +558,7 @@
     <p>Washout = the 50-day line drops to a deeply washed-out level after it had recovered since the previous washout. Hollow ring = the deepest close of a washout that had not reset, when it came clearly later and lower. The KDJ blocks’ weekly, 2-week and monthly candles use the breadth of their last trading day.</p>
     <p>Nasdaq-100 and Russell 2000: the same lines on today’s members of each index, updated after each close; the S&amp;P 500 also updates during the session. Today’s Russell 2000 list holds many young companies, so its early years count fewer, surviving names. The Russell 1000 is left out: it moves with the S&amp;P 500 almost exactly.</p>
     <p id="footPct">Percentile = where a reading ranks among past candles of the same size since 2013 (or since 2021); an open candle is ranked “so far”. Low percentile = few stocks above their average, rare.</p>
+    <p id="footTb">Trend breadth: the same series as the TET Radar tab. Method: Trend Emotion Timing (TET) by Dr. Oliver Reiss (NAAIM 2025). This is an independent re-implementation, not affiliated with or endorsed by the author or NAAIM.</p>
     <p id="footData">Derived values only (counts of stocks; SPY, QQQ and IWM closes). Prices about 15 minutes delayed during the session. No cookies, no tracking.</p>
   </footer>
 </main>
@@ -547,5 +592,6 @@
 <script src="idxkdj.js?v=1" defer></script>
 <script src="kdjwash.js?v=7" defer></script>
 <script src="newlows.js?v=4" defer></script>
+<script src="tbreadth.js?v=1" defer></script>
 </body>
 </html>
