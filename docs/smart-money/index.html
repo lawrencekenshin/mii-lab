@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Money Flow · live</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23151a23%22/%3E%3Cpath d=%22M2 5 L6 7 L10 6 L14 3%22 stroke=%22%235b8def%22 stroke-width=%221.6%22 fill=%22none%22/%3E%3Cpath d=%22M2 13 L6 11 L10 12 L14 9%22 stroke=%22%23f5a623%22 stroke-width=%221.6%22 fill=%22none%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css?v=6">
+</head>
+<body>
+<a class="skip" href="#now">Skip to the readings</a>
+<header class="sitehdr">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Smart Money Flow</span><span class="t-short">Smart $</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Smart Money <span>Flow</span></h1>
+      <div class="sub">How each index trades after the opening stretch, as a running total, against price. KDJ of the flow line underneath.</div>
+    </div>
+    <div class="vint num" id="vint">Loading…</div>
+  </header>
+
+  <div class="controls">
+    <div class="fg"><span class="lab">Show</span><span id="views"></span></div>
+    <div class="fg" id="tfwrap"><span class="lab">Candles</span><span id="tfs"></span></div>
+    <div class="fg" id="rgwrap"><span class="lab">Range</span><span id="ranges"></span></div>
+  </div>
+
+  <section id="now">
+    <h2>Every candle size <span class="h2s" id="mtxsub"></span></h2>
+    <div class="tscroll"><table class="grid num rows" id="mtx"></table></div>
+    <h2 id="nowh">Right now <span class="h2s" id="nowtf"></span></h2>
+    <div class="tscroll"><table class="grid num" id="nowtab"></table></div>
+  </section>
+
+  <h2 id="chartsh"></h2>
+  <section id="charts"></section>
+
+  <section id="divs">
+    <h2>After past divergences <span class="h2s" id="divtf"></span></h2>
+    <div class="filters">
+      <div class="fg"><span class="lab">Candles</span><span id="fdtf"></span></div>
+      <div class="fg" id="fidxwrap"><span class="lab">Index</span><span id="fidx"></span></div>
+      <div class="fg"><span class="lab">Type</span><span id="ftyp"></span></div>
+    </div>
+    <div class="tscroll"><table class="grid num" id="sumtab"></table></div>
+    <div class="tscroll"><table class="grid num rows" id="divtab"></table></div>
+  </section>
+
+  <footer class="defs">
+    <p><b>Smart Money Flow</b> — a running total of each session's move from after the open to the close: the overnight
+      gap and the opening stretch are left out. Recipe published by WallStreetCourier (the Smart Money Flow
+      Index). History from <span id="first">2013</span>.</p>
+    <p><b>So far</b> — a candle that hasn't closed yet (this week, these two weeks, this month, and today during US hours)
+      is drawn dashed, and its numbers are marked <span class="sofar">so far</span>. It can still change; divergences and
+      the after-tables use closed candles only.</p>
+    <p><b>Divergence</b> — two back-to-back closing lows, the second lower while the flow line is higher
+      (<span class="up">bullish</span>), or two back-to-back closing highs, the second higher while the flow line is lower
+      (<span class="down">bearish</span>). A low or high only counts once later candles confirm it, so the arrow is dated
+      on the confirming candle.</p>
+    <p><b>KDJ</b> of the flow line. Dots mark K crossing D: <span class="up">green</span> up, <span class="down">red</span>
+      down, grey while the candle is still open. Weekly, 2-week and monthly candles use the flow line's high, low and close
+      inside the candle.</p>
+    <p><b>After</b> — the index move 1, 3 and 6 months after the signal day's close, the worst close within 3 months, and
+      the same index on every day of the same history for comparison.</p>
+  </footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="app.js?v=14"></script>
+</body>
+</html>
