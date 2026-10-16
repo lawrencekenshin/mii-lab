@@ -71,7 +71,7 @@
       line: 'How do the big indices trade after the opening stretch? The Smart Money Flow line against price, with KDJ on four candle sizes and every past divergence.',
       when: 'Every 15 min in US hours, plus an update after the close',
       feed: { file: 'smart-money-data/smart-money/manifest.json', due: 90, live: 45,
-        read: function (j) { return { day: j.as_of, ts: j.generated_utc, state: j.state }; } } },
+        read: function (j) { return { day: j.live_day || j.as_of, ts: j.generated_utc, state: j.state }; } } },
     { id: 'semis', live: true, name: 'Semis Tracking', url: 'semis/',
       line: 'Is the chip cycle speeding up? Taiwan, Korea, hardware data, signals and big-tech spending plans.',
       when: 'Every 15 min in US hours; Taiwan and Korea data on their release days',
