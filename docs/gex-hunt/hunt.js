@@ -460,7 +460,11 @@ function niceStep(range, n = 8) {
 }
 function chartSVG(n, Wd, Hh, asof) {
   const g = n[K()][S.h], lv = n.lv[S.h], S0 = n.spot, O = n.ohlc.slice(-130), L = g.levels || [], put = PUT();
-  const ks = L.map(l => l.k).concat(asof ? asof.lv.map(l => l[0]) : []);
+
+
+  const BIG = asof ? [] : ((n.big && n.big[S.h] && n.big[S.h][put ? 'neg' : 'pos']) || []);
+  const reach = k => k >= S0 * 0.5 && k <= S0 * 2;
+  const ks = L.map(l => l.k).concat(asof ? asof.lv.map(l => l[0]) : [], BIG.map(b => b[0]).filter(reach));
   const lvHi = ks.length ? Math.max(...ks, S0) : S0, lvLo = ks.length ? Math.min(...ks, S0) : S0;
   const lo = Math.min(...O.map(r => r[3]), lvLo, S0 * 0.85) * (put ? 0.93 : 0.97), hi = Math.max(...O.map(r => r[2]), lvHi, S0 * 1.08) * (put ? 1.03 : 1.08);
   const narrow = Wd < 700, padR = 62, cw = Wd - padR, cx1 = cw * (narrow ? 0.42 : 0.52), bx0 = cx1 + 12, bx1 = cw - (narrow ? 120 : 215);
@@ -483,7 +487,9 @@ function chartSVG(n, Wd, Hh, asof) {
     if (ix >= 0) { const x = ix * cwid + cwid / 2; s += `<line x1="${x}" x2="${x}" y1="${top}" y2="${bot}" stroke="#b39ddb" stroke-dasharray="3,3"/><text x="${Math.max(2, x - 44)}" y="${bot - 28}" fill="#b39ddb" font-size="11">${day(asof.day)}</text>`; }
     asof.lv.forEach(([k]) => { if (k > lo && k < hi) s += `<line x1="0" x2="${cw}" y1="${y(k)}" y2="${y(k)}" stroke="#b39ddb" stroke-opacity=".7" stroke-dasharray="5,4"/><text x="4" y="${y(k) - 3}" fill="#b39ddb" font-size="10.5">${sk(k)} · ${day(asof.day)}</text>`; });
   }
-  const bars = (n.bars[S.h] || []).filter(b => b[0] > lo && b[0] < hi);
+  const ALLB = (n.bars[S.h] || []).concat((n.xbars && n.xbars[S.h]) || []);
+  BIG.forEach(b => { if (!ALLB.some(x => x[0] === b[0])) ALLB.push([b[0], b[1], 0, 0, 0, 0]); });
+  const bars = ALLB.filter(b => b[0] > lo && b[0] < hi);
   const PV = {}; if (!asof && n.prev && n.prev.bars && n.prev.bars[S.h]) n.prev.bars[S.h].forEach(b => { PV[b[0]] = b[1]; });
   const mx = Math.max(1, ...bars.map(b => Math.abs(b[1])), ...bars.filter(b => b[0] in PV).map(b => Math.abs(PV[b[0]])));
   const kk = bars.map(b => b[0]).sort((a, b) => a - b); let gap = Infinity; for (let i = 1; i < kk.length; i++) gap = Math.min(gap, kk[i] - kk[i - 1]);
@@ -510,6 +516,20 @@ function chartSVG(n, Wd, Hh, asof) {
     s += `<line x1="0" x2="${cw}" y1="${y(wall)}" y2="${y(wall)}" stroke="${col}" stroke-width="1.3"/><rect x="${px}" y="${y(wall) - 9}" width="92" height="18" rx="3" fill="${col}"/><text x="${px + 46}" y="${y(wall) + 4}" font-size="11" fill="#fff" text-anchor="middle" font-weight="600">${put ? 'CALL' : 'PUT'} WALL ${sk(wall)}</text>`;
   }
   s += `<line x1="0" x2="${cw}" y1="${y(S0)}" y2="${y(S0)}" stroke="#2962ff" stroke-dasharray="2,3"/><rect x="${cw + 2}" y="${y(S0) - 9}" width="${padR - 4}" height="18" fill="#2962ff" rx="2"/><text x="${cw + 7}" y="${y(S0) + 4}" font-size="11" fill="#fff">${S0.toFixed(2)}</text>`;
+  if (BIG.length) {
+    const side = put ? 'put' : 'call', on = k => k > lo && k < hi, lvY = L.map(l => y(l.k));
+    BIG.forEach(([k, g, rk]) => {
+      if (!on(k) || L.some(l => l.k === k) || k === lv.king) return;
+      const yy = y(k); if (lvY.some(v => Math.abs(v - yy) < 17)) return;
+      const t = `${sk(k)} ${pc(k / S0 - 1)} · ${fm(g)} · #${rk}${narrow ? '' : ' ' + side + ' strike'}`, tw = t.length * 6.2 + 12;
+      const lx = Math.min(cw - tw - 6, bx0 + blen(g) + 6), one = rk === 1;
+      s += `<rect x="${lx}" y="${yy - 9}" width="${tw}" height="18" rx="3" fill="${one ? '#3a3311' : '#131722'}" stroke="${one ? '#f5d63d' : put ? '#8a3b39' : '#2f6f66'}" stroke-dasharray="3,2"/><text x="${lx + tw / 2}" y="${yy + 4}" font-size="11" fill="${one ? '#f5d63d' : put ? '#f3a5a3' : '#9fe0d6'}" text-anchor="middle">${t}</text>`; });
+    const edge = (arr, arrow, yAt) => arr.forEach(([k, g, rk], i) => {
+      const t = `${arrow} ${sk(k)}  ${pc(k / S0 - 1)} · ${fm(g)} · #${rk}${narrow ? '' : ' ' + side + ' strike'}`, tw = t.length * 6.3 + 14, yy = yAt(i), one = rk === 1;
+      s += `<rect x="${bx0}" y="${yy}" width="${tw}" height="18" rx="3" fill="${one ? '#f5d63d' : put ? '#3a1d1f' : '#16302d'}" stroke="${one ? '#f5d63d' : put ? '#8a3b39' : '#2f6f66'}" stroke-dasharray="${one ? '' : '3,2'}"/><text x="${bx0 + tw / 2}" y="${yy + 13}" font-size="11" fill="${one ? '#131722' : put ? '#f3a5a3' : '#9fe0d6'}" text-anchor="middle" font-weight="${one ? 700 : 500}">${t}</text>`; });
+    edge(BIG.filter(b => !on(b[0]) && b[0] >= hi).sort((a, b) => b[0] - a[0]), '▲', i => top + 26 + i * 22);
+    edge(BIG.filter(b => !on(b[0]) && b[0] <= lo).sort((a, b) => a[0] - b[0]), '▼', i => bot - 46 - i * 22);
+  }
   L.forEach(d => { const yy = y(d.k), isK = d.k === lv.king;
     const t = `${isK ? 'KING ' : ''}${sk(d.k)} ${pc(d.k / S0 - 1)} · ${fm(d.gex)}${narrow ? '' : ' · ' + expS(d.exp)}`;
     const tw = t.length * 6.2 + 12, lx = Math.min(cw - tw - 6, bx0 + blen(d.gex) + 6);
@@ -563,7 +583,7 @@ async function renderDetail() {
   $('#cmain').innerHTML = `<div id="chead"><span class="t"><b>${sym}</b> · ${esc(n.name || '')} · D</span>
     <span class="muted num">close ${n.spot.toFixed(2)} · <span class="${(n.ret20 || 0) >= 0 ? 'up' : 'dn'}">${pc(n.ret20, 1)} 20d</span> · GEX ${S.h} · King ${sk(lv.king)} · Flip ${lv.flip ? lv.flip.toFixed(1) : '—'} · Net ${fm(lv.net)}</span>
     <span style="margin-left:auto;display:flex;gap:6px"><button class="btn g" data-v="board">← Board</button></span></div>
-    <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}${n.prev && !ASOF ? `<span class="gkey">vs ${day(n.prev.px_day)} close · OI ${day(n.prev.oi_settle)}: ${GKEY}</span> · ` : ''}Price axis stretched to the whole stack. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
+    <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}${n.prev && !ASOF ? `<span class="gkey">vs ${day(n.prev.px_day)} close · OI ${day(n.prev.oi_settle)}: ${GKEY}</span> · ` : ''}Price axis stretched to the whole stack${n.big ? ' and to the 5 biggest strikes within 2× the price; dashed tag = one of them outside the stack zone, ▲▼ tag = beyond the chart' : ''}. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
     <div id="chart"></div>`;
   drawChart(n);
   const ck = g.checks.map(([id, ok, t]) => `<span class="${ok ? 'y' : 'n'}">${ok ? '✓' : '✕'}</span><span>${esc(t)}</span>`).join('');
