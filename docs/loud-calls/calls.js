@@ -34,7 +34,7 @@ const S = { v: 'board', s: null, q: '', d: null, tf: store.get('tf1', 'list'), s
   ix: LOUD || STEALTH ? store.get('ix1', 'all') : 'all', lx: 'simple', sk: LOUD ? store.get('sk1', 'L') : 'L',
   sr: LOUD ? store.get('sr1', 'big') : STEALTH ? store.get('sr1', 'grp') : 'big',
   ld: STEALTH && !!store.get('ld1', false), cz: STEALTH || LOUD ? (window.innerWidth < 760 ? store.get('czm1', '1M') : store.get('cz1', '3M')) : '1Y',
-  dw: STEALTH ? store.get('dw1', '1') : '1', cps: STEALTH ? store.get('cps1', 'heavy') : 'heavy', cpa: false,
+  dw: STEALTH ? store.get('dw1', '1') : LOUD ? store.get('dw1', '5') : '1', cps: STEALTH ? store.get('cps1', 'heavy') : 'heavy', cpa: false,
   pm: LOUD ? store.get('pm1', 'calls') : 'calls', pk: LOUD ? store.get('pk1', 'B') : 'B' };
 let D = null, TIDE = null, REC = null, OUTC = null, CASE = null, EVI = undefined, STATUS = null, BUILD = null, SECT = null;
 const NAMES = {}, DAYB = {};
@@ -100,6 +100,7 @@ async function loadBoard() {
   for (const k in NAMES) delete NAMES[k];
   TIDE = null; REC = null; OUTC = null; CASE = null; SECT = null;
   LOUDB = undefined; for (const k in LOUDD) delete LOUDD[k]; WLV = null;
+  if (LOUD) { for (const k in DAYB) delete DAYB[k]; WLD = null; }
 }
 async function loadName(s) {
   if (!NAMES[s]) { if (!hasPage(s)) throw new Error(s + ' has no page'); NAMES[s] = await getJSON('data/names/' + encodeURIComponent(s) + '.json'); }
@@ -123,6 +124,7 @@ function readHash() {
   if (LOUD && SRS.some(x => x[0] === p.get('sr'))) S.sr = p.get('sr');
   if (STEALTH && p.has('ld')) S.ld = p.get('ld') === '1';
   if (STEALTH && ['1', '5', '10', 'all'].includes(p.get('dw'))) S.dw = p.get('dw');
+  if (LOUD && ['1', '5', 'all'].includes(p.get('dw'))) S.dw = p.get('dw');
   if (LOUD && ['calls', 'puts'].includes(p.get('pm'))) S.pm = p.get('pm');
   if (LOUD && PKS.some(x => x[0] === p.get('pk'))) S.pk = p.get('pk');
 }
@@ -139,6 +141,7 @@ function writeHash(push) {
   if (LOUD && S.v === 'board' && S.lx !== 'full' && S.sr !== 'big') p.set('sr', S.sr);
   if (STEALTH && S.v === 'board' && S.ld) p.set('ld', '1');
   if (STEALTH && S.v === 'board' && S.dw !== '1' && !S.d) p.set('dw', S.dw);
+  if (LOUD && S.v === 'board' && S.dw !== '5' && !S.d) p.set('dw', S.dw);
   if (LOUD && S.v === 'board' && S.lx !== 'full' && S.pm === 'puts') { p.set('pm', 'puts'); if (S.pk !== 'B') p.set('pk', S.pk); }
   const h = p.toString() ? '#' + p.toString() : '#';
   if (h !== (location.hash || '#')) (push ? history.pushState : history.replaceState).call(history, null, '', h);
@@ -150,7 +153,7 @@ function go(ch, push = true) {
   store.set('og1', S.og); store.set('osort1', S.osort); store.set('oph1', S.oph);
   if (LADDER) store.set('ps1', S.ps);
   if (STEALTH) { store.set('cat1', S.cat); store.set('ld1', S.ld); store.set('lx1', S.lx); store.set('sr1', S.sr); store.set('dw1', S.dw); store.set('cps1', S.cps); store.set('ix1', S.ix); }
-  if (LOUD) { store.set('cat1', S.cat); store.set('ag1', S.ag); store.set('ix1', S.ix); store.set('lx1', S.lx); store.set('sk1', S.sk); store.set('sr1', S.sr); store.set('pm1', S.pm); store.set('pk1', S.pk); }
+  if (LOUD) { store.set('cat1', S.cat); store.set('ag1', S.ag); store.set('ix1', S.ix); store.set('lx1', S.lx); store.set('sk1', S.sk); store.set('sr1', S.sr); store.set('pm1', S.pm); store.set('pk1', S.pk); store.set('dw1', S.dw); }
   writeHash(push);
   render(prevV !== S.v);
 }
@@ -983,9 +986,11 @@ const topL = pr => { if (pr == null) return '–'; if (pr >= 0.99995) return 'th
   return 'top ' + (t < 0.1 ? t.toFixed(2) : t < 10 ? t.toFixed(1) : Math.round(t)) + '%'; };
 function tlStrip(tl, big) {
   if (!tl) return '<span class="muted">–</span>';
-  const lb = (D.meta || {}).lookback || [];
+  const lb = dwLd() === 'all' && tl.length === winDaysLd('all').length ? winDaysLd('all') : (D.meta || {}).lookback || [];
   const W = { L: 'loud call buying', C: 'loud on a move day', S: 'loud spread', x: 'loud, not buying', '.': 'nothing loud' };
-  return `<span class="tls${big ? ' big' : ''}" title="The last ${tl.length} settles, oldest first${lb.length ? ` (${day(lb[0])} → ${day(lb[lb.length - 1])})` : ''}: L loud call buying · C on a move day · S a spread · × loud, not buying · empty = nothing loud">${tl.split('').map((c, i) => `<i class="${c === '.' ? 'n' : c}" title="${lb[i] ? day(lb[i]) + ': ' : ''}${W[c] || c}">${c === '.' ? '' : c === 'x' ? '×' : c}</i>`).join('')}</span>`;
+  const cut = Math.max(0, tl.length - 20);
+  const old = cut ? tl.slice(0, cut).replace(/\./g, '').length : 0;
+  return `<span class="tls${big ? ' big' : ''}" title="The last ${tl.length} settles, oldest first${lb.length ? ` (${day(lb[0])} → ${day(lb[lb.length - 1])})` : ''}: L loud call buying · C on a move day · S a spread · × loud, not buying · empty = nothing loud">${cut ? `<i class="more" title="${cut} older settles${lb[cut - 1] ? ' to ' + day(lb[cut - 1]) : ''}: ${old ? old + ' loud' : 'nothing loud'}">${old ? '+' + old : '…'}</i>` : ''}${tl.split('').slice(cut).map((c, j) => { const i = j + cut; return `<i class="${c === '.' ? 'n' : c}" title="${lb[i] ? day(lb[i]) + ': ' : ''}${W[c] || c}">${c === '.' ? '' : c === 'x' ? '×' : c}</i>`; }).join('')}</span>`;
 }
 const inCatLd = r => S.cat === 'all' || r.cat === S.cat;
 const inAgLd = r => !S.ag || pastDay() || (r.again || 0) >= 2;
@@ -1020,13 +1025,75 @@ function ixNote(short) {
   return `<div class="ixnote"><b>${esc(ixName(S.ix))}</b>: <b class="wh">${j.toLocaleString()}</b> of ${m.toLocaleString()} members judged on the ${day(D.meta.settle)} settle${miss > 0 ? ` · the other ${miss.toLocaleString()} have no options data, too few open calls, or too little price history` : ''}.${S.ix === 'r2k' ? ' <span class="am">Most Russell 2000 names have too little options trading to judge.</span>' : ''} <span class="muted">The list only narrows the view — “loud” is still ranked against all ${(D.meta.universe || 0).toLocaleString()} names.</span></div>`;
 }
 function ixBarLd(kind, rows0) {
-  const rows = rows0 || srcRows(), inT = (r, t) => t === 'list' ? LISTED.includes(r.t) : r.t === t;
+  const rows = rows0 || srcRowsLd(), inT = (r, t) => t === 'list' ? LISTED.includes(r.t) : r.t === t;
   const ok = kind || (r => inT(r, S.tf) && inCatLd(r) && inAgLd(r));
   const cnt = k => rows.filter(r => ok(r) && inIx(r, k)).length;
   return `<div class="viewbar ixbar"><span class="muted">List</span>${IXS.map(([k, t]) => { const [m, j] = ixInfo(k), off = k !== 'all' && m == null;
     const tip = off ? 'Member list not available on this build' : k === 'all' ? `Every name judged: ${(j || 0).toLocaleString()}` : `${(j || 0).toLocaleString()} of ${(m || 0).toLocaleString()} members judged`;
     return `<button class="chip ix${S.ix === k ? ' on' : ''}" data-ix="${k}" ${off ? 'disabled' : ''} title="${tip}">${esc(t)}<span class="c">${off ? '–' : cnt(k)}</span></button>${IXGAP[k] ? '<span class="sep"></span>' : ''}`; }).join('')}${kind ? '' : pmSwitch() + lxSwitch()}</div>${ixNote(!!kind)}`;
 }
+const DWL = [['1', 'Today', 'The latest settle only'], ['5', '1 week', 'The last 5 settles: the board as built'], ['all', 'Total', 'Every saved settle since the board began']];
+const dwLd = () => LOUD && S.v === 'board' && !pastDay() ? S.dw : '5';
+const allDaysLd = () => [...new Set([...(D.saved_days || []), ...(D.meta.lookback || []), D.meta.settle])].filter(d => d && d <= D.meta.settle).sort();
+const winDaysLd = (k = dwLd()) => k === '1' ? [D.meta.settle] : k === 'all' ? allDaysLd() : (D.meta.lookback || []).slice();
+const againLd = (k = dwLd()) => k === 'all' ? `since ${day(winDaysLd('all')[0])}` : `in ${(D.meta.lookback || []).length || 5} days`;
+const dwNoteLd = (k, W) => k === '1' ? `the ${dayW(D.meta.settle)} settle` : `${W.length} settles · ${day(W[0])} → ${day(W[W.length - 1])}`;
+function dwBarLd(W) {
+  const k = pastDay() ? null : S.dw;
+  return `<div class="viewbar sx-kinds sx-dates dwld"><span class="muted">Dates</span>${DWL.map(([v, t, tip]) => `<button class="chip dw ${k === v ? 'on' : ''}" data-dw="${v}" title="${esc(tip)}">${t}</button>`).join('')}<span class="muted sx-ldnote">${k ? dwNoteLd(k, W || winDaysLd(k)) : `the saved ${dayW(S.d)} settle · a date button goes back to the latest board`}</span></div>`;
+}
+const WFAIL = new Set();
+async function loadWinLd() {
+  const k = dwLd();
+  if (k === '5') return;
+  const sd = new Set(D.saved_days || []);
+  await Promise.all(winDaysLd(k).filter(d => sd.has(d) && !DAYB[d] && !WFAIL.has(d + '|' + D.build))
+    .map(d => loadDay(d).catch(() => { WFAIL.add(d + '|' + D.build); })));
+}
+const TLC_LD = { L: 'L', C: 'C', S: 'S', X: 'x' };
+const ROWK_LD = ['n', 'k', 'sec', 'gics', 'etf', 'ind', 'px', 'pd', 'dd', 'hi', 'r20', 'r60', 'ps', 'wo', 'biz', 'run'];
+let WLD = null;
+function winRowsLd() {
+  const k = dwLd();
+  if (k === '5') return D.rows;
+  const W = winDaysLd(k), key = k + '|' + W.filter(d => DAYB[d]).join(',');
+  if (WLD && WLD.key === key && WLD.D === D) return WLD.rows;
+  const cur = {}, ev = {}, Wi = {}, LBi = {}, TLB = { L: 'L', C: 'C', S: 'S', x: 'X' };
+  D.rows.forEach(r => { cur[r.s] = r; });
+  (D.meta.lookback || []).forEach((d, i) => { LBi[d] = i; });
+  W.forEach((d, i) => { Wi[d] = i; const X = DAYB[d]; if (!X) return; normDayLd(X, d);
+    X.rows.forEach(r => { if (r.t) (ev[r.s] || (ev[r.s] = {}))[d] = r; }); });
+
+
+  D.rows.forEach(c => { if (!c.tl) return;
+    W.forEach(d => { const i = LBi[d]; if (i == null) return;
+      const t = TLB[c.tl[i]], E = ev[c.s];
+      if (!t) { if (E) delete E[d]; return; }
+      const e = E || (ev[c.s] = {});
+      if (c.t && c.e === d) e[d] = c;
+      else if (!e[d] || e[d].t !== t) e[d] = e[d] ? Object.assign({}, e[d], { t }) : { s: c.s, t, strip: 1 };
+    }); });
+  const tiered = [];
+  Object.entries(ev).forEach(([s, E]) => {
+    const ds = Object.keys(E).sort(), dn = ds.filter(d => !E[d].strip), c = cur[s];
+    if (!dn.length) return;
+    const shown = dn.filter(d => LISTED.includes(E[d].t)).pop() || dn[dn.length - 1];
+    const own = c && c.t && c.e === shown;
+    const r = own ? Object.assign({}, c) : Object.assign({}, E[shown], c ? Object.fromEntries(ROWK_LD.filter(q => q in c).map(q => [q, c[q]])) : { px: null }, { e: shown });
+    if (k === '1') Object.assign(r, { ago: 0, tl: c ? c.tl : null, again: c ? c.again : null, new: !!c && LISTED.includes(r.t) && c.again === 1 });
+    else { const tl = W.map(d => E[d] ? TLC_LD[E[d].t] || 'x' : '.').join(''), again = ds.filter(d => LISTED.includes(E[d].t)).length;
+      Object.assign(r, { ago: W.length - 1 - Wi[shown], tl, again, new: again === 1 && LISTED.includes(r.t) }); }
+    tiered.push(r);
+  });
+  const inW = new Set(tiered.map(r => r.s));
+  const rest = D.rows.filter(r => !inW.has(r.s)).map(r => r.t ? Object.assign({}, r, { t: null, rk: null,
+    why: `${TLONG[r.t].toLowerCase()} on ${day(r.e)} — not ${k === '1' ? 'on the latest settle' : 'in this window'}` }) : r);
+  WLD = { key, D, rows: tiered.concat(rest) };
+  return WLD.rows;
+}
+const srcRowsLd = () => pastDay() ? srcRows() : winRowsLd();
+const winMissLd = () => dwLd() === 'all' ? winDaysLd('all').filter(d => !DAYB[d]) : [];
+const missNoteLd = () => { const m = winMissLd(); return m.length ? `<div class="ixnote am">${m.length} saved day${m.length === 1 ? '' : 's'} could not be read (${m.slice(0, 4).map(day).join(', ')}${m.length > 4 ? '…' : ''}): only the board's own events show for ${m.length === 1 ? 'it' : 'them'}.</div>` : ''; };
 const PUTSON = () => LOUD && S.pm === 'puts' && S.lx !== 'full' && S.v === 'board' && !pastDay();
 const pmSwitch = () => `<span class="pmsw"><button class="calls ${PUTSON() ? '' : 'on'}" data-pm="calls" title="Loud call buying: bets on a rise">▲ Loud Calls</button><button class="puts ${PUTSON() ? 'on' : ''}" data-pm="puts" title="Loud put buying: bets on a drop, or insurance">▼ Loud Puts</button></span>`;
 const lxSwitch = () => '';
@@ -1034,7 +1101,7 @@ const SKS = [['L', 'Loud buying', 'The pattern: loud, big and bought, on a day t
   ['LCS', 'Plus news days & spreads', 'Also the same buying on a big move day (likely news) and capped bets (spreads)'],
   ['X', 'Loud, not buying', 'Loud and big, but it looks like selling, hedging or a trade']];
 const skOK = r => S.sk === 'X' ? r.t === 'X' : S.sk === 'LCS' ? LISTED.includes(r.t) : r.t === 'L';
-const SRS = [['big', 'Biggest bet', 'Ranked by the $ of calls bought that day (the board\'s own order), across the last 5 days'],
+const SRS = [['big', 'Biggest bet', 'Ranked by the $ of calls bought that day (the board\'s own order), across the dates picked'],
   ['loud', 'Loudest', 'Ranked by how loud the day was against every stock (the loudest first)'],
   ['day', 'By day', 'Newest day first, ranked by $ inside each day']];
 const byBig5 = (a, b) => (SX(b).prem || 0) - (SX(a).prem || 0) || (SX(b).ca || 0) - (SX(a).ca || 0) || a.s.localeCompare(b.s);
@@ -1077,7 +1144,7 @@ function tags5(r, x, when) {
   if (r.t === 'C') t.push(`<span class="sx-tag c">bought on a ${pcL(x.move)} day — likely news</span>`);
   if (r.t === 'S') t.push('<span class="sx-tag s">a spread — a capped bet</span>');
   if (r.t === 'X') t.push(`<span class="sx-tag x">${esc(why5(r)[0] || 'does not look like buying')}</span>`);
-  if ((r.again || 0) >= 2) t.push(`<span class="sx-tag ag">loud ${r.again}× in 5 days</span>`);
+  if ((r.again || 0) >= 2) t.push(`<span class="sx-tag ag">loud ${r.again}× ${againLd()}</span>`);
   return t.length ? `<div class="sx-tags">${t.join('')}</div>` : '';
 }
 function hdrSort(cols, key) {
@@ -1127,6 +1194,13 @@ async function loadPuts() {
   try { PUTS = await getJSON('data/puts.json'); } catch (e) { PUTS = { build: D.build, rows: [], err: e.message }; }
   return PUTS;
 }
+function putsWin() {
+  const k = dwLd(), w = k !== '5' && PUTS.win ? PUTS.win[k] : null;
+  if (w) return { k, rows: w.rows || [], lookback: w.lookback || [] };
+  return { k: '5', rows: PUTS.rows || [], lookback: PUTS.lookback || D.meta.lookback || [], stale: k !== '5' };
+}
+const againP = () => { const k = dwLd(), w = PUTS && PUTS.win && PUTS.win.all;
+  return k === 'all' && w && (w.lookback || []).length ? `since ${day(w.lookback[0])}` : `in ${((PUTS && PUTS.lookback) || []).length || 5} days`; };
 const PLISTED = ['buy', 'move', 'spread', 'unclear'];
 const PKS = [['B', 'Put buying', 'Loud, big puts, mostly bought (a lean), on a day the price did not jump: each says drop bet or insurance'],
   ['D', 'Drop bets only', 'Put buying that does not look like insurance: not a whole-market fund, no big run-up first'],
@@ -1173,7 +1247,7 @@ function tagsP(r, when) {
   if (r.mark === 'unclear') t.push('<span class="sx-tag s">too few trades to tell who bought</span>');
   if (r.mark === 'sell') t.push('<span class="sx-tag x">probably selling puts — a bullish lean</span>');
   if (r.mark === 'other') t.push(`<span class="sx-tag x">${esc(((r.fails || [])[0] && (PWHY.find(([re]) => re.test(r.fails[0])) || [0, r.fails[0]])[1]) || 'does not look like buying')}</span>`);
-  if ((r.again || 0) >= 2) t.push(`<span class="sx-tag ag">loud ${r.again}× in 5 days</span>`);
+  if ((r.again || 0) >= 2) t.push(`<span class="sx-tag ag">loud ${r.again}× ${againP()}</span>`);
   return t.length ? `<div class="sx-tags">${t.join('')}</div>` : '';
 }
 const PUCOLS = {
@@ -1197,7 +1271,9 @@ function rowP(r, i, n, when) {
 async function renderPutsLd() {
   await loadPuts();
   if (!PUTSON() || S.v !== 'board') return;
-  const q = S.q, m = D.meta, all = PUTS.rows || [], lb = PUTS.lookback || m.lookback || [];
+  const q = S.q, m = D.meta, PW = putsWin(), all = PW.rows, lb = PW.lookback;
+  const wTxt = PW.k === '1' ? `on ${dayW(m.settle)}` : PW.k === 'all' ? `since ${day(lb[0])}` : `in the last ${lb.length} days`;
+  const B5 = (PUTS.rows || []).filter(r => r.mark === 'buy' && inIxLd(r));
   const rows = q ? all.filter(r => matchQ(r, q)) : all.filter(r => pkOK(r) && inIxLd(r) && inLv(r));
   const Bs = all.filter(r => r.mark === 'buy' && inIxLd(r)), now = Bs.filter(r => r.ago === 0), drops = Bs.filter(r => !r.ins);
   const big = all.filter(r => (S.pk === 'BMS' ? PLISTED.includes(r.mark) : r.mark === 'buy') && inIxLd(r)).sort(byBigP)[0];
@@ -1212,9 +1288,11 @@ async function renderPutsLd() {
         <li><b>One-sided</b> — far more new puts than calls, not deep in the money, not paired with calls (that would be a collar or a trade).</li>
         <li><b>Bought</b> — most trades above the middle price (read from closing prices). Under half = probably <b>selling</b> puts, a bullish lean.</li></ol>
         <div class="muted"><b>Drop bet or insurance?</b> Puts on a whole-market fund (SPY, QQQ, IWM…) and puts after a big run-up with the price above its long-term averages usually protect a position — those say “insurance?”. The rest say “drop bet”. A loud put day on a big move is listed as a news day; spreads are capped bets.</div></details></div>
+    ${dwBarLd(lb)}${PW.stale ? '<div class="ixnote am">Today and Total for puts arrive with the next board build — showing 1 week.</div>' : ''}
     ${ixBarLd(r => pkOK(r), all)}
     <div class="sx-stats"><div><span class="sx-n">${now.length}</span><span class="sx-k">loud put buys on ${dayW(m.settle)}<br><small>the latest day</small></span></div>
-      <div><span class="sx-n">${Bs.length}</span><span class="sx-k">loud put buys in the last ${lb.length} days<br><small>${drops.length} look like drop bets${S.ix !== 'all' ? ' · ' + esc(ixName(S.ix)) : ''}</small></span></div>
+      ${PW.k === '1' ? `<div class="lnk" data-dw="5" title="Show the last ${(PUTS.lookback || []).length} days"><span class="sx-n">${B5.length}</span><span class="sx-k">loud put buys in the last ${(PUTS.lookback || []).length} days<br><small>1 week · click to see them</small></span></div>`
+      : `<div><span class="sx-n">${Bs.length}</span><span class="sx-k">loud put buys ${wTxt}<br><small>${drops.length} look like drop bets${S.ix !== 'all' ? ' · ' + esc(ixName(S.ix)) : ''}</small></span></div>`}
       <div class="lnk" ${big ? `data-s="${big.s}"` : ''}><span class="sx-n">${big ? fm(PX(big).prem) : '–'}</span><span class="sx-k">biggest put bet: <b class="wh">${big ? big.s : '–'}</b><br><small>${big ? day(big.e) : ''}</small></span></div></div>
     <div class="sx-ctl"><div class="viewbar sx-kinds"><span class="muted">Show</span>${PKS.map(([k, t, tip]) => `<button class="chip ${S.pk === k ? 'on' : ''}${k === 'X' ? ' xk' : ''}" data-pk="${k}" title="${esc(tip)}">${t}<span class="c">${nK(k)}</span></button>`).join('')}</div>
       <div class="viewbar sx-kinds"><span class="muted">Rank by</span>${SRS.map(([k, t, tip]) => `<button class="chip sr ${S.sr === k ? 'on' : ''}" data-sr="${k}" title="${esc(tip.replace('calls', 'puts'))}">${t}</button>`).join('')}</div></div>`;
@@ -1228,19 +1306,20 @@ async function renderPutsLd() {
     h += `<div class="sx-day"><b>${dayW(d)}</b>${d === m.settle ? '<span class="sx-latest">latest</span>' : ''}<span class="sx-cnt">${g.length} ${nmF(g.length)}</span></div>${g.map((r, i) => rowP(r, i, g.length)).join('')}`;
   });
   else if (rows.length) { const g = rows.slice().sort(HS.cmp(S.sr === 'loud' ? byLoudP : byBigP));
-    h += `<div class="sx-day"><b>${HS.label() || `Ranked by ${S.sr === 'loud' ? 'how loud' : 'biggest bet'}`}</b><span class="sx-cnt">${g.length} ${nmF(g.length)} · last ${lb.length} days${S.ix !== 'all' ? ' · ' + esc(ixName(S.ix)) : ''}</span></div>${g.map((r, i) => rowP(r, i, g.length, true)).join('')}`; }
-  if (!days.length) h += `<div class="empty small">${PUTS.err ? 'No Loud Puts build yet.' : q ? `No loud put name matches “${esc(q)}”.` : `No ${S.pk === 'X' ? 'loud put builds that look like selling' : S.pk === 'D' ? 'drop bets' : 'loud put buying'} in the last ${lb.length} days${S.ix !== 'all' ? ' for ' + esc(ixName(S.ix)) : ''}.${S.pk === 'B' || S.pk === 'D' ? ' Try “Plus news days & spreads”.' : ''}`}</div>`;
+    h += `<div class="sx-day"><b>${HS.label() || `Ranked by ${S.sr === 'loud' ? 'how loud' : 'biggest bet'}`}</b><span class="sx-cnt">${g.length} ${nmF(g.length)} · ${wTxt.replace(/^in the /, '')}${S.ix !== 'all' ? ' · ' + esc(ixName(S.ix)) : ''}</span></div>${g.map((r, i) => rowP(r, i, g.length, true)).join('')}`; }
+  if (!days.length) h += `<div class="empty small">${PUTS.err ? 'No Loud Puts build yet.' : q ? `No loud put name matches “${esc(q)}”.` : `No ${S.pk === 'X' ? 'loud put builds that look like selling' : S.pk === 'D' ? 'drop bets' : 'loud put buying'} ${wTxt}${S.ix !== 'all' ? ' for ' + esc(ixName(S.ix)) : ''}.${S.pk === 'B' || S.pk === 'D' ? ' Try “Plus news days & spreads”.' : ''}`}</div>`;
   h += `<div class="sx-foot">Click a stock for its chart: ▼ marks its loud put days, and a card lists them. Rebuilt after each close from end-of-day options open interest.</div></div>`;
   $('#main').innerHTML = h;
   wireBoard();
   $('#main').onclick = ev => { const b = ev.target.closest('[data-hs]'); if (!b) return; ev.stopPropagation(); HS.click(b.dataset.hs); renderPutsLd(); };
 }
 function renderSimpleLd() {
-  const q = S.q, lb = D.meta.lookback || [], m = D.meta;
-  const rows = q ? D.rows.filter(r => r.t && matchQ(r, q)) : D.rows.filter(r => skOK(r) && inIxLd(r) && inLv(r));
-  const Ls = D.rows.filter(r => r.t === 'L' && inIxLd(r)), now = Ls.filter(r => r.ago === 0);
-  const big = D.rows.filter(r => (S.sk === 'LCS' ? LISTED.includes(r.t) : r.t === 'L') && inIxLd(r)).sort(byBig5)[0];
-  const nK = k => D.rows.filter(r => (k === 'X' ? r.t === 'X' : k === 'LCS' ? LISTED.includes(r.t) : r.t === 'L') && inIxLd(r)).length;
+  const q = S.q, lb = D.meta.lookback || [], m = D.meta, R = srcRowsLd(), wk = dwLd(), W = winDaysLd(wk);
+  const wTxt = wk === '1' ? `on ${dayW(m.settle)}` : wk === 'all' ? `since ${day(W[0])}` : `in the last ${lb.length} days`;
+  const rows = q ? R.filter(r => r.t && matchQ(r, q)) : R.filter(r => skOK(r) && inIxLd(r) && inLv(r));
+  const Ls = R.filter(r => r.t === 'L' && inIxLd(r)), now = Ls.filter(r => r.ago === 0);
+  const big = R.filter(r => (S.sk === 'LCS' ? LISTED.includes(r.t) : r.t === 'L') && inIxLd(r)).sort(byBig5)[0];
+  const nK = k => R.filter(r => (k === 'X' ? r.t === 'X' : k === 'LCS' ? LISTED.includes(r.t) : r.t === 'L') && inIxLd(r)).length;
   let h = `<div class="sx">
     <div class="sx-top"><div class="sx-mode">${pmSwitch()}</div><div class="sx-hrow"><div class="sx-h1">Who is making big, loud call bets?</div>${lxSwitch()}</div>
       <div class="sx-lead">Each stock below had <b>one day</b> of call buying that was <b>loud</b> (among the very biggest call builds in the market that day), <b>big</b> and <b>bought</b> — not sold, hedged or capped.</div>
@@ -1251,9 +1330,11 @@ function renderSimpleLd() {
         <li><b>Bought</b> — most trades above the middle price, far more new calls than puts, not deep in the money, not paired with puts.</li>
         <li><b>Not a spread</b> — not mostly calls bought and sold together.</li></ol>
         <div class="muted">The same buying on a day the price jumped is listed as a news day. Who bought is a lean read from closing prices.</div></details></div>
+    ${dwBarLd(W)}${missNoteLd()}
     ${ixBarLd(skOK)}
     <div class="sx-stats"><div><span class="sx-n">${now.length}</span><span class="sx-k">loud buys on ${dayW(m.settle)}<br><small>the latest day</small></span></div>
-      <div><span class="sx-n">${Ls.length}</span><span class="sx-k">loud buys in the last ${lb.length} days${S.ix !== 'all' ? `<br><small>${esc(ixName(S.ix))}</small>` : ''}</span></div>
+      ${wk === '1' ? `<div class="lnk" data-dw="5" title="Show the last ${lb.length} days"><span class="sx-n">${D.rows.filter(r => r.t === 'L' && inIxLd(r)).length}</span><span class="sx-k">loud buys in the last ${lb.length} days<br><small>1 week · click to see them</small></span></div>`
+      : `<div><span class="sx-n">${Ls.length}</span><span class="sx-k">loud buys ${wTxt}${S.ix !== 'all' || wk === 'all' ? `<br><small>${[wk === 'all' ? W.length + ' saved settles' : '', S.ix !== 'all' ? esc(ixName(S.ix)) : ''].filter(Boolean).join(' · ')}</small>` : ''}</span></div>`}
       <div class="lnk" ${big ? `data-s="${big.s}"` : ''}><span class="sx-n">${big ? fm(SX(big).prem) : '–'}</span><span class="sx-k">biggest bet: <b class="wh">${big ? big.s : '–'}</b><br><small>${big ? day(big.e) : ''}</small></span></div></div>
     <div class="sx-ctl"><div class="viewbar sx-kinds"><span class="muted">Show</span>${SKS.map(([k, t, tip]) => `<button class="chip ${S.sk === k ? 'on' : ''}${k === 'X' ? ' xk' : ''}" data-sk="${k}" title="${esc(tip)}">${t}<span class="c">${nK(k)}</span></button>`).join('')}</div>
       <div class="viewbar sx-kinds"><span class="muted">Rank by</span>${SRS.map(([k, t, tip]) => `<button class="chip sr ${S.sr === k ? 'on' : ''}" data-sr="${k}" title="${esc(tip)}">${t}</button>`).join('')}</div></div>`;
@@ -1268,16 +1349,32 @@ function renderSimpleLd() {
     h += `<div class="sx-day"><b>${dayW(d)}</b>${d === m.settle ? '<span class="sx-latest">latest</span>' : ''}<span class="sx-cnt">${g.length} ${nmF(g.length)}</span></div>${g.map((r, i) => row5(r, i, g.length)).join('')}`;
   });
   else if (rows.length) { const g = rows.slice().sort(HS.cmp(S.sr === 'loud' ? byLoud5 : byBig5));
-    h += `<div class="sx-day"><b>${HS.label() || `Ranked by ${S.sr === 'loud' ? 'how loud' : 'biggest bet'}`}</b><span class="sx-cnt">${g.length} ${nmF(g.length)} · last ${lb.length} days${S.ix !== 'all' ? ' · ' + esc(ixName(S.ix)) : ''}</span></div>${g.map((r, i) => row5(r, i, g.length, true)).join('')}`; }
-  if (!days.length) h += `<div class="empty small">${q ? `No loud name matches “${esc(q)}”.` : `Nothing here in the last ${lb.length} days${S.ix !== 'all' ? ' for ' + esc(ixName(S.ix)) : ''}.`}</div>`;
-  if (q) { const other = D.rows.filter(r => !r.t && matchQ(r, q)).slice(0, 12);
-    if (other.length) h += `<div class="ixnote">Not loud in the last ${lb.length} days: ${other.map(r => `<span class="lnk wh" data-s="${r.s}">${r.s}</span>`).join(' · ')} — open one to see why.</div>`; }
+    h += `<div class="sx-day"><b>${HS.label() || `Ranked by ${S.sr === 'loud' ? 'how loud' : 'biggest bet'}`}</b><span class="sx-cnt">${g.length} ${nmF(g.length)} · ${wTxt.replace(/^in the /, '')}${S.ix !== 'all' ? ' · ' + esc(ixName(S.ix)) : ''}</span></div>${g.map((r, i) => row5(r, i, g.length, true)).join('')}`; }
+  if (!days.length) h += `<div class="empty small">${q ? `No loud name matches “${esc(q)}”${wk !== '5' ? ' ' + wTxt : ''}.` : `Nothing here ${wTxt}${S.ix !== 'all' ? ' for ' + esc(ixName(S.ix)) : ''}.`}</div>`;
+  if (q) { const other = R.filter(r => !r.t && matchQ(r, q)).slice(0, 12);
+    if (other.length) h += `<div class="ixnote">Not loud ${wTxt}: ${other.map(r => `<span class="lnk wh" data-s="${r.s}">${r.s}</span>`).join(' · ')} — open one to see why.</div>`; }
   h += `<div class="sx-foot">Click a stock for its chart, the contracts and every check. Rebuilt after each close from end-of-day options open interest.</div></div>`;
   $('#main').innerHTML = h;
   wireBoard();
   $('#main').onclick = ev => { const b = ev.target.closest('[data-hs]'); if (!b) return; ev.stopPropagation(); HS.click(b.dataset.hs); renderSimpleLd(); };
 }
+function normDayLd(x, d) {
+  if (!x || x._ld === D) return;
+  const cur = {}; D.rows.forEach(r => { cur[r.s] = r; });
+  if (!x._src) x._src = Array.isArray(x.rows) ? x.rows : Object.entries(x.rows || {}).map(([s, r]) => Object.assign({ s }, r));
+  const rows = x._src.filter(r => r.t).map(r => { const c = cur[r.s] || {};
+    return Object.assign({ n: c.n, k: c.k, sec: c.sec, etf: c.etf, ind: c.ind, dd: c.dd, hi: c.hi, fund: c.fund }, r,
+      { e: d, ago: 0, tl: null, again: null, x: Object.assign({}, r.x || {}) }); });
+  ['L', 'C', 'S', 'X'].forEach(t => rows.filter(r => r.t === t).sort((a, b) => (SX(b).prem || 0) - (SX(a).prem || 0) || (SX(b).ca || 0) - (SX(a).ca || 0))
+    .forEach((r, i) => { if (r.rk == null) r.rk = i + 1; }));
+  x.rows = rows; x._ld = D;
+}
 async function renderBoardLd() {
+  if (!PUTSON() && dwLd() !== '5' && winDaysLd().some(d => (D.saved_days || []).includes(d) && !DAYB[d] && !WFAIL.has(d + '|' + D.build))) {
+    $('#main').innerHTML = `<div class="empty">Loading ${dwLd() === 'all' ? 'every saved day' : 'the latest settle'}…</div>`;
+    await loadWinLd();
+    if (S.v !== 'board') return;
+  }
   if (PUTSON()) return renderPutsLd();
   return renderSimpleLd();
 }
@@ -1514,7 +1611,8 @@ async function poll() {
     if (!DWS.some(x => x[0] === S.dw)) S.dw = '1'; if (!IXS.some(x => x[0] === S.ix)) S.ix = 'all'; }
   if (LOUD) { if (!CATS.some(x => x[0] === S.cat)) S.cat = 'all'; if (!IXS.some(x => x[0] === S.ix)) S.ix = 'all';
     if (!['simple', 'full'].includes(S.lx)) S.lx = 'simple'; if (!SKS.some(x => x[0] === S.sk)) S.sk = 'L'; if (!SRS.some(x => x[0] === S.sr)) S.sr = 'big';
-    if (!['calls', 'puts'].includes(S.pm)) S.pm = 'calls'; if (!PKS.some(x => x[0] === S.pk)) S.pk = 'B'; }
+    if (!['calls', 'puts'].includes(S.pm)) S.pm = 'calls'; if (!PKS.some(x => x[0] === S.pk)) S.pk = 'B';
+    if (!DWL.some(x => x[0] === S.dw)) S.dw = '5'; }
   writeHash(false);
   render();
   setInterval(poll, 300000);
