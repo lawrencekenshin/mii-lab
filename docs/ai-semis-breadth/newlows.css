@@ -1,0 +1,49 @@
+
+
+
+#newlows .card-head{align-items:flex-start}
+.nl-tf{flex:0 0 auto;margin-top:2px}
+.nl-tf button{min-width:0;padding:8px 14px}
+.nl-now{margin:10px 0 2px}
+.nl-num{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px}
+.nl-v{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em;color:#EF5350;font-variant-numeric:tabular-nums}
+.nl-on{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
+.nl-sub{margin:6px 0 0;font-size:14px;line-height:1.45;color:#E8C547;font-variant-numeric:tabular-nums}
+.nl-sub .nl-dot{color:#8A8E99;padding:0 3px}
+.nl-sub .nl-it{white-space:normal}
+.nl-controls{margin:12px 0 2px}
+.seg-range.nl-range{max-width:340px}
+.nl-ro .nv{color:#EF5350;font-weight:700}
+.nl-ro .op{color:#F28B88;font-weight:700}
+.nl-ro .nh{color:#4DB6AC;font-weight:600}
+.nl-ro .kk{color:#4FC3F7;font-weight:700} .nl-ro .kd{color:#FFB74D;font-weight:700} .nl-ro .kj{color:#A9ADBA;font-weight:600}
+.nl-ro .xu{color:#EF5350;font-weight:700} .nl-ro .xd{color:#26A69A;font-weight:700}
+.nl-ro .m{color:var(--muted)}
+.nl-rn{display:block}
+.nl-rn+.nl-rn{margin-top:4px}
+.nl-rk{color:var(--white);font-weight:700}
+.nl-rv{color:#EF5350;font-weight:700}
+.nl-chart{position:relative;width:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:crosshair}
+.nl-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.lg-nlbar{display:inline-block;width:8px;height:11px;background:#EF5350;border-radius:1px}
+.lg-nlopen{display:inline-block;width:8px;height:11px;background:rgba(239,83,80,.42);border-radius:1px}
+.lg-nlpx{display:inline-block;width:16px;height:0;border-top:2px solid #8EC0FA}
+.lg-nlup{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #EF5350}
+.lg-nldn{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid #26A69A}
+.lg-nltag{display:inline-block;font-size:10px;font-weight:700;line-height:1;padding:2px 4px;border-radius:3px;background:#EF5350;color:#131722}
+.lg-nlpk{color:#E8C547;font-weight:700;font-size:11px}
+#newlows .kdj-honest{line-height:1.45}
+@media (min-width:720px){#newlows .tspan{color:var(--muted);font-weight:600}}
+@media (max-width:719px){
+  .nl-tf{display:flex;width:100%}
+  .nl-tf button{flex:1 1 0;padding:0 4px}
+  .nl-ro{min-height:4.35em}
+  .seg-range.nl-range{max-width:none}
+}
+@media (max-width:479px){
+  .nl-v{font-size:36px}
+  .nl-on{font-size:15px}
+  .nl-sub{font-size:13.5px}
+  .nl-sub .nl-dot{padding:0 1px}
+}
+.lg-nlghost{display:inline-block;width:9px;height:9px;border-radius:50%;border:1.6px solid var(--text);background:var(--bg)}
