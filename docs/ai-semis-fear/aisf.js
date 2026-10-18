@@ -4840,12 +4840,13 @@
   function shaOf(m) { return m && m.files && m.files[DATA_FILE] ? m.files[DATA_FILE].sha256 || null : null; }
   function load(initial) {
     if (loading) return; loading = true;
-    getJSONRetry('manifest.json').then(function (m) { volManSha = volShaOf(m); return shaOf(m); }, function () { volManSha = undefined; return null; }).then(function (sha) {
+    getJSONRetry('manifest.json').then(function (m) { volManSha = volShaOf(m); return m; }, function () { volManSha = undefined; return null; }).then(function (man) {
+      var sha = shaOf(man);
       return getJSONRetry(DATA_FILE).then(function (f) {
         if (!validateFull(f)) throw pubErr('the data looked broken');
         var g0 = groupKeys(f)[0];
         var changed = !full || f.built_utc !== full.built_utc || f.groups[g0].generated_epoch !== (full.groups[g0] || {}).generated_epoch;
-        fullSha = sha; loadedAt = now(); lastErr = null;
+        fullSha = man && man.generated_utc === f.built_utc ? sha : null; loadedAt = now(); lastErr = null;
         if (!changed) { renderStatus(); return; }
         full = f;
         GROUPS = groupKeys(f); PRICES = priceKeys(f, GROUPS[0]);
