@@ -10,11 +10,12 @@
 <meta name="description" content="How many AI, semiconductor and high-beta stocks are above their 20-, 50-, 100- and 200-day averages, next to the S&amp;P 500's own breadth: washouts since 2013 and what came after them. Updated through the trading day.">
 <title>AI · Semis · High-Beta Breadth · live</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%233987E5%22/%3E%3C/svg%3E">
-<link rel="stylesheet" href="breadth.css?v=20261019p2">
-<link rel="stylesheet" href="gauges.css?v=20261019p2">
-<link rel="stylesheet" href="kdjwash.css?v=20261019p2">
-<link rel="stylesheet" href="newlows.css?v=20261019p2">
-<link rel="stylesheet" href="bkdj.css?v=20261019p2">
+<link rel="stylesheet" href="breadth.css?v=20261019p4">
+<link rel="stylesheet" href="gauges.css?v=20261019p4">
+<link rel="stylesheet" href="kdjwash.css?v=20261019p4">
+<link rel="stylesheet" href="newlows.css?v=20261019p4">
+<link rel="stylesheet" href="bkdj.css?v=20261019p4">
+<link rel="stylesheet" href="tbreadth.css?v=20261019p4">
 </head>
 <body>
 <a class="skip" href="#daily">Skip to the chart</a>
@@ -141,6 +142,7 @@
     </section>
 
     <section class="card" id="gauges"></section>
+    <section class="card" id="tbreadth"></section>
 
 
     <section class="card" id="speeds" aria-labelledby="t5">
@@ -197,6 +199,7 @@
   <footer class="foot" id="foot">
     <div id="footFoot"></div>
     <dl id="footRules"></dl>
+    <p id="footTb" hidden>Trend breadth: the TET Radar tab’s trend check on this page’s own stocks; the dashed S&amp;P 500 line is the TET Radar tab’s own series. Method: Trend Emotion Timing (TET) by Dr. Oliver Reiss (NAAIM 2025). This is an independent re-implementation, not affiliated with or endorsed by the author or NAAIM.</p>
     <p id="footData">Prices: daily closing bars; during the session the open candle comes from a ~15-min delayed quote. No cookies, no tracking.</p>
   </footer>
 </main>
@@ -225,10 +228,11 @@
 </div>
 
 <noscript><p class="wrap noscript">This page needs JavaScript to draw the charts.</p></noscript>
-<script src="breadth.js?v=20261019p2" defer></script>
-<script src="gauges.js?v=20261019p2" defer></script>
-<script src="kdjwash.js?v=20261019p2" defer></script>
-<script src="newlows.js?v=20261019p2" defer></script>
-<script src="bkdj.js?v=20261019p2" defer></script>
+<script src="breadth.js?v=20261019p4" defer></script>
+<script src="gauges.js?v=20261019p4" defer></script>
+<script src="kdjwash.js?v=20261019p4" defer></script>
+<script src="newlows.js?v=20261019p4" defer></script>
+<script src="bkdj.js?v=20261019p4" defer></script>
+<script src="tbreadth.js?v=20261019p4" defer></script>
 </body>
 </html>

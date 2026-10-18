@@ -300,7 +300,7 @@
     var X = f.groups[g], si = X.start_i, n = X.v.v50.length;
     var d = f.days.slice(si, si + n).map(dayNum);
     var P = { g: g, d: d, si: si, v: hund(X.v.v50), t: hund(X.v.v200), f20: hund(X.v.v20), f100: hund(X.v.v100),
-      n: X.daily.n, a: X.daily.a50, spy: X.prices[p], tf: {}, stats: {} };
+      n: X.daily.n, a: X.daily.a50, spy: X.prices[p], tf: {}, cstat: {} };
     P.sp50 = refOn('v50', si, n);
     P.tf['1D'] = { s: d, e: d, v: P.v, t: P.t, a: P.a, n: P.n, p13: X.p13.g50, p13t: X.p13.g200 };
     ['1W', '2W', '1M'].forEach(function (k) {
@@ -313,7 +313,7 @@
     TFS.forEach(function (k) {
       var T = P.tf[k], j = T.v.length - 1, c = f.candles[k] || {};
       T.open = !!X.open[k]; T.closed = T.open ? T.v.length - 1 : T.v.length;
-      P.stats[k] = { latest: T.v[j], latest200: T.t[j], open: T.open, note: c.note || '', name: c.name || TF_NAME[k] };
+      P.cstat[k] = { latest: T.v[j], latest200: T.t[j], open: T.open, note: c.note || '', name: c.name || TF_NAME[k] };
 
       T.wash = washOf(X.wash[k], T.v.length);
       T.ringOf = {}; T.wash.rings.forEach(function (r) { T.ringOf[r.k] = r.i; });
@@ -501,7 +501,7 @@
 
   function nowWords() { return closedNow() ? 'at today’s close (preliminary)' : isLive() ? 'today so far' : 'at the close'; }
   function renderText() {
-    var st = D.stats, live = isLive(), s1 = st['1D'], sessDn = dayNum(full.live.session_date), cn = closedNow();
+    var st = D.cstat, live = isLive(), s1 = st['1D'], sessDn = dayNum(full.live.session_date), cn = closedNow();
     $('t1name').textContent = G.title || gMeta(grp).title || 'Breadth';
     $('t1sub').textContent = 'How many of the ' + G.n_listed + ' ' + G.words + ' are above their 50-day and 200-day averages' +
       (D.sp50 ? ' · dashed white = the S&P 500’s 50-day line' : '');
@@ -784,12 +784,12 @@
     function pctCell(R) { return [pctWord(R), R ? ' · ' + rankWord(R) : '']; }
     TFS.forEach(function (k) {
       var T = D.tf[k], j = T.v.length - 1, R = pctCandle(k, j);
-      row([TF_SHORT[k] + ' · 50-day', pct1(T.v[j]) + soFar(k, R), pctCell(R.s13), pctWord(R.s21), washCell(k), D.stats[k].note]);
+      row([TF_SHORT[k] + ' · 50-day', pct1(T.v[j]) + soFar(k, R), pctCell(R.s13), pctWord(R.s21), washCell(k), D.cstat[k].note]);
     });
     var last = D.d.length - 1, N = G.pnow;
     [[20, D.f20], [100, D.f100], [200, D.t]].forEach(function (o) {
       var R13 = rankOf(N['g' + o[0]].r13), R21 = rankOf(N['g' + o[0]].r21);
-      row(['Daily · ' + o[0] + '-day', pct1(o[1][last]), pctCell(R13), pctWord(R21), '', D.stats['1D'].note]);
+      row(['Daily · ' + o[0] + '-day', pct1(o[1][last]), pctCell(R13), pctWord(R21), '', D.cstat['1D'].note]);
     });
     var ref = full.ref;
     if (ref && ref.latest) {
@@ -1154,7 +1154,7 @@
     var T1 = D.tf['1D'], last = D.d.length - 1, keep = {};
     T1.wash.sig.forEach(function (i) { keep[i] = 1; });
     var spyY = spyPanel(svg, X, x0, x1, L, 0, pw, spyH, 12.5, ticks, keep);
-    var g = el('g', {}, svg), st = D.stats['1D'], todayIn = D.last >= x0 && D.last <= x1, live = isLive();
+    var g = el('g', {}, svg), st = D.cstat['1D'], todayIn = D.last >= x0 && D.last <= x1, live = isLive();
     panelRect(g, L, mTop, pw, mH);
     var Y = breadthY(mTop, mH, 8);
     yTicks(g, Y, breadthTicks(Y), L + pw, L, String, 'right', mTop);
