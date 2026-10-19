@@ -547,10 +547,15 @@
 
 
 
-  const TV_THIN = { 1: 1000, 5: 3000, 10: 5000 };
-  const tvLab = n => n === 1 ? 'Today\'s' : n + '-day';
+
+
+  let TV_FROM = null;
+  const TV_COL = { 1: 'tv1', 5: 'tv5', 10: 'tv10', a: 'tv10' };
+  const TV_THIN = { 1: 1000, 5: 3000, 10: 5000, a: 5000 };
+  const tvLab = n => { const k = String(n); return k === '1' ? 'Today\'s' : k === '5' ? '1-week' : k === 'a' ? (TV_FROM ? 'Since ' + MON[D(TV_FROM).getUTCMonth()] + ' ' + D(TV_FROM).getUTCDate() : 'Total') : k + '-day'; };
   const tvThin = (c, n) => c[0] + c[1] < (TV_THIN[n] || 1000);
-  const tvTip = (c, n) => `${kf(c[0])} calls vs ${kf(c[1])} puts traded ${n === 1 ? 'in the newest session' : 'over the last ' + n + ' sessions'} (every strike and expiry), ${Math.round(cpShare(c) * 100)}% calls` + (tvThin(c, n) ? ` · thin: under ${int(TV_THIN[n] || 1000)} contracts traded` : '') + '. Total calls : puts (last column) counts the contracts still open.';
+  const tvSpan = n => { const k = String(n); return k === '1' ? 'in the newest session' : k === '5' ? 'over the last 5 sessions (1 week)' : k === 'a' ? 'over every session on this board' + (TV_FROM ? ' (since ' + dayW(TV_FROM) + ')' : '') : 'over the last ' + k + ' sessions'; };
+  const tvTip = (c, n) => `${kf(c[0])} calls vs ${kf(c[1])} puts traded ${tvSpan(n)} (every strike and expiry), ${Math.round(cpShare(c) * 100)}% calls` + (tvThin(c, n) ? ` · thin: under ${int(TV_THIN[n] || 1000)} contracts traded` : '') + '. Total calls : puts (last column) counts the contracts still open.';
   function tvCell(c, n) {
     if (!cpOk(c)) return '<span class="muted" title="No volume for this name in the days shown.">–</span>';
     return `<div class="cpc${tvThin(c, n) ? ' thin' : ''}" title="${esc(tvTip(c, n))}"><div class="cpt">${cpLab(c)}</div>${cpBar(c)}<div class="tcpn">${kf(c[0] + c[1])} traded</div></div>`;
@@ -663,7 +668,7 @@
 
 
 
-  const SX_DAYS = 10;
+
   const SIMPLE = () => st.route === 'top' && LX !== 'full' && st.T === defaultT();
   const SXIX = [['R1000', 'Russell 1000', 'Russell 1000 members (the IWB universe)'], ['R2000', 'Russell 2000', 'Russell 2000 members (the IWM universe)'],
     ['ETF', 'ETFs', 'IWM and IWB themselves'], ['AI', 'AI stocks', AI_TIP], ['all', 'Total', 'Every Russell 1000 and 2000 member plus IWM and IWB']];
@@ -680,8 +685,8 @@
     ['since', 'Since then', 'Ranked by the move from that day\'s close to the latest close (biggest gain first); the latest day has no move yet'],
     ['biz', 'Business', 'Ranked by the business score (0-100), best first; names without one last']];
   const SXSO = [['desc', 'High → low', 'Highest first (click a column header or this button to flip)'], ['asc', 'Low → high', 'Lowest first']];
-  const SXDW = [['1', 'Today', 'Only the newest US session on the board. A session\'s options data lands after its close, so while the US market is open "today" is still the previous session'], ['5', 'Last 5 days', 'The 5 newest sessions, one row per stock and side (its newest day)'],
-    ['10', 'Last 10 days', 'The 10 newest sessions, one row per stock and side (its newest day)']];
+  const SXDW = [['1', 'Today', 'Only the newest US session on the board. A session\'s options data lands after its close, so while the US market is open "today" is still the previous session'], ['5', '1 week', 'The 5 newest sessions (one trading week), one row per stock and side (its newest day)'],
+    ['a', 'Total', 'Every session on this board, one row per stock and side (its newest day)']];
   const SXV = { ix: SXIX, sk: SXSK, sd: SXSD, sr: SXSR, so: SXSO, dw: SXDW };
   const sxValid = (k, v) => !!SXV[k] && SXV[k].some(x => x[0] === v);
   function sxClean() { for (const k in SXDEF) if (!sxValid(k, SX[k])) SX[k] = SXDEF[k]; }
@@ -844,7 +849,8 @@
       (NARROWSX() ? '' : `<div class="sx-cpx">${totalCp(x.cp, null, true)}</div>`) + '</div>';
   }
   async function loadSimple() {
-    const Ts = (META.sessions || []).slice(0, SX_DAYS).map(s => s.T);
+    const Ts = (META.sessions || []).map(s => s.T);
+    TV_FROM = Ts.length ? Ts[Ts.length - 1] : null;
     const ranks = await Promise.all(Ts.map(T => loadRank(T).then(d => ({ T, rows: d.rows }))
       .catch(e => { if (e.status === 404) return { T, rows: [], missing: true }; throw e; })));
     const nm0 = await loadNames(Ts[0]).catch(() => null);
@@ -861,7 +867,7 @@
     return {
       Ts, ranks, T0: Ts[0], today: etToday(), partial: (sessionOf(Ts[0]) || {}).status === 'partial',
       last: sym => { const v = n0(sym); return v != null ? v : last.has(sym) ? last.get(sym) : null; },
-      tvOf: (sym, n) => { const r = nm0 && nm0.by.get(sym); const v = r && r['tv' + n]; return cpOk(v) ? v : null; },
+      tvOf: (sym, k) => { const r = nm0 && nm0.by.get(sym); const v = r && r[TV_COL[k] || 'tv' + k]; return cpOk(v) ? v : null; },
       sector: sym => { const n = nm0 && nm0.by.get(sym); return (n && n.sector) || (n && n.idx === 'ETF' ? 'ETF' : ''); }
     };
   }
@@ -869,19 +875,24 @@
     const tierOK = { AL: t => t === 'A' || t === 'L', ALB: t => t === 'A' || t === 'L' || t === 'B', J: t => t === 'J' };
     const inIx = (r, ix) => idxOK(r, ix), inSd = (r, sd) => sd === 'both' || r.side === sd;
     const keepFor = (sk, ix, sd) => r => tierOK[sk](r.tier) && inIx(r, ix) && inSd(r, sd);
-    const nWin = Math.max(1, Math.min(ctx.ranks.length, Number(SX.dw) || 5));
+    const wk = sxValid('dw', SX.dw) ? SX.dw : '5';
+    const nOf = k => k === 'a' ? ctx.ranks.length : Math.max(1, Math.min(ctx.ranks.length, Number(k) || 5));
+    const nWin = nOf(wk);
     const W = ctx.ranks.slice(0, nWin), TsW = ctx.Ts.slice(0, nWin);
     const W5 = ctx.ranks.slice(0, Math.min(5, ctx.ranks.length));
     const sinceOf = x => { const v = ctx.last(x.sym); return x.T === ctx.T0 || !isNum(v) || !isNum(x.spot) || x.spot <= 0 ? null : v / x.spot - 1; };
     const rows = simpleRows(W, keepFor(SX.sk, SX.ix, SX.sd));
-    rows.forEach(x => { x._since = sinceOf(x); x._tv = ctx.tvOf(x.sym, nWin); x._tvthin = x._tv ? tvThin(x._tv, nWin) : false; });
+    rows.forEach(x => { x._since = sinceOf(x); x._tv = ctx.tvOf(x.sym, wk); x._tvthin = x._tv ? tvThin(x._tv, wk) : false; });
     const picks = simpleRows(nWin === 1 ? W5 : W, keepFor('AL', SX.ix, 'both'));
     const now = simpleRows(W.slice(0, 1), keepFor('AL', SX.ix, 'both'));
     const big = simpleOrder(simpleRows(W, keepFor(SX.sk === 'J' ? 'AL' : SX.sk, SX.ix, SX.sd)), 'big', TsW).map(g => g.rows[0])[0];
     const cnt = (sk, ix, sd) => simpleRows(W, keepFor(sk, ix, sd)).length;
     const ixName = (SXIX.find(x => x[0] === SX.ix) || SXIX[SXIX.length - 1])[1];
-    ctx.nWin = nWin;
+    ctx.nWin = wk;
     const nDays = TsW.length, nPick = nWin === 1 ? W5.length : nDays, word = SX.sk === 'J' ? (n => 'filtered out') : (n => n === 1 ? 'pick' : 'picks');
+    const oldest = TsW[TsW.length - 1];
+    const winIn = wk === 'a' ? `since ${dayW(oldest)} (${nDays} sessions)` : nDays === 1 ? 'today' : wk === '5' ? `in the last week (${nDays} sessions)` : `in the last ${nDays} days`;
+    const winShort = wk === 'a' ? `total since ${dayW(oldest)}` : nDays === 1 ? `today · ${dayW(ctx.T0)}` : wk === '5' ? '1 week' : `last ${nDays} days`;
     const missing = W.filter(k => k.missing).map(k => dayW(k.T));
     const chips = (k, list, count) => list.map(([v, t, tip]) => `<button class="chip${k === 'sk' && v === 'J' ? ' xk' : ''}${k === 'sr' ? ' sr' : ''}${k === 'ix' ? ' ixc' : ''}${SX[k] === v ? ' on' : ''}" data-sx="${k}" data-v="${v}" title="${esc(tip)}">${esc(t)}${count ? `<span class="c">${int(count(v))}</span>` : ''}</button>`).join('');
     let h = `<div class="sx">
@@ -897,25 +908,25 @@
           <div class="muted" style="margin-top:6px"><b>Business</b> (0–100) scores the company's growth, cash flow and PEG; <b>Calls : Puts</b> counts every open call vs put contract (all strikes and expiries) with a white tick a week earlier. Both are shown for context and never change a pick or its signal score; “Rank by Business” only re-sorts the list.</div></details></div>
       <div class="viewbar ixbar"><span class="muted">List</span>${chips('ix', SXIX.slice(0, 3), v => cnt(SX.sk, v, SX.sd))}<span class="sep"></span>${chips('ix', SXIX.slice(3), v => cnt(SX.sk, v, SX.sd))}</div>
       <div class="sx-stats"><div><span class="sx-n">${int(now.length)}</span><span class="sx-k">top picks on ${esc(dayW(ctx.T0))}<br><small>today (the newest session)${ctx.partial ? ', still filling in' : ''}</small></span></div>
-        <div><span class="sx-n">${int(picks.length)}</span><span class="sx-k">top picks in the last ${nPick} days${SX.ix !== 'all' ? `<br><small>${esc(ixName)}</small>` : ''}</span></div>
+        <div><span class="sx-n">${int(picks.length)}</span><span class="sx-k">top picks ${nWin === 1 ? `in the last ${nPick} days` : winIn}${SX.ix !== 'all' ? `<br><small>${esc(ixName)}</small>` : ''}</span></div>
         <div class="lnk"${big ? ` data-sym="${esc(big.sym)}" role="link" tabindex="0"` : ''}><span class="sx-n">${big ? money(big.prem) : '–'}</span><span class="sx-k">biggest bet: <b class="wh">${big ? esc(big.sym) : '–'}</b><br><small>${big ? esc(dayW(big.T)) + ' · ' + (big.side === 'bear' ? 'betting down' : 'betting up') : ''}</small></span></div></div>
       <div class="sx-ctl"><div class="viewbar sx-kinds"><span class="muted">Show</span>${chips('sk', SXSK, v => cnt(v, SX.ix, SX.sd))}</div>
         <div class="viewbar sx-kinds"><span class="muted">Side</span>${chips('sd', SXSD, v => cnt(SX.sk, SX.ix, v))}</div>
-        <div class="viewbar sx-kinds"><span class="muted">Days</span>${chips('dw', SXDW.map(x => x[0] === '1' ? ['1', `Today · ${dayW(ctx.T0)}`, x[2]] : x), v => simpleRows(ctx.ranks.slice(0, Number(v)), keepFor(SX.sk, SX.ix, SX.sd)).length)}</div>
+        <div class="viewbar sx-kinds"><span class="muted">Days</span>${chips('dw', SXDW.map(x => x[0] === '1' ? ['1', `Today · ${dayW(ctx.T0)}`, x[2]] : x[0] === 'a' ? ['a', 'Total', `${x[2]}: since ${dayW(ctx.Ts[ctx.Ts.length - 1])}, ${ctx.Ts.length} sessions`] : x), v => simpleRows(ctx.ranks.slice(0, nOf(v)), keepFor(SX.sk, SX.ix, SX.sd)).length)}</div>
         <div class="viewbar sx-kinds"><span class="muted">Rank by</span>${chips('sr', SXSR)}<button class="chip sodir" data-sx="so" data-v="${SX.so === 'asc' ? 'desc' : 'asc'}" title="Flip the order (a column header click does the same)">${SX.so === 'asc' ? 'Low → high ↑' : 'High → low ↓'}</button></div></div>`;
     const hs = (key, label, sub, tip) => { const on = SX.sr === key, ar = on ? (SX.so === 'asc' ? ' ▲' : ' ▼') : '';
       return `<div class="hsort${on ? ' on' : ''}" data-sort="${key}" role="button" tabindex="0" title="${esc((tip ? tip + ' ' : '') + 'Click to sort high to low; click again for low to high.')}">${label}${ar}<span>${sub}</span></div>`; };
-    if (!NARROWSX()) h += `<div class="sx-row sx-hd"><div>#</div><div>Stock</div>${hs('big', 'Bet size', '$ on that side that day')}<div>What they’re betting<span>the biggest contract, from the latest close</span></div>${hs('score', 'Signal', 'tier and score')}${hs('biz', '<span class="lab-l">Business</span><span class="lab-s">Biz</span>', 'score 0–100', BIZ_TIP)}${hs('tv', `${tvLab(nWin)} calls : puts`, 'contracts traded')}<div>Earnings</div>${hs('since', 'Since then', 'from that day’s close')}${hs('cp', 'Total calls : puts', 'all open contracts')}</div>`;
+    if (!NARROWSX()) h += `<div class="sx-row sx-hd"><div>#</div><div>Stock</div>${hs('big', 'Bet size', '$ on that side that day')}<div>What they’re betting<span>the biggest contract, from the latest close</span></div>${hs('score', 'Signal', 'tier and score')}${hs('biz', '<span class="lab-l">Business</span><span class="lab-s">Biz</span>', 'score 0–100', BIZ_TIP)}${hs('tv', `${tvLab(wk)} calls : puts`, 'contracts traded')}<div>Earnings</div>${hs('since', 'Since then', 'from that day’s close')}${hs('cp', 'Total calls : puts', 'all open contracts')}</div>`;
     const groups = simpleOrder(rows, SX.sr, TsW, SX.so);
-    if (rows.length) h += `<div class="sx-why"><b>What this ranks:</b> ${nDays === 1 ? `today only (${esc(dayW(ctx.T0))}, the newest session)` : `the last ${nDays} days together, one row per stock and direction (its newest day)`}, ${SX.sr === 'day' ? 'newest day first, by score inside each day' : ({ big: 'by bet size', biz: 'by business score', cp: 'by calls share of all open contracts', tv: 'by calls share of contracts traded in the days shown', since: 'by the move since that day' })[SX.sr] || 'by score'}${SX.so === 'asc' ? ' (lowest first)' : ''}; bullish and bearish share one list${SX.sr === 'score' ? ', A and L are mixed and KDJ is not used' : ''}. <span class="lnk wh" data-lx="full">Full detail</span> ranks one day at a time, tier first, with bullish and bearish apart, so its order differs.</div>`;
+    if (rows.length) h += `<div class="sx-why"><b>What this ranks:</b> ${nDays === 1 ? `today only (${esc(dayW(ctx.T0))}, the newest session)` : `${wk === 'a' ? `every session since ${esc(dayW(oldest))} (${nDays})` : wk === '5' ? `the last week (${nDays} sessions)` : `the last ${nDays} days`} together, one row per stock and direction (its newest day)`}, ${SX.sr === 'day' ? 'newest day first, by score inside each day' : ({ big: 'by bet size', biz: 'by business score', cp: 'by calls share of all open contracts', tv: 'by calls share of contracts traded in the days shown', since: 'by the move since that day' })[SX.sr] || 'by score'}${SX.so === 'asc' ? ' (lowest first)' : ''}; bullish and bearish share one list${SX.sr === 'score' ? ', A and L are mixed and KDJ is not used' : ''}. <span class="lnk wh" data-lx="full">Full detail</span> ranks one day at a time, tier first, with bullish and bearish apart, so its order differs.</div>`;
     if (SX.sr === 'day') groups.forEach(g => {
       h += `<div class="sx-day"><b>${esc(dayW(g.T))}</b>${g.T === ctx.T0 ? '<span class="sx-latest">latest</span>' : ''}<span class="sx-cnt">${int(g.rows.length)} ${word(g.rows.length)}</span></div>${g.rows.map(x => row5(x, ctx, false)).join('')}`;
     });
     else if (groups.length) {
       const g = groups[0].rows;
-      h += `<div class="sx-day"><b>Ranked by ${({ big: 'biggest bet', biz: 'business score', cp: 'total calls share (open contracts)', tv: 'traded calls share', since: 'move since then' })[SX.sr] || 'strongest signal'}${SX.so === 'asc' ? ', lowest first' : ''}</b><span class="sx-cnt">${int(g.length)} ${word(g.length)} · ${nDays === 1 ? `today · ${esc(dayW(ctx.T0))}` : `last ${nDays} days`}${SX.ix !== 'all' ? ' · ' + esc(ixName) : ''}</span></div>${g.map(x => row5(x, ctx, true)).join('')}`;
+      h += `<div class="sx-day"><b>Ranked by ${({ big: 'biggest bet', biz: 'business score', cp: 'total calls share (open contracts)', tv: 'traded calls share', since: 'move since then' })[SX.sr] || 'strongest signal'}${SX.so === 'asc' ? ', lowest first' : ''}</b><span class="sx-cnt">${int(g.length)} ${word(g.length)} · ${esc(winShort)}${SX.ix !== 'all' ? ' · ' + esc(ixName) : ''}</span></div>${g.map(x => row5(x, ctx, true)).join('')}`;
     }
-    if (!rows.length) h += `<div class="empty small">Nothing here ${nDays === 1 ? 'today' : `in the last ${nDays} days`}${SX.ix !== 'all' ? ' for ' + esc(ixName) : ''}${SX.sd !== 'both' ? ' ' + (SX.sd === 'bull' ? 'betting up' : 'betting down') : ''}.</div>`;
+    if (!rows.length) h += `<div class="empty small">Nothing here ${esc(winIn)}${SX.ix !== 'all' ? ' for ' + esc(ixName) : ''}${SX.sd !== 'both' ? ' ' + (SX.sd === 'bull' ? 'betting up' : 'betting down') : ''}.</div>`;
     if (missing.length) h += `<div class="ixnote">No ranking file yet for ${esc(missing.join(', '))}.</div>`;
     h += `<div class="sx-foot">Click a stock for its chart, the contracts and every check. <span class="lnk wh" data-lx="full">Full detail</span> has all the numbers, older days and filters.</div></div>`;
     return h;
