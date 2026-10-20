@@ -47,7 +47,7 @@ function setSym(s, push) {
   const u = new URL(location.href);
   u.searchParams.set('s', s);
   if (push) history.pushState({ s }, '', u); else history.replaceState({ s }, '', u);
-  document.title = s + ' · Eagle Eye Technicals';
+  document.title = s + ' · ' + PAGE_NAME;
 
   state = null; meta = null; version = -1; loadedTf = null; wantN = {}; structKey = ''; nBars = 0; dLen = 0;
   lastTimes = []; lastPt = []; gexKey = ''; levelsRange = null;
@@ -111,5 +111,5 @@ window.addEventListener('popstate', () => {
   if (s) setSym(s, false);
 });
 history.replaceState({ s: sym }, '', (() => { const u = new URL(location.href); u.searchParams.set('s', sym); return u; })());
-document.title = sym + ' · Eagle Eye Technicals';
+document.title = sym + ' · ' + PAGE_NAME;
 loadSymbols();

@@ -424,9 +424,23 @@ function resetPriceView() {
   if (!chart) return;
   const ts = chart.timeScale(), bs = paneWidth() < 700 ? 4 : 7;
   const need = HISTW() + (PHONE() ? 82 : COMPACT() ? 110 : 250) + 20;
-  progSet(() => { ts.applyOptions({ barSpacing: bs, rightOffset: Math.ceil(need / bs) }); ts.scrollToRealTime(); });
+  progSet(() => {
+    ts.applyOptions({ barSpacing: bs, rightOffset: Math.ceil(need / bs) });
+
+
+    ts.scrollToPosition(Math.ceil(need / bs), false);
+  });
   candles.priceScale().setAutoScale(true);
   topMargin = -1; sig = '';
+}
+
+
+function settleView() {
+  const t0 = performance.now();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (userAt.p > t0 || userAt.d > t0 || !chart || !nBars) return;
+    resetPriceView(); resetDiView();
+  }));
 }
 function resetDiView() {
   if (!dchart) return;
@@ -480,7 +494,7 @@ function renderBody() {
   }
   if (di.panes) { lastCut = -1; applyCut(); dLen = (di.panes.t || []).length; lastPt = di.panes.t || []; }
   lastTimes = bars.map(b => b[0]);
-  if (first) { resetPriceView(); resetDiView(); }
+  if (first) { resetPriceView(); resetDiView(); settleView(); }
   if (DPVIEW) [0, 80, 400].forEach(ms => setTimeout(syncFlowPanels, ms));
   else {
 

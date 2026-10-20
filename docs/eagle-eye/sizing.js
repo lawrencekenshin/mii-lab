@@ -3,13 +3,39 @@
 
 
 let paneFactors = [], maxPane = null;
-let priceShare = (() => { try { const v = parseFloat(localStorage.getItem('gexdash.priceShare')); return v > 0.08 && v < 0.92 ? v : 0.3; } catch (e) { return 0.3; } })();
+
+
+const SHARE0 = CLASSIC_PAGE ? 0.34 : 0.3;
+const SHARE_KEY = 'gexdash.priceShare' + (CLASSIC_PAGE ? '.classic' : '');
+let priceShare = (() => { try { const v = parseFloat(localStorage.getItem(SHARE_KEY)); return v > 0.08 && v < 0.92 ? v : SHARE0; } catch (e) { return SHARE0; } })();
 function applyPaneFactors() {
   if (!dchart) return;
   dchart.panes().forEach((p, i) => p.setStretchFactor(paneFactors[i] || 1));
   sig = '';
 }
+
+
+
+const LINE_PITCH = 19.5, CARD_PAD = 16;
+function classicMinH() {
+  const secs = (state && state.di && state.di.panes && state.di.panes.sections) || [];
+  if (!dchart || !secs.length) return 0;
+  const hp = secs.map(s => (s.layout && s.layout.height_px) || 120), sum = hp.reduce((a, b) => a + b, 0);
+  const k = Math.max(...secs.map((s, i) => (CARD_PAD + LINE_PITCH * Math.max(1, (s.lines || []).length)) / hp[i]));
+  let axis = 28;
+  try { axis = dchart.timeScale().height() || axis; } catch (e) {  }
+  return Math.ceil((k * sum + secs.length + axis) / (1 - SHARE0) + 6 + 2);
+}
+function applyClassicMin() {
+  if (!CLASSIC_PAGE) return;
+  const want = classicMinH(), el = $('main'), cur = el.style.getPropertyValue('--cmin');
+  if (want > 0 && cur !== want + 'px') el.style.setProperty('--cmin', want + 'px');
+  if (!want && cur) el.style.removeProperty('--cmin');
+  const n = ((state && state.di && state.di.panes && state.di.panes.sections) || []).length;
+  document.body.classList.toggle('ctall', n >= 7);
+}
 function applyLayout() {
+  applyClassicMin();
   const box = $('chartbox'), H = box.clientHeight;
   const noDi = typeof diHidden === 'function' && diHidden();
   const ph = maxPane === 'price' || noDi ? H : maxPane === 'di' ? 0 : Math.round(priceShare * Math.max(0, H - 6));
@@ -36,7 +62,7 @@ function setMaximized(mode) {
   if (mode !== null) window.scrollTo(0, 0);
   sizeFs();
   if (chart) chart.applyOptions({ handleScroll: touchFor('price') });
-  if (dchart) dchart.applyOptions({ handleScroll: touchFor('di') });
+  if (dchart) dchart.applyOptions(CLASSIC_PAGE ? { handleScroll: touchFor('di'), handleScale: scaleFor('di') } : { handleScroll: touchFor('di') });
   applyLayout();
   const fs = document.documentElement.requestFullscreen && (!NARROW() || COARSE());
   if (mode !== null && fs && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
@@ -73,10 +99,10 @@ $('maxbtns').addEventListener('click', e => {
   const end = () => {
     if (!dragging) return;
     dragging = false; hs.classList.remove('drag');
-    try { localStorage.setItem('gexdash.priceShare', String(priceShare)); } catch (e) {  }
+    try { localStorage.setItem(SHARE_KEY, String(priceShare)); } catch (e) {  }
   };
   hs.addEventListener('pointerup', end); hs.addEventListener('pointercancel', end);
-  hs.addEventListener('dblclick', e => { e.stopPropagation(); priceShare = 0.3; applyLayout(); try { localStorage.setItem('gexdash.priceShare', '0.3'); } catch (x) {  } });
+  hs.addEventListener('dblclick', e => { e.stopPropagation(); priceShare = SHARE0; applyLayout(); try { localStorage.setItem(SHARE_KEY, String(SHARE0)); } catch (x) {  } });
 })();
 
 

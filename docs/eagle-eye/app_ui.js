@@ -96,7 +96,7 @@ function renderHead() {
   const m = meta || state, bars = (state && state.di && state.di.bars) || [];
   $('symname').textContent = m.name || m.symbol || sym;
   $('exch').textContent = (m.exchange ? ' · ' + m.exchange : '') + (m.kind === 'crypto' ? ' · times in UTC' : '');
-  document.title = (m.symbol || sym) + ' · Eagle Eye Technicals';
+  document.title = (m.symbol || sym) + ' · ' + PAGE_NAME;
   markTfs(m);
   if (bars.length) {
     const b = bars[bars.length - 1], p = m.price;
@@ -108,7 +108,7 @@ function renderHead() {
   const errs = Object.entries(Object.assign({}, m.errors || {}, (state && state.di && state.di.errors) || {}))
     .map(([k, v]) => `<span class="err">${esc(k)}: ${esc(v)}</span>`).join(' · ');
   const pubTxt = m.published ? ` · updated after each close${m.published.live ? ', this ticker every 15 min in the session (hourly charts after the close)' : ''}` : '';
-  $('ind').innerHTML = `Eagle Eye Technicals · Desktop Integrated + GEX · options: ${m.kind === 'crypto' ? 'none yet for crypto' : 'saved Cboe chain ' + (d ? esc(d.build_et) : '—')} · price: ${esc(srcName(m.price))}${m.published ? pubTxt : ', every ' + cadence(m.poll_s)}` +
+  $('ind').innerHTML = `${CLASSIC_PAGE ? 'Classic Indicators · RSI, MACD, Stoch RSI, KDJ, OBV MACD, Williams %R, BB %B, WMSR + GEX' : 'Eagle Eye Technicals · Desktop Integrated + GEX'} · options: ${m.kind === 'crypto' ? 'none yet for crypto' : 'saved Cboe chain ' + (d ? esc(d.build_et) : '—')} · price: ${esc(srcName(m.price))}${m.published ? pubTxt : ', every ' + cadence(m.poll_s)}` +
     ' · charts: <a class="credit" href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>' +
     (errs ? '<br>' + errs : '');
   const ib = $('infobtn'); if (ib) ib.classList.toggle('err', !!errs);
@@ -227,7 +227,8 @@ function renderCards() {
     const lines = (s.lines || []).filter((l, j) => !(j === 0 && l.text === s.title));
     let body;
     if (phone) {
-      const vals = lines.filter(l => l.ghost != null || /^[A-Z][A-Za-z0-9 -]{0,9}[ ][+−-]?[0-9]/.test(l.text)).slice(0, 3);
+      let vals = lines.filter(l => l.ghost != null || VAL_LINE.test(l.text)).slice(0, 3);
+      if (!vals.length && CLASSIC_PAGE) vals = lines.slice(0, 1);
       body = vals.length ? `<div>${vals.map(l => partsHtml(l.parts, l.text, l.color)).join('<span class="muted"> · </span>')}</div>` : '';
     } else {
       const fit = Math.max(0, Math.floor((pg.h - 16) / 19.5) - 1);
@@ -238,8 +239,13 @@ function renderCards() {
   });
   if (maxPane === null) (state.di.panes.notes || []).forEach(n => {
     const last = g[g.length - 1];
-    const top = n.anchor === 'above_cards' ? (g[1] ? g[1].top - 17 : 0) : last.top + last.h - 17;
-    const parts = phone && n.parts && n.parts.length ? n.parts.slice(-1) : n.parts;
+    let top = n.anchor === 'above_cards' ? (g[1] ? g[1].top - 17 : 0) : last.top + last.h - 17;
+    if (n.anchor === 'above_section') {
+      const k = secs.findIndex(s => s.id === n.section);
+      if (k < 0 || !g[k + 1] || g[k + 1].h < 40) return;
+      top = g[k + 1].top - (k > 0 ? 22 : 17);
+    }
+    const parts = phone && n.parts && n.parts.length ? (n.phone_parts || n.parts.slice(-1)) : n.parts;
     html += `<div class="note" style="right:${dchart.priceScale('right').width() + 18}px;top:${top}px">${partsHtml(parts, n.text, n.color)}</div>`;
   });
   host.innerHTML = html;
@@ -249,7 +255,7 @@ function renderCards() {
     if (phone) {
       const k = Number(c.dataset.k), pg = g[k + 1];
       const top = Math.min(0.6, (c.offsetHeight + 10) / Math.max(1, pg.h));
-      try { dchart.priceScale('right', k).applyOptions({ scaleMargins: { top, bottom: 0.06 } }); } catch (e) {  }
+      try { dchart.priceScale('right', k).applyOptions({ scaleMargins: { top, bottom: bottomMargin(secs[k], pg.h) } }); } catch (e) {  }
     }
   });
   if (!phone && !cardMarginsReset) {
@@ -257,10 +263,38 @@ function renderCards() {
     cardMarginsReset = true;
   }
   if (phone) cardMarginsReset = false;
+  if (!phone) {
+    if (bandMargins.chart !== dchart) bandMargins = { chart: dchart };
+    secs.forEach((s, k) => {
+      const pg = g[k + 1], b = pg ? bottomMargin(s, pg.h) : 0.06;
+      if (b === 0.06 || bandMargins[s.id] === b) return;
+      bandMargins[s.id] = b;
+      try { dchart.priceScale('right', k).applyOptions({ scaleMargins: { top: 0.08, bottom: b } }); } catch (e) {  }
+    });
+  } else bandMargins = {};
   const want = phone ? 0 : Math.min(right + 16, w * 0.7);
+  if (CLASSIC_PAGE) {
+    const nr = {};
+    if (!phone) {
+      secs.forEach(s => { nr[s.id] = 0; });
+      host.querySelectorAll('.card').forEach(c => { const s = secs[Number(c.dataset.k)]; if (s) nr[s.id] = Math.min(c.offsetLeft + c.offsetWidth + 16, w * 0.7); });
+    }
+    const ka = Object.keys(nr), kb = Object.keys(secRight);
+    if (ka.length !== kb.length || ka.some(id => !(id in secRight) || Math.abs(nr[id] - secRight[id]) > 2)) {
+      secRight = nr; lastCut = -1;
+      if (Math.abs(want - cardRight) <= 2) applyCut();
+    }
+  }
   if (Math.abs(want - cardRight) > 2) { cardRight = want; lastCut = -1; applyCut(); }
 }
 let cardMarginsReset = false;
+
+
+const VAL_LINE = CLASSIC_PAGE ? /^%?[A-Z][A-Za-z0-9 -]{0,9}( \(\d+\))?[ ][+−-]?[0-9](?!.* [·/] )/ : /^[A-Z][A-Za-z0-9 -]{0,9}[ ][+−-]?[0-9]/;
+
+const BAND_ROOM = 14;
+const bottomMargin = (s, h) => (s && (s.series || []).some(x => x.kind === 'band') && h > 0 ? Math.round(Math.min(0.3, (BAND_ROOM + 4) / h) * 100) / 100 : 0.06);
+let bandMargins = {};
 
 
 $('ditb').addEventListener('click', e => {
@@ -365,6 +399,93 @@ function drawGhosts(c, g, paneW) {
 }
 
 
+
+
+let markerHits = [];
+const PICTO = /\p{Extended_Pictographic}/u;
+function drawClassic(c, cb, g, paneW) {
+  markerHits = [];
+  const P = state && state.di && state.di.panes;
+  if (!P || !P.sections || !dchart) return;
+  const ts = dchart.timeScale(), pt = P.t || [], bs = ts.options().barSpacing;
+  const vr = ts.getVisibleLogicalRange();
+  if (!vr) return;
+  P.sections.forEach((s, k) => {
+    const pg = g[k + 1], host = hostOf(s);
+    if (!pg || pg.h < 20 || !host) return;
+    const cut = Math.max(0, secCut[s.id] != null ? secCut[s.id] : lastCut);
+    const i0 = Math.max(cut, Math.floor(vr.from) - 1), i1 = Math.min(pt.length - 1, Math.ceil(vr.to) + 1);
+    if (s.band_fill) {
+      const f = s.band_fill, ya = host.priceToCoordinate(f.from), yb = host.priceToCoordinate(f.to);
+      if (ya != null && yb != null) {
+        const top = Math.max(0, Math.min(ya, yb)), bot = Math.min(pg.h, Math.max(ya, yb)), x0 = Math.max(0, rightOf(s));
+        if (bot > top && paneW > x0) { cb.fillStyle = f.color; cb.fillRect(x0, pg.top + top, paneW - x0, bot - top); }
+      }
+    }
+    c.save(); c.beginPath(); c.rect(0, pg.top, paneW, pg.h); c.clip();
+    (s.series || []).forEach(x => {
+      if (x.kind !== 'band') return;
+      const hh = x.height_px || 4, y = pg.top + pg.h - BAND_ROOM + 2, w = Math.max(1, bs), cols = x.colors || [];
+      const xl = ts.logicalToCoordinate(cut);
+      const bar = (X, col) => { const a = Math.max(X - w / 2, xl == null ? -Infinity : xl); if (X + w / 2 > a) { c.fillStyle = col; c.fillRect(a, y, X + w / 2 - a, hh); } };
+      for (let i = i0; i <= i1; i++) {
+        const X = cols[i] ? ts.logicalToCoordinate(i) : null;
+        if (X != null) bar(X, cols[i]);
+      }
+      const gh = x.ghost;
+      const GX = gh && gh.color && gh.index >= cut ? ts.logicalToCoordinate(gh.index) : null;
+      if (GX != null) bar(GX, gh.color);
+    });
+    (s.markers || []).forEach(m => {
+      if (m.i == null || m.i < cut || m.i >= pt.length) return;
+      const X = ts.logicalToCoordinate(m.i);
+      if (X == null || X < -12 || X > paneW + 12) return;
+      const r = (m.size_px || 8) / 2, below = m.pos !== 'above';
+      let Y = m.value != null ? host.priceToCoordinate(m.value) : null;
+      if (Y == null) Y = below ? pg.h - BAND_ROOM - r - 2 : r + 4;
+      Y += pg.top;
+      c.fillStyle = m.color || '#d1d4dc';
+      if (m.shape === 'circle') { c.beginPath(); c.arc(X, Y, r, 0, Math.PI * 2); c.fill(); }
+      else if (m.shape === 'triangle_up' || m.shape === 'triangle_down') {
+        const d = m.shape === 'triangle_up' ? 1 : -1;
+        c.beginPath(); c.moveTo(X, Y - d * r); c.lineTo(X + r, Y + d * r * 0.8); c.lineTo(X - r, Y + d * r * 0.8); c.closePath(); c.fill();
+      }
+      if (m.text) {
+        const big = PICTO.test(m.text), rr = m.shape === 'none' ? 0 : r, fs = big ? 12 : 10;
+        c.font = `${fs}px -apple-system, BlinkMacSystemFont, Roboto, sans-serif`;
+        c.fillStyle = m.text_color || m.color || '#d1d4dc';
+        let band = 0;
+        if (PHONE()) try { band = (dchart.priceScale('right', k).options().scaleMargins.top || 0) * pg.h - 2; } catch (e) {  }
+        const lo = pg.top + Math.max(6, band), hi = pg.top + pg.h - 6, ty = below ? Y + rr + 2 : Y - rr - 2;
+        if (below ? ty + fs <= hi : ty - fs >= lo) {
+          c.textAlign = 'center'; c.textBaseline = below ? 'top' : 'bottom'; c.fillText(m.text, X, ty);
+        } else {
+          const tw = c.measureText(m.text).width, right = X + rr + 3 + tw <= paneW - 4;
+          c.textAlign = right ? 'left' : 'right'; c.textBaseline = 'middle';
+          c.fillText(m.text, right ? X + rr + 3 : X - rr - 3, Math.min(hi - fs / 2, Math.max(lo + fs / 2, Y)));
+        }
+      }
+      if (m.tip || m.text) markerHits.push({ x: X, y: Y, r: Math.max(7, r + 3), tip: m.tip || m.text, color: m.color });
+    });
+    c.restore();
+  });
+}
+
+$('chartbox').addEventListener('mousemove', e => {
+  if (!markerHits.length) { const t = $('mtip'); if (t) t.hidden = true; return; }
+  const r = $('chartbox').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = null, bd = Infinity;
+
+  markerHits.forEach(h => { const d = Math.hypot(h.x - x, h.y - y); if (d <= h.r && d <= bd) { bd = d; best = h; } });
+  let t = $('mtip');
+  if (!best) { if (t) t.hidden = true; return; }
+  if (!t) { t = document.createElement('div'); t.id = 'mtip'; $('chartbox').appendChild(t); }
+  t.textContent = best.tip; t.style.borderColor = best.color || '#363a45'; t.hidden = false;
+  t.style.left = Math.min(x + 12, r.width - t.offsetWidth - 4) + 'px'; t.style.top = Math.max(0, y - 30) + 'px';
+});
+$('chartbox').addEventListener('mouseleave', () => { const t = $('mtip'); if (t) t.hidden = true; });
+
+
 function chamfer(g2, x, y, w, h, r) {
   g2.beginPath(); g2.moveTo(x + r, y); g2.lineTo(x + w - r, y); g2.lineTo(x + w, y + r); g2.lineTo(x + w, y + h - r);
   g2.lineTo(x + w - r, y + h); g2.lineTo(x + r, y + h); g2.lineTo(x, y + h - r); g2.lineTo(x, y + r); g2.closePath();
@@ -388,18 +509,30 @@ function drawFrames(cb, c, g, paneW) {
   c.save(); c.font = '11px -apple-system, BlinkMacSystemFont, Roboto, sans-serif'; c.textAlign = 'right'; c.textBaseline = 'middle';
   P.sections.forEach((s, k) => {
     const pg = g[k + 1]; if (!pg || pg.h < 40) return;
+    const shown = s.scale && s.scale.mode ? roomyLabels(secGuides[s.id] || [], pg.h) : null;
     (secGuides[s.id] || []).forEach(gd => {
       if (!gd.ser) return;
       const y = gd.ser.priceToCoordinate(gd.value);
       if (y == null || y < 4 || y > pg.h - 4) return;
       c.save(); c.strokeStyle = gd.color || '#d1d4dc8c'; c.lineWidth = 1;
       c.setLineDash(gd.style === 'dotted' ? [1, 3] : gd.style === 'solid' ? [] : [5, 5]);
-      c.beginPath(); c.moveTo(Math.max(cardRight, 20), pg.top + y + 0.5); c.lineTo(W - (gd.label ? 52 : 24), pg.top + y + 0.5); c.stroke(); c.restore();
-      if (gd.label) { c.fillStyle = '#b2b5bec0'; c.fillText(gd.label, W - 18, pg.top + y); }
+      c.beginPath(); c.moveTo(Math.max(rightOf(s), 20), pg.top + y + 0.5); c.lineTo(W - (gd.label ? 52 : 24), pg.top + y + 0.5); c.stroke(); c.restore();
+      if (gd.label && (!shown || shown.has(gd))) { c.fillStyle = '#b2b5bec0'; c.fillText(gd.label, W - 18, pg.top + y); }
     });
     (s.lane_tags || []).forEach(t => { c.fillStyle = t.color || '#d1d4dcb8'; c.fillText(t.text, W - 18, pg.top + 16); });
   });
   c.restore();
+}
+
+
+function roomyLabels(list, h) {
+  const out = new Set(), ys = [];
+  list.filter(gd => gd.label && gd.ser).sort((a, b) => (a.style === 'dotted') - (b.style === 'dotted')).forEach(gd => {
+    const y = gd.ser.priceToCoordinate(gd.value);
+    if (y == null || y < 4 || y > h - 4 || ys.some(v => Math.abs(v - y) < 11)) return;
+    ys.push(y); out.add(gd);
+  });
+  return out;
 }
 
 const cv = $('overlay'), cu = $('under'), chartbox = $('chartbox');
@@ -572,6 +705,7 @@ function draw() {
   c.restore(); cb.restore();
   drawFrames(cb, c, g, dW);
   drawGhosts(c, g, dW);
+  drawClassic(c, cb, g, dW);
   $('gex').style.right = (chart.priceScale('right').width() + 10) + 'px';
   const want = Math.min(0.5, ($('gex').offsetHeight + 16) / Math.max(1, paneH));
   if (Math.abs(want - topMargin) > 0.01) { topMargin = want; candles.priceScale().applyOptions({ scaleMargins: { top: want, bottom: 0.06 } }); }

@@ -7,6 +7,10 @@ const C = { up: '#26a69a', dn: '#ef5350', king: '#f5d63d', call: '#00e676', put:
 const BAND = 0.015, BAND_MAX = 0.04, META_MS = 5000;
 const STYLE = { solid: 0, dotted: 1, dashed: 2 };
 const $ = id => document.getElementById(id);
+
+const CLASSIC_PAGE = !!window.CLASSIC;
+const PAGE_NAME = CLASSIC_PAGE ? 'Classic Indicators' : 'Eagle Eye Technicals';
+if (CLASSIC_PAGE) document.body.classList.add('classic');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const NARROW = () => window.innerWidth < 1200;
 const paneWidth = () => (chart ? chart.timeScale().width() : window.innerWidth);
@@ -29,13 +33,17 @@ let gexBars = (() => { try { const v = localStorage.getItem('gexdash.gexbars'); 
 
 let tableLive = (() => { try { return localStorage.getItem('gexdash.tablelive') === '1'; } catch (e) { return false; } })();
 const api = path => path + (path.includes('?') ? '&' : '?') + 's=' + encodeURIComponent(sym) + '&h=' + encodeURIComponent(gexH) +
-  (tableLive ? '&live=1' : '');
+  (tableLive ? '&live=1' : '') + (CLASSIC_PAGE && path.startsWith('/api/state') ? '&panes=classic' : '');
 let tf = (() => { try { return localStorage.getItem('gexdash.tf') || '1W'; } catch (e) { return '1W'; } })();
 if (!TFS.includes(tf)) tf = '1W';
 let meta = null, state = null, version = -1, loadedTf = null, lastOkPoll = 0, inflight = false;
 let chart = null, dchart = null, candles = null, structKey = '', dseries = {}, oseries = {}, markersApi = null, guideLines = [], gexLines = [];
 let nBars = 0, levelsRange = null, gexKey = '', topMargin = -1, sig = '';
 let secRange = {}, secGuides = {}, lastCut = -1, cardRight = 0;
+
+
+let secRight = {}, secCut = {}, cutKey = '';
+const rightOf = s => (CLASSIC_PAGE && s && secRight[s.id] != null ? secRight[s.id] : cardRight);
 let wantN = {}, dLen = 0, moreBusy = false;
 let lastTimes = [], lastPt = [];
 
@@ -61,7 +69,12 @@ const LAYERS = [
   { group: 'Other', key: 'candles4', label: 'Four-colour candles' },
 ];
 
-const PANES = [
+
+const PANES = CLASSIC_PAGE ? [
+  { id: 'c_rsi', label: 'RSI' }, { id: 'c_macd', label: 'MACD' }, { id: 'c_stochrsi', label: 'Stoch RSI' },
+  { id: 'c_kdj', label: 'KDJ' }, { id: 'c_obvmacd', label: 'OBV MACD (pivot buy / sell)' }, { id: 'c_willr', label: 'Williams %R' },
+  { id: 'c_bbpct', label: 'BB %B' }, { id: 'c_wmsr', label: 'WMSR' },
+] : [
   { id: 'kdj', label: 'KDJ' }, { id: 'rsi', label: 'RSI' }, { id: 'macdv', label: 'MACD-V' },
   { id: 'bbwidth', label: 'BB Width' }, { id: 'h', label: 'H (Washout)' }, { id: 'hkdj', label: 'H-KDJ' },
 ];
@@ -174,6 +187,11 @@ const TOUCH_SCROLL = { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: 
 
 const TOUCH_FULL = Object.assign({}, TOUCH_SCROLL, { vertTouchDrag: true });
 const touchFor = which => (maxPane === which ? TOUCH_FULL : TOUCH_SCROLL);
+
+
+
+const scaleFor = which => (CLASSIC_PAGE && which === 'di' ? { pinch: false, mouseWheel: maxPane === 'di' } : { pinch: false });
+const pageWheel = e => CLASSIC_PAGE && maxPane === null && Math.abs(e.deltaY) > Math.abs(e.deltaX);
 function makeChart() {
   if (chart) chart.remove();
   if (dchart) dchart.remove();
@@ -186,7 +204,7 @@ function makeChart() {
     timeScale: { borderColor: '#2a2e39', timeVisible: INTRADAY.has(tf), secondsVisible: false, barSpacing: bs, rightOffset: ro },
     crosshair: { mode: LW.CrosshairMode.Normal },
     handleScroll: touchFor('di'),
-    handleScale: { pinch: false },
+    handleScale: scaleFor('di'),
   });
 
   dchart = LW.createChart($('dchart'), base(7, 3));
@@ -238,9 +256,11 @@ function watchUser(el, k) {
   el.addEventListener('pointerdown', () => { userAt[k] = Infinity; lastUser = k; }, true);
   const up = () => { if (userAt[k] === Infinity) userAt[k] = performance.now() + 1200; };
   el.addEventListener('pointerup', up, true); el.addEventListener('pointercancel', up, true); window.addEventListener('pointerup', up);
-  el.addEventListener('wheel', () => { userAt[k] = performance.now() + 400; lastUser = k; }, { capture: true, passive: true });
+  el.addEventListener('wheel', e => { if (k === 'd' && pageWheel(e)) return; userAt[k] = performance.now() + 400; lastUser = k; }, { capture: true, passive: true });
 }
 watchUser($('chart'), 'p'); watchUser($('dchart'), 'd');
+
+$('dchart').addEventListener('wheel', e => { if (pageWheel(e)) e.stopPropagation(); }, { capture: true, passive: true });
 
 
 
@@ -342,7 +362,10 @@ function buildSeries(di) {
   secs.forEach((s, k) => {
     const pane = k;
     const fixed = s.scale && s.scale.min != null ? { priceRange: { minValue: s.scale.min, maxValue: s.scale.max } } : null;
-    (s.series || []).forEach(x => {
+    const drawn = (s.series || []).filter(x => x.kind !== 'band');
+    if (!drawn.length && (s.series || []).length) dseries[s.id + '/_pane'] = dchart.addSeries(LW.LineSeries, { visible: false,
+      priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: () => secRange[s.id] || fixed }, pane);
+    drawn.forEach(x => {
       const common = { priceLineVisible: false, lastValueVisible: false, title: '' };
 
       common.autoscaleInfoProvider = () => secRange[s.id] || fixed;
@@ -379,30 +402,65 @@ function pts(times, values, colors) {
 
 
 const roundUp2 = x => { if (!(x > 0)) return 1; const e = Math.floor(Math.log10(x)) - 1, p = Math.pow(10, e); return Math.ceil(x / p) * p; };
+
+const hostOf = s => {
+  for (const x of s.series || []) { const r = dseries[s.id + '/' + x.id]; if (r) return r; }
+  return dseries[s.id + '/_pane'];
+};
 function setGuides(s, list) {
-  const host = dseries[s.id + '/' + ((s.series || [])[0] || {}).id];
+  const host = hostOf(s);
   secGuides[s.id] = list.map(g => Object.assign({}, g, { ser: host }));
+}
+
+const fmtAmp = a => {
+  const v = Number(a.toPrecision(2)), m = Math.abs(v), k = (x, u) => Number(x.toPrecision(3)) + u;
+  return m >= 1e9 ? k(v / 1e9, 'B') : m >= 1e6 ? k(v / 1e6, 'M') : m >= 1e4 ? k(v / 1e3, 'K') : m > 0 && m < 1e-3 ? v.toPrecision(2) : String(Number(v.toFixed(4)));
+};
+
+
+
+function scaleByMode(s, lo, hi, amp) {
+  const sc = s.scale, fixed = sc.min != null && sc.max != null ? { priceRange: { minValue: sc.min, maxValue: sc.max } } : null;
+  if (sc.mode === 'widen') {
+    const b0 = sc.base_min != null ? sc.base_min : sc.min, b1 = sc.base_max != null ? sc.base_max : sc.max;
+    const a = Math.min(b0 != null ? b0 : lo, lo), b = Math.max(b1 != null ? b1 : hi, hi);
+    secRange[s.id] = isFinite(a) && isFinite(b) && b > a ? { priceRange: { minValue: a - (b - a) * 0.04, maxValue: b + (b - a) * 0.04 } } : fixed;
+    setGuides(s, s.guides || []);
+  } else if (sc.mode === 'sym' && amp > 0) {
+    const A = roundUp2(amp), t = fmtAmp(A), c0 = ((s.guides || [])[0] || {}).color;
+    secRange[s.id] = { priceRange: { minValue: -1.1 * A, maxValue: 1.1 * A } };
+    setGuides(s, [{ value: A, label: '+' + t, color: c0, style: 'dashed' }, { value: 0, label: '0', color: c0, style: 'dashed' },
+                  { value: -A, label: '−' + t, color: c0, style: 'dashed' }]);
+  } else {
+    secRange[s.id] = fixed;
+    setGuides(s, sc.mode === 'sym' ? (s.guides || []).filter(g => g.value === 0) : s.guides || []);
+  }
 }
 function applyCut() {
   const P = state && state.di && state.di.panes, bars = state && state.di && state.di.bars;
   if (!P || !bars || !bars.length || !dchart) return;
   const ts = dchart.timeScale(), pt = P.t || [];
-  const lg = cardRight ? ts.coordinateToLogical(cardRight) : 0;
-  const pi = Math.max(0, Math.min(pt.length, Math.ceil(lg == null ? 0 : lg)));
-  if (pi === lastCut) return;
-  lastCut = pi;
+  const cutAt = x => { const lg = x ? ts.coordinateToLogical(x) : 0; return Math.max(0, Math.min(pt.length, Math.ceil(lg == null ? 0 : lg))); };
+  const pi = cutAt(cardRight);
+  const key = CLASSIC_PAGE ? (P.sections || []).map(s => cutAt(rightOf(s))).join(',') : '';
+  if (pi === lastCut && key === cutKey) return;
+  lastCut = pi; cutKey = key;
   (P.sections || []).forEach(s => {
     let lo = Infinity, hi = -Infinity, amp = 0;
+    const si = CLASSIC_PAGE ? cutAt(rightOf(s)) : pi;
+    secCut[s.id] = si;
     (s.series || []).forEach(x => {
+      if (x.kind === 'band') return;
       const ser = dseries[s.id + '/' + x.id];
-      const vals = (x.values || []).map((v, i) => (i >= pi ? v : null));
+      const vals = (x.values || []).map((v, i) => (i >= si ? v : null));
       if (ser) ser.setData(pts(pt, vals, x.colors));
       vals.concat(x.ghost && x.ghost.value != null ? [x.ghost.value] : []).forEach(v => {
         if (v == null || !isFinite(v)) return;
         lo = Math.min(lo, v); hi = Math.max(hi, v); amp = Math.max(amp, Math.abs(v));
       });
     });
-    if (s.id === 'kdj' && s.scale && s.scale.auto && isFinite(lo)) {
+    if (s.scale && s.scale.mode) scaleByMode(s, lo, hi, amp);
+    else if (s.id === 'kdj' && s.scale && s.scale.auto && isFinite(lo)) {
       const a = Math.min(0, lo), b = Math.max(100, hi), pad = (b - a) * 0.04;
       secRange[s.id] = { priceRange: { minValue: a - pad, maxValue: b + pad } };
       setGuides(s, s.guides || []);
@@ -432,9 +490,23 @@ function resetPriceView() {
   if (!chart) return;
   const ts = chart.timeScale(), bs = paneWidth() < 700 ? 4 : 7;
   const need = HISTW() + (PHONE() ? 82 : COMPACT() ? 110 : 250) + 20;
-  progSet(() => { ts.applyOptions({ barSpacing: bs, rightOffset: Math.ceil(need / bs) }); ts.scrollToRealTime(); });
+  progSet(() => {
+    ts.applyOptions({ barSpacing: bs, rightOffset: Math.ceil(need / bs) });
+
+
+    ts.scrollToPosition(Math.ceil(need / bs), false);
+  });
   candles.priceScale().setAutoScale(true);
   topMargin = -1; sig = '';
+}
+
+
+function settleView() {
+  const t0 = performance.now();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (userAt.p > t0 || userAt.d > t0 || !chart || !nBars) return;
+    resetPriceView(); resetDiView();
+  }));
 }
 function resetDiView() {
   if (!dchart) return;
@@ -475,7 +547,7 @@ function renderBody() {
   }
   if (di.panes) { lastCut = -1; applyCut(); dLen = (di.panes.t || []).length; lastPt = di.panes.t || []; }
   lastTimes = bars.map(b => b[0]);
-  if (first) { resetPriceView(); resetDiView(); }
+  if (first) { resetPriceView(); resetDiView(); settleView(); }
   else {
 
     progSet(() => {
