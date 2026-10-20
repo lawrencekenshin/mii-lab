@@ -7,10 +7,13 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#131722">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="Which stocks are building one-sided call or put positions, ranked over a day, a week, two weeks and a month.">
+<meta name="description" content="Which stocks are building one-sided call or put positions, ranked over a day, a week, two weeks, a month and every saved settle.">
 <title>Skew Tracker · live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="skew.css?v=20261013k">
+<link rel="stylesheet" href="skew.css?v=20261020g">
+<link rel="stylesheet" href="skew-board.css?v=20261020g">
+<link rel="stylesheet" href="skew-name.css?v=20261020g">
+<link rel="stylesheet" href="skew-views.css?v=20261020g">
 </head>
 <body>
 <a class="skip" href="#list">Skip to the list</a>
@@ -34,110 +37,56 @@
 
 
 <main class="wrap">
-  <section class="status" aria-label="Data status">
-    <div class="status-row">
-      <span class="chip chip-wait" id="chip">LOADING</span>
-      <span class="asof" id="asof">Fetching the latest numbers…</span>
-    </div>
-    <p class="status-line" id="statusLine"></p>
+  <section class="status" id="status" aria-label="Data status" aria-live="polite">
+    <div class="status-row"><span class="schip s-wait" id="chip">LOADING</span><span class="asof" id="asof">Fetching the latest numbers…</span></div>
   </section>
 
-  <div id="banners" aria-live="polite"></div>
+  <section id="hero" aria-label="Summary"></section>
+  <div id="leftLine"></div>
 
-  <div class="head">
-    <div class="head-row">
-      <h1>Skew Tracker</h1>
-    </div>
-    <p class="sub">Which stocks are piling into calls or into puts: new option positions on one side, as a share of each stock's own options, over a day, a week, two weeks and a month.</p>
+  <div id="controls" role="group" aria-label="What to show">
+    <div class="ctlrow" id="winChips"></div>
+    <div class="ctlrow" id="sideRow"></div>
+    <div class="ctlrow" id="listRow"></div>
+    <div class="ctlrow" id="lensRow"><p class="lensdef" id="lensDef"></p></div>
+    <div class="ctlrow" id="showRow"></div>
+    <div class="ctlrow" id="searchRow"></div>
   </div>
 
-  <div class="controls" role="group" aria-label="What to show">
-    <div class="ctl">
-      <span class="ctl-k" id="lblWin">Time frame</span>
-      <span class="seg" role="group" aria-labelledby="lblWin" id="winSeg">
-        <button type="button" data-w="1d" aria-pressed="true">1D</button>
-        <button type="button" data-w="1w" aria-pressed="false">1W</button>
-        <button type="button" data-w="2w" aria-pressed="false">2W</button>
-        <button type="button" data-w="1m" aria-pressed="false">1M</button>
-      </span>
-    </div>
-    <div class="ctl">
-      <span class="ctl-k" id="lblSide">Leaning to</span>
-      <span class="seg" role="group" aria-labelledby="lblSide" id="sideSeg">
-        <button type="button" data-s="C" aria-pressed="true" class="s-c">Calls ↑</button>
-        <button type="button" data-s="P" aria-pressed="false" class="s-p">Puts ↓</button>
-      </span>
-    </div>
-    <div class="ctl">
-      <label class="ctl-k" for="listSel">List</label>
-      <select id="listSel" class="sel">
-        <option value="all">Whole list</option>
-        <option value="spx">S&amp;P 500</option>
-        <option value="ndx">Nasdaq 100</option>
-        <option value="wl">Watchlist 1</option>
-        <option value="ai">AI companies</option>
-      </select>
-    </div>
-    <div class="ctl ctl-q">
-      <label class="ctl-k" for="q">Find a stock</label>
-      <input id="q" class="q" type="search" placeholder="Ticker or name" autocomplete="off" autocapitalize="characters" spellcheck="false">
-    </div>
-  </div>
+  <nav id="viewBar" aria-label="Views"></nav>
 
-  <div class="controls rankrow" role="group" aria-label="How to rank the list">
-    <div class="ctl">
-      <span class="ctl-k" id="lblRank">Rank by</span>
-      <span class="seg seg-rank" role="group" aria-labelledby="lblRank" id="rankSeg">
-        <button type="button" data-r="skew" aria-pressed="true">Skew</button>
-        <button type="button" data-r="kd" aria-pressed="false">King distance</button>
-        <button type="button" data-r="kz" aria-pressed="false">King size</button>
-        <button type="button" data-r="bz" aria-pressed="false">Business</button>
-      </span>
-    </div>
-    <div class="ctl">
-      <span class="ctl-k" id="lblKf">Filter</span>
-      <button type="button" class="tog" id="kSide" aria-pressed="false">King on the lean's side</button>
-    </div>
-  </div>
+  <p class="sub listsub" id="listSub"></p>
+  <section id="list" aria-label="Ranked list"></section>
+  <div id="endSections"></div>
+  <section id="view" aria-label="View"></section>
 
-  <section class="study today" id="tiles" aria-label="Summary"></section>
+  <details class="fold card-fold" id="how"></details>
+  <details class="fold card-fold" id="covBox"><summary>Days on record</summary></details>
 
-  <section class="card list-card" id="list" aria-labelledby="listH">
-    <div class="list-head">
-      <h2 id="listH">Call-heavy · 1D</h2>
-      <p class="sub" id="listSub"></p>
-    </div>
-    <div class="tbl" id="tbl" role="table" aria-describedby="listSub"></div>
-    <p class="empty" id="empty" hidden></p>
-    <div id="others" hidden>
-      <h3 class="h3">Other names we track</h3>
-      <div class="tbl" id="tblOthers" role="table"></div>
-    </div>
-  </section>
+  <section id="name" aria-label="Name"></section>
 
-  <section class="card" id="tapeCard" hidden aria-labelledby="tapeH">
-    <h2 id="tapeH">Traded but not settled yet</h2>
-    <p class="sub" id="tapeSub"></p>
-    <div class="tbl" id="tblTape" role="table"></div>
-    <p class="empty" id="tapeEmpty" hidden></p>
-  </section>
-
-  <section class="card" aria-labelledby="covH">
-    <details class="table-card" id="covBox">
-      <summary id="covH">Days on record</summary>
-      <p class="src">How many stocks each day's numbers cover. Days marked “net only” come from an older daily snapshot that kept the overall tilt but not calls and puts separately; days marked “joined” fold two or three sessions together because the days between were never saved.</p>
-      <div class="table-scroll"><table id="covTbl"><thead><tr><th>Day</th><th>Stocks</th><th>Full detail</th><th>Net only</th><th>Joined</th></tr></thead><tbody></tbody></table></div>
-    </details>
-  </section>
-
-  <footer class="foot">
-    <p><b>Reading it.</b> Open interest is the number of option contracts still open after each day. A stock ranks here when far more new contracts opened on one side (calls or puts) than the other, measured against that stock's own options, so a big name and a small one can sit on the same list. The time frames add up each day's new positions.</p>
-    <p><b>Opened is not the same as bought.</b> Every option has a buyer and a seller. “Read” looks at where the last trades sat against the price quoted at the close: near the asking price usually means buyers were in a hurry, near the bid means sellers were. Calls sold at the bid are often stock owners writing calls, not a bet on a rise.</p>
-    <p><b>Timing.</b> Open interest is posted the morning after each session, so the newest full day is always one session behind. The “traded but not settled” section uses the newest session's trading: where more contracts traded than were open that morning, the difference has to be new positions.</p>
+  <footer class="foot" id="foot">
+    <p id="footDyn"></p>
+    <p><b>Opened.</b> New option contracts: the rise in open interest (contracts still open after each session) on one side, calls or puts. “Added” counts only series that are still open; an expiry that has passed drops out.</p>
+    <p><b>Net and of its book.</b> Net = calls opened minus puts opened, after the contracts closed on each side. “Of its book” = that net as a share of every option contract open on the stock, so a big name and a small one can sit on the same list.</p>
+    <p><b>One-sided.</b> How much of the new contracts went to the leaning side. A name ranks when its build is one-sided, big against its own book, and seen on most of the window's sessions.</p>
+    <p><b>Read.</b> Where the late trades of the new contracts sat against the closing quote: near the ask reads as bought, near the bid as sold (sellers opened them). It is a lean, not a fact: every option has a buyer and a seller.</p>
+    <p><b>Build chip and gold line.</b> The build chip counts the leaning side's new contracts and the expiries they went into; the gold line names the expiry, or the two expiries, that took most of them.</p>
+    <p><b>$ opened.</b> The new contracts on the leaning side × each option's closing mid price × 100, added up over the window.</p>
+    <p><b>Held calls : puts.</b> Every open call against every open put on the stock now, all strikes and expiries. The white tick, where shown, marks the call share at the window start.</p>
+    <p><b>King node, pile, negative king.</b> The king node is the strike with the most call gamma (gamma dollars per 1% move); a pile is a run of neighbouring strikes holding most of it; the negative king is the strike with the most negative gamma.</p>
+    <p><b>Day strip and glyph.</b> The day strip has one cell per session: green when calls led that day, red when puts led, an outline when it was quiet. The glyph shows where the window&rsquo;s new contracts sit against the price: calls above the line, puts below it, nearer strikes in the middle and farther ones out at the ends.</p>
+    <p><b>Sorting.</b> Every column sorts: a first click puts the highest (or A to Z, or the soonest) first, a second click flips it, “#” returns to the ranking. Rank numbers always stay the ranking's.</p>
+    <p><b>Timing.</b> Open interest is posted the morning after each session, so the newest settle is one session behind and fills in over the next day. The Tape chip uses the newest session's trading: where more contracts traded than were open that morning, the difference must be new.</p>
     <noscript><p class="noscript">This page needs JavaScript.</p></noscript>
   </footer>
 </main>
 
-<script src="skew.js?v=20261013k"></script>
+<script defer src="skew-core.js?v=20261020g"></script>
+<script defer src="skew-ui.js?v=20261020g"></script>
+<script defer src="skew-charts.js?v=20261020g"></script>
+<script defer src="skew-board.js?v=20261020g"></script>
+<script defer src="skew-name.js?v=20261020g"></script>
+<script defer src="skew-views.js?v=20261020g"></script>
 </body>
 </html>
