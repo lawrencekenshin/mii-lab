@@ -266,3 +266,11 @@ html.puts #hero h1,.acc-h{color:var(--head)}
 #footDyn:empty{display:none}
 .noscript{color:var(--amber)}
 @media (min-width:720px){h1{font-size:30px} h2{font-size:24px} .sub{font-size:15px}}
+
+
+.sk-tod{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.sk-tod .v{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px;white-space:nowrap}
+.sk-tod .v .k{color:var(--muted);font-size:12px}
+.sk-tod b{color:var(--white)} .sk-tod b.up{color:var(--up)} .sk-tod b.down{color:var(--down)} .sk-tod b.mut{color:var(--muted)}
+.sk-tod.late{color:var(--muted)} .sk-tod.late .sbar{opacity:.55}
+.sk-tod small.sub{white-space:nowrap}

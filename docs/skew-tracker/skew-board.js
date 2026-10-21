@@ -380,12 +380,13 @@
 
 
   var SORT_NAMES = {
-    px: 'price move', op: 'added ratio', net: 'net as a share of its book', build: 'contracts opened', bet: 'days to the bet', usd: '$ opened',
+    px: 'price move', op: 'added ratio', tod: 'today\'s added ratio', net: 'net as a share of its book', build: 'contracts opened', bet: 'days to the bet', usd: '$ opened',
     str: 'strength', one: 'one-sided', read: 'read', days: 'days leaning', rk: 'windows ranked on', held: 'held call share', trd: 'traded ratio',
     z: 'vs its normal', king: 'king distance', biz: 'business', earn: 'next earnings', kdj: 'KDJ', stk: 'name A to Z', shr: 'vs shares',
     gly: 'distance of the build', kh: 'king held', setup: 'setup', pile: 'pile size', kvp: 'king vs price', why: 'strength', lv: 'the lens value',
     tnew: 'must be new', tbk: 'share of its book', tsh: 'their share', tbig: 'biggest contract', tpx: 'price'
   };
+  function sortName(k) { return k === 'tod' && S.w === 'tape' ? 'settled added ratio' : SORT_NAMES[k]; }
   function windowsRanked(r) { var n = 0; STAT_W.forEach(function (w) { var st = r && r.w && r.w[w]; if (st && st.r) n++; }); return n; }
   function kdjScore(r) {
     var k = r && r.kdj;
@@ -411,6 +412,7 @@
       case 'days': return e.w === '1d' ? (isNum(st.z) ? st.z : null) : leanDays(st, sd);
       case 'rk': return windowsRanked(r);
       case 'held': return share(r.oC, r.oP);
+      case 'tod': var td = todayParts(e); return td ? (sd === 'P' ? share(td.p, td.c) : share(td.c, td.p)) : null;
       case 'trd': return st.tv ? share(st.tv[sI(sd)], st.tv[1 - sI(sd)]) : null;
       case 'z': return isNum(st.z) ? st.z : null;
       case 'king': return kg && isNum(kg[1]) ? (sd === 'P' ? -kg[1] : kg[1]) : null;
@@ -543,6 +545,7 @@
     if (s0 != null) tip += ' At the ' + F.dayShort(per(e.w).base) + ' settle, same expiries: ' + pc0(s0) + ' calls; calls ' + F.sk((c || 0) - h0[0]) + ', puts ' + F.sk((p || 0) - h0[1]) + '.';
     return { c: c, p: p, now: now, s0: s0, mv: mv, tip: tip, cls: r.hlean === 'C' ? 'up' : r.hlean === 'P' ? 'down' : 'mut', thin: !!r.thin };
   }
+  function todayParts(e) { return SKT.todayCP(e.sym); }
   function mvTxt(mv) { return mv == null ? '' : mv > 0 ? '▲' + mv + ' pt' : mv < 0 ? '▼' + Math.abs(mv) + ' pt' : '='; }
   function bizParts(r) {
     var v = r && r.biz, fund = r && (r.ls || []).indexOf('etf') >= 0;
@@ -729,15 +732,18 @@
     if (H.live) safe('live', function () { var lv = H.live(e); if (lv) c.appendChild(lv); });
     return c;
   }
-  function cOpened(e) {
-    var c = el('div', 'bd-op'), st = e.st;
-    if (!st || (!isNum(st.aC) && !isNum(st.aP))) { c.appendChild(dash()); return c; }
+
+  function todX(e) { var m = todMini(e.sym, 'opened'); if (!m) return null; var d = el('div', 'todx'); d.appendChild(m); return d; }
+  function cOpened(e, ctx) {
+    var c = el('div', 'bd-op'), st = e.st, tx = ctx && !ctx.simple && !ctx.card && e.w !== '1d' && e.w !== 'tape' ? todX(e) : null;
+    if (!st || (!isNum(st.aC) && !isNum(st.aP))) { c.appendChild(dash()); if (tx) c.appendChild(tx); return c; }
     var lead = (st.aC || 0) > 0 && (st.aP || 0) > 0 ? 'added ' + ratioTxt(st.aC, st.aP) : ratioTxt(st.aC, st.aP);
     c.appendChild(el('b', 'v ' + ((st.aC || 0) >= (st.aP || 0) ? 'up' : 'down'), lead));
     c.appendChild(U.twoBar(st.aC, st.aP, { w: 72 }));
     c.appendChild(sub('+' + F.k(st.aC) + ' calls · +' + F.k(st.aP) + ' puts'));
     var tv = trdParts(e);
     if (tv) { var s = sub(tv.t, 'trd-sub' + (tv.thin ? ' thin' : '')); c.appendChild(s); }
+    if (tx) c.appendChild(tx);
     U.tip(c, 'Calls opened ' + sinceTxt(e.w) + ': ' + F.num(st.aC) + ' · puts ' + F.num(st.aP));
     return c;
   }
@@ -910,8 +916,8 @@
     return c;
   }
   function cHeld(e, ctx) {
-    var c = el('div', 'bd-held'), h = heldParts(e);
-    if (!h) { c.appendChild(dash()); return c; }
+    var c = el('div', 'bd-held'), h = heldParts(e), tx = ctx.simple && !ctx.compact && !ctx.tape && !ctx.card ? todX(e) : null;
+    if (!h) { c.appendChild(dash()); if (tx) c.appendChild(tx); return c; }
     if (h.thin) c.classList.add('thin');
     var l = el('div', 'v'); l.appendChild(el('b', h.cls, ratioTxt(h.c, h.p)));
     if (h.mv != null) l.appendChild(sp('hmv ' + (h.mv > 0 ? 'up' : h.mv < 0 ? 'down' : 'mut'), mvTxt(h.mv)));
@@ -919,7 +925,20 @@
     c.appendChild(U.splitBar(h.c, h.p, { w: ctx.simple ? 100 : 86, mid: true, tick: h.s0, thin: h.thin }));
     c.appendChild(sub(F.k(h.c) + ' C · ' + F.k(h.p) + ' P'));
     if (h.s0 != null && v2Note(e.w)) c.appendChild(sub(v2Note(e.w), 'v2'));
+    if (tx) c.appendChild(tx);
     U.tip(c, h.tip + (h.s0 != null ? v2Tip(e.w) : ''));
+    return c;
+  }
+  function cToday(e, ctx) {
+    var c = el('div', 'bd-tod'), t = todayParts(e);
+    if (!t) { c.appendChild(dash()); U.tip(c, F.day(D.latest) + ': no reading for ' + e.sym + ' yet'); return c; }
+    if (t.late) c.classList.add('late');
+    var l = el('div', 'v'); l.appendChild(el('b', t.late ? 'mut' : t.cls, t.txt)); c.appendChild(l);
+    c.appendChild(U.splitBar(t.c, t.p, { w: ctx.simple ? 100 : 86, mid: true, thin: t.late }));
+    c.appendChild(sub(F.sk(t.c) + ' C · ' + F.sk(t.p) + ' P'));
+
+    if (t.late) c.appendChild(sub(ctx.compact || ctx.tape ? F.dayShort(t.day) : F.dayShort(t.day) + ' · ' + F.dayShort(D.latest) + ' not in yet', 'v2'));
+    U.tip(c, t.tip);
     return c;
   }
   function cTraded(e) {
@@ -1137,16 +1156,19 @@
       return [C('', 'c-rk', '#', '', cRank), C('stk', 'c-st', 'Stock', '', cStock), C('tpx', 'c-px', 'Price', 'close of that day', cTPrice),
         C('tnew', 'c-tn', 'Must be new', 'traded over the open', cTNew), C('tbk', 'c-tb', 'Of book', 'every open contract', cTBook),
         C('tsh', 'c-ts', 'Their share', 'of the new', cTShare), C('tbig', 'c-tbig', 'Biggest contract', 'and its last print', cTBig),
-        C('held', 'c-held', 'Held C : P', 'open now', cHeld), C('king', 'c-king', 'King', 'this board\'s king node', cKing), C('biz', 'c-biz', 'Business', 'score', cBiz)];
+        C('tod', 'c-tod', 'Settled C\u00a0:\u00a0P', 'opened at the ' + F.dayShort(D.latest) + ' settle', cToday),
+        C('held', 'c-held', 'Held C\u00a0:\u00a0P', 'open now', cHeld), C('king', 'c-king', 'King', 'this board\'s king node', cKing), C('biz', 'c-biz', 'Business', 'score', cBiz)];
     }
     if (ctx.compact) {
       return [C('', 'c-rk', '#', '', cRank), C('stk', 'c-st', 'Stock', '', cStock), C('usd', 'c-usd', 'Bet size', '$ opened', cUsd),
         C('bet', 'c-bet', 'Betting', 'main strike + date', cBet), C('str', 'c-str', 'One-sided', 'strength', cStrength),
-        C('held', 'c-held', 'Held C : P', 'open now', cHeld), C('biz', 'c-biz', 'Business', 'score', cBiz)];
+        C('tod', 'c-tod', 'Today C\u00a0:\u00a0P', 'opened ' + F.dayShort(D.latest), cToday),
+        C('held', 'c-held', 'Held C\u00a0:\u00a0P', 'open now', cHeld), C('biz', 'c-biz', 'Business', 'score', cBiz)];
     }
     if (ctx.simple) {
       var s = [C('', 'c-rk', '#', '', cRank), C('stk', 'c-st', 'Stock', '', cStock), C('usd', 'c-usd', 'Bet size', '$ opened · contracts', cUsd),
         C('bet', 'c-bet', 'What they\'re betting', 'the main strike and date', cBet), C('str', 'c-str', 'How one-sided', 'vs every name read', cStrength),
+        C('tod', 'c-tod hide6', 'Today C\u00a0:\u00a0P', 'opened ' + F.dayShort(D.latest), cToday),
         C('held', 'c-held', 'Calls : puts held', 'every open contract', cHeld), C('biz', 'c-biz', 'Business', 'score', cBiz)];
       if (hasEarn) s.push(C('earn', 'c-earn', 'Earnings', 'vs the main expiry', cEarn));
       s.push(C('px', 'c-px', 'Since then', 'price and move', cPrice));
@@ -1154,8 +1176,10 @@
     }
     var f = [C('', 'c-rk', '#', '', cRank), C('stk', 'c-st', 'Stock', '', cStock)];
     if (lensCol) f.push(C('lv', 'c-lv', LENS[ctx.lens].l, 'the lens value', cLens));
-    f.push(C('px', 'c-px', 'Price · since', 'close and move', cPrice), C('op', 'c-op', 'Opened C : P', 'added this window', cOpened),
-      C('net', 'c-net', 'Net', 'of its book', cNet), C('build', 'c-bld', 'Build', 'lean side · expiries', cBuild),
+
+    f.push(C('px', 'c-px', 'Price · since', 'close and move', cPrice), C('op', 'c-op', 'Opened C : P', ctx.w === '1d' ? 'today · opened ' + F.dayShort(D.latest) : 'added this window', cOpened));
+    if (ctx.w !== '1d') f.push(C('tod', 'c-tod hide4t', 'Today C\u00a0:\u00a0P', 'opened ' + F.dayShort(D.latest), cToday));
+    f.push(C('net', 'c-net', 'Net', 'of its book', cNet), C('build', 'c-bld', 'Build', 'lean side · expiries', cBuild),
       C('bet', 'c-bet', 'Betting', 'main strike + date', cBet), C('usd', 'c-usd', '$ opened', 'lean · other side', cUsd),
       C('str', 'c-str', 'Strength', 'vs every name read', cStrength), C('read', 'c-rd', 'Read', 'late prints', cRead),
       C('days', 'c-days hide6', ctx.w === '1d' ? 'vs its normal' : 'Days', ctx.w === '1d' ? 'last 10 · z' : 'each session', cDays),
@@ -1171,6 +1195,9 @@
   }
   function headRow(cols, onSort) {
     var tr = el('tr');
+
+    var tc = cols.filter(function (c) { return c.k === 'tod'; })[0];
+    var host = !tc ? '' : /hide4t/.test(tc.cls) ? 'op' : /hide6/.test(tc.cls) ? 'held' : '';
     cols.forEach(function (c) {
       var th = el('th', c.cls), on = (c.k || '') === (S.so || '');
       if (onSort) {
@@ -1178,10 +1205,18 @@
         b.type = 'button';
         b.appendChild(sp('hl', c.label + (on && c.k ? (S.sd < 0 ? ' ▲' : ' ▼') : '')));
         if (c.sub) b.appendChild(sp('hs', c.sub));
-        U.tip(b, c.k ? 'Sort by ' + (SORT_NAMES[c.k] || c.label.toLowerCase()) + (on ? ' (click again to flip)' : '') : 'Back to the ranking');
+        U.tip(b, c.k ? 'Sort by ' + (sortName(c.k) || c.label.toLowerCase()) + (on ? ' (click again to flip)' : '') : 'Back to the ranking');
         b.addEventListener('click', function (ev) { ev.stopPropagation(); onSort(c.k || ''); });
         th.appendChild(b);
         if (on && c.k) th.setAttribute('aria-sort', S.sd < 0 ? 'ascending' : 'descending');
+        if (host && c.k === host) {
+          var to = S.so === 'tod', tb2 = el('button', 'thx-tod' + (to ? ' on' : ''), 'today C\u00a0:\u00a0P' + (to ? (S.sd < 0 ? ' ▲' : ' ▼') : ''));
+          tb2.type = 'button';
+          U.tip(tb2, 'Sort by ' + sortName('tod') + (to ? ' (click again to flip)' : ''));
+          tb2.addEventListener('click', function (ev) { ev.stopPropagation(); onSort('tod'); });
+          th.appendChild(tb2);
+          if (to) th.setAttribute('aria-sort', S.sd < 0 ? 'ascending' : 'descending');
+        }
       } else { th.appendChild(sp('hl', c.label)); if (c.sub) th.appendChild(sp('hs', c.sub)); }
       tr.appendChild(th);
     });
@@ -1250,6 +1285,15 @@
       }
     }
     var duo = el('div', 'duo');
+    var td = todayParts(e);
+    if (td) {
+      var tb = el('div', 'dbox' + (td.late ? ' thin' : ''));
+      var t0 = el('div', 'dt'); t0.appendChild(sp('dk', (e.w === 'tape' ? F.dayShort(td.day) + ' settle' : td.late ? F.dayShort(td.day) : 'Today') + ' opened ')); t0.appendChild(el('b', td.late ? 'mut' : td.cls, td.txt));
+      tb.appendChild(t0);
+      var sb0 = el('div', 'sbw'); sb0.appendChild(U.splitBar(td.c, td.p, { mid: true, thin: td.late, cls: 'wide' })); tb.appendChild(sb0);
+      U.tip(tb, td.tip);
+      duo.appendChild(tb);
+    }
     var h = heldParts(e);
     if (h) {
       var bx = el('div', 'dbox' + (h.thin ? ' thin' : ''));
@@ -1463,13 +1507,16 @@
     var prev = (SKT.VIEWS && SKT.VIEWS.prev) || ((D.sessions || []).length > 1 ? D.sessions[D.sessions.length - 2][0] : null);
     if (items.length) {
       var p = el('p', 'lft');
-      txt(p, 'Left the ' + (WL[S.w] || S.w) + ' ' + (S.side === 'B' ? '' : sideW(S.side) + ' ') + 'list' + (prev ? ' since ' + F.dayShort(prev) : '') + ': ');
+      txt(p, 'Left the ' + (WL[S.w] || S.w) + ' ' + (S.side === 'B' ? '' : sideW(S.side) + ' ') + 'list' + (prev ? ' since ' + F.dayShort(prev) : '') + ' (with today\'s C : P): ');
       items.slice(0, 12).forEach(function (x, i) {
         if (i) txt(p, ' · ');
         var b = el('button', 'tkb', x[0]); b.type = 'button';
         U.tip(b, (S.side === 'B' ? (x[2] === 'C' ? 'calls: ' : 'puts: ') : '') + 'now: ' + x[1]);
         b.addEventListener('click', function () { openName(x[0]); });
         p.appendChild(b);
+        var tm = todMini(x[0], false);
+        if (!tm && !SKT.row(x[0])) { tm = sp('bd-todr'); tm.appendChild(el('b', 'mut', '–')); U.tip(tm, 'Today\'s C : P for ' + x[0] + ' comes with the full name list (All names or its page)'); }
+        if (tm) { txt(p, ' '); p.appendChild(tm); }
       });
       if (items.length > 12) txt(p, ' +' + (items.length - 12) + ' more');
       line.appendChild(p);
@@ -1507,10 +1554,24 @@
     viewsBusy = true;
     SKT.loadViews().then(function () { viewsBusy = false; if (!S.open) safe('left', renderLeft); }, function () { viewsBusy = false; if (!S.open) safe('left', renderLeft); });
   }
+
+
+
+  function todMini(sym, key) {
+    var t = todayParts({ sym: sym });
+    if (!t) return null;
+    var s = sp('bd-todr' + (t.late ? ' late' : ''));
+    if (key || t.late) s.appendChild(sp('k', (t.late ? F.dayShort(t.day) : 'today') + (key === 'opened' ? ' opened' : '') + ' '));
+    s.appendChild(el('b', t.late ? 'mut' : t.cls || null, t.txt));
+    U.tip(s, t.tip);
+    return s;
+  }
   function pillBtn(sym, label, tip) {
     var b = el('button', 'bd-pb'); b.type = 'button';
     b.appendChild(el('b', null, sym));
     if (label) txt(b, ' ' + label);
+    var tm = todMini(sym, true);
+    if (tm) { txt(b, ' · '); b.appendChild(tm); }
     if (tip) U.tip(b, tip);
     b.addEventListener('click', function () { openName(sym); });
     return b;
@@ -1769,7 +1830,7 @@
     var right = el('div', 'bd-sright');
     if (cardMode() && !S.an) {
       var opts = [{ k: '', label: 'Ranking' }];
-      sortOptions().forEach(function (k) { opts.push({ k: k, label: SORT_NAMES[k] ? SORT_NAMES[k].charAt(0).toUpperCase() + SORT_NAMES[k].slice(1) : k }); });
+      sortOptions().forEach(function (k) { var nm = sortName(k); opts.push({ k: k, label: nm ? nm.charAt(0).toUpperCase() + nm.slice(1) : k }); });
       var ps = el('div', 'bd-psort');
       ps.appendChild(U.select(opts, S.so, function (v) { go({ so: v, sd: 1 }); }, { label: 'Sort', aria: 'Sort the cards' }));
       if (S.so) {
@@ -1795,8 +1856,8 @@
     box.appendChild(right);
   }
   function sortOptions() {
-    if (S.w === 'tape') return ['tnew', 'tbk', 'tsh', 'tbig', 'held', 'king', 'biz', 'tpx', 'stk'];
-    var k = ['usd', 'bet', 'str', 'held', 'biz', 'px', 'net', 'build', 'op', 'one', 'read', 'days', 'rk', 'trd', 'king', 'kdj', 'earn', 'stk'];
+    if (S.w === 'tape') return ['tnew', 'tbk', 'tsh', 'tbig', 'tod', 'held', 'king', 'biz', 'tpx', 'stk'];
+    var k = ['usd', 'bet', 'str', 'tod', 'held', 'biz', 'px', 'net', 'build', 'op', 'one', 'read', 'days', 'rk', 'trd', 'king', 'kdj', 'earn', 'stk'];
     if (S.w === '1d') k.push('z');
     return k;
   }
@@ -1847,7 +1908,7 @@
     box.appendChild(h);
     if (S.so) {
       var n = el('p', 'bd-snote');
-      txt(n, 'Sorted by ' + (SORT_NAMES[S.so] || S.so) + ' ' + (S.sd < 0 ? '▲' : '▼') + ' · ');
+      txt(n, 'Sorted by ' + (sortName(S.so) || S.so) + ' ' + (S.sd < 0 ? '▲' : '▼') + ' · ');
       var b = el('button', 'linkbtn', 'back to the ranking'); b.type = 'button';
       b.addEventListener('click', function () { go({ so: '' }); });
       n.appendChild(b);
@@ -1941,6 +2002,10 @@
       { k: 'rk', label: 'On this window', v: function (e) { return e.st && e.st.r ? 1e4 - e.st.r : null; }, f: function (e) { return e.st && e.st.r ? '#' + e.st.r + ' ' + sideW(e.st.side) : e.why; } },
       { k: 'px', label: 'Price · since', num: true, v: function (e) { return e.st && isNum(e.st.ret) ? e.st.ret : null; }, f: function (e) { return F.money(e.r.px) + (e.st && isNum(e.st.ret) ? ' ' + F.spct(e.st.ret) : ''); } },
       { k: 'op', label: 'Opened C : P', num: true, v: function (e) { return e.st ? share(e.st.aC, e.st.aP) : null; }, f: function (e) { return e.st ? '+' + F.k(e.st.aC) + ' / +' + F.k(e.st.aP) : '–'; } },
+
+      { k: 'tod', label: S.w === 'tape' ? 'Settled C\u00a0:\u00a0P' : 'Today C\u00a0:\u00a0P', cls: 'c-tod', tip: 'Calls : puts opened on the ' + F.day(D.latest) + ' settle (the newest); muted = the previous settle while the newest fills in',
+        v: function (e) { var t = todayParts(e); return t && t.share != null ? (S.side === 'P' ? 1 - t.share : t.share) : null; },
+        f: function (e) { return SKT.todayCell(e.sym, { sub: false, w: 56 }); } },
       { k: 'net', label: 'Net · of book', num: true, v: function (e) { return colVal(e, 'net'); }, f: function (e) { return e.st && isNum(e.st.net) ? F.sk(e.st.net) + (isNum(e.st.pct) ? ' · ' + F.pct(Math.abs(e.st.pct)) : '') : '–'; } },
       { k: 'one', label: 'One-sided', num: true, v: function (e) { return oneOf(e.st); }, f: function (e) { return pc0(oneOf(e.st)); } },
       { k: 'usd', label: '$ opened', num: true, v: function (e) { return premOf(e.st, e.side); }, f: function (e) { return F.usd(premOf(e.st, e.side)); } },
@@ -1954,9 +2019,16 @@
     var sorted = U.sortRows(list, col.v, dir), pages = Math.max(1, Math.ceil(sorted.length / 200));
     if (browsePage >= pages) browsePage = 0;
     var page = sorted.slice(browsePage * 200, browsePage * 200 + 200);
-    box.appendChild(el('p', 'bd-snote', F.num(sorted.length) + ' names · page ' + (browsePage + 1) + ' of ' + pages));
-    box.appendChild(U.table(cols, page, { sort: { k: k, dir: dir }, onSort: sortBy, cls: 'bd-browse',
-      onRow: function (e, tr) { tr.dataset.sym = e.sym; tr.tabIndex = 0; tr.classList.add('br'); } }));
+    var lateD = {};
+    page.forEach(function (e) { var t = todayParts(e); if (t && t.late) lateD[t.day] = 1; });
+    var lds = Object.keys(lateD).sort().map(function (d) { return F.dayShort(d); });
+    box.appendChild(el('p', 'bd-snote', F.num(sorted.length) + ' names · page ' + (browsePage + 1) + ' of ' + pages +
+      (lds.length ? ' · muted ' + (S.w === 'tape' ? 'Settled' : 'Today') + ' C : P = the ' + lds.join(' / ') + ' reading while ' + F.dayShort(D.latest) + ' fills in' : '')));
+    var bt = U.table(cols, page, { sort: { k: k, dir: dir }, onSort: sortBy, cls: 'bd-browse',
+      onRow: function (e, tr) { tr.dataset.sym = e.sym; tr.tabIndex = 0; tr.classList.add('br'); } });
+    var tth = bt.querySelector('thead th.c-tod');
+    if (tth) tth.appendChild(el('small', 'bd-ths', 'opened ' + (S.w === 'tape' ? 'at the ' : '') + F.dayShort(D.latest)));
+    box.appendChild(bt);
     if (pages > 1) {
       var pg = el('div', 'bd-pager');
       for (var i = 0; i < pages; i++) (function (i) { var b = el('button', 'chip' + (i === browsePage ? ' on' : ''), String(i + 1)); b.type = 'button'; b.addEventListener('click', function () {
@@ -2102,6 +2174,39 @@
     }
     if (H.end) safe('home end', function () { H.end(box); });
   }
+
+
+  function cpsToday(rows) {
+    var seen = {}, fr = { c: 0, p: 0, n: 0 }, lt = { c: 0, p: 0, n: 0, day: null }, all = 0;
+    rows.forEach(function (e) {
+      if (seen[e.sym]) return;
+      seen[e.sym] = 1; all++;
+      var t = todayParts(e);
+      if (!t) return;
+      var g = t.late ? lt : fr;
+      g.c += t.c; g.p += t.p; g.n++;
+      if (t.late && !lt.day) lt.day = t.day;
+    });
+    var use = fr.n ? fr : lt, late = !fr.n;
+    if (!use.n) return null;
+    var c = use.c, p = use.p, day = late ? lt.day : D.latest;
+    var cls = late ? 'mut' : c > 0 && p > 0 ? (c >= 2 * p ? 'up' : p >= 2 * c ? 'down' : '') : c > 0 ? 'up' : p > 0 ? 'down' : 'mut';
+    var t = c > 0 && p > 0 ? ratioTxt(c, p) : c > 0 ? 'calls only' : p > 0 ? 'puts only' : 'no change';
+    var box = el('div', 'cps-tod' + (late ? ' late' : ''));
+    var hd = el('div', 'ct');
+    hd.appendChild(sp('k', (late ? F.dayShort(day) : 'Today') + ' '));
+    hd.appendChild(el('b', cls || null, t));
+    hd.appendChild(sp('s', late ? ' opened on that settle · ' + F.dayShort(D.latest) + ' not in yet' : ' opened on the ' + F.dayShort(day) + ' settle'));
+    box.appendChild(hd);
+    var bar = el('div', 'cps-bar');
+    bar.appendChild(U.splitBar(c, p, { mid: true, h: 8, cls: 'wide', thin: late }));
+    box.appendChild(bar);
+    var note = F.sk(c) + ' calls · ' + F.sk(p) + ' puts across ' + F.num(use.n) + ' of the ' + F.num(all) + ' names';
+    if (!late && lt.n) note += '; ' + F.num(lt.n) + (lt.n === 1 ? ' name' : ' names') + ' not in yet for ' + F.dayShort(D.latest);
+    box.appendChild(el('p', 'mut', note + '.'));
+    U.tip(box, 'Calls and puts opened on the ' + F.day(day) + ' settle, every expiry still open, added up over the names shown' + (late ? '' : ' that have it') + '.');
+    return box;
+  }
   function cpsBody(rows) {
     var w = el('div', 'bd-cps'), aC = 0, aP = 0, oC = 0, oP = 0, h0C = 0, h0P = 0, hnC = 0, hnP = 0, nh0 = 0;
     var items = rows.map(function (e) {
@@ -2124,6 +2229,8 @@
     w.appendChild(el('p', 'mut', F.num(oC) + ' calls · ' + F.num(oP) + ' puts held across these names' + (s0all != null ? '; the white tick is ' +
       (part ? 'the call share of the ' + F.num(nh0) + ' names settled on ' + F.dayShort(D.latest) + ' at the ' + F.dayShort(per(S.w).base) + ' settle (' + pc0(s0all) + '; ' + pc0(share(hnC, hnP)) + ' now)'
         : 'their call share at the ' + F.dayShort(per(S.w).base) + ' settle (' + pc0(s0all) + ')') : '') + '.'));
+    var tdl = cpsToday(rows);
+    if (tdl) w.appendChild(tdl);
     var hasH = items.some(function (x) { return x.mv != null; });
     var list = hasH ? items.filter(function (x) { return x.mv != null; }).sort(function (a, b) { return Math.abs(b.mv) - Math.abs(a.mv); }) : items.filter(function (x) { return x.now != null; }).sort(function (a, b) { return (b.ad || 0) - (a.ad || 0); });
     var g = el('div', 'cps-rows');

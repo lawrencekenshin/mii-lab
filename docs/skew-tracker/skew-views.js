@@ -136,6 +136,68 @@
     return w;
   }
 
+
+  function todOf(sym) { return typeof SKT.todayCP === 'function' ? SKT.todayCP(sym) : null; }
+  function todShare(sym, side) {
+    var t = todOf(sym);
+    if (!t || t.share == null) return null;
+    return side === 'P' ? 1 - t.share : t.share;
+  }
+  function todDay() { return SKT.D && SKT.D.latest ? fmt().dayShort(SKT.D.latest) : ''; }
+  function todCell(sym, opts) {
+    if (typeof SKT.todayCell === 'function') return SKT.todayCell(sym, opts);
+    return el('span', 'mut', '–');
+  }
+  function todMini(sym) { return todCell(sym, { sub: false, label: 'Today', w: 56 }); }
+
+  function todRatio(sym, opts) {
+    opts = opts || {};
+    var t = todOf(sym), w = el('span', 'vx-tdr' + (opts.cls ? ' ' + opts.cls : ''));
+    if (!t) return null;
+    if (opts.label !== false) w.appendChild(el('span', 'vx-tdk', (t.late ? fmt().dayShort(t.day) : opts.label || 'Today') + ' '));
+    w.appendChild(el('b', t.late ? 'mut' : t.cls, t.txt));
+    if (opts.tip !== false) SKT.ui.tip(w, t.tip);
+    return w;
+  }
+
+  function todLegend(syms, lead) {
+    var late = {}, f = fmt();
+    syms.forEach(function (sym) { var t = todOf(sym); if (t && t.late) late[t.day] = 1; });
+    var ds = Object.keys(late).sort();
+    return el('p', 'src vx-tdsrc', lead + ' = calls : puts opened on the ' + todDay() + ' settle' +
+      (ds.length ? '; muted = the ' + ds.map(function (d) { return f.dayShort(d); }).join(' / ') + ' reading while ' + todDay() + ' fills in' : '') + '.');
+  }
+
+  function tkTod(sym, side, opts) {
+    opts = opts || {};
+    var b = tk(sym, side, opts), t = todOf(sym);
+    if (!t) return b;
+    b.appendChild(el('span', 'vx-tkr ' + (t.late ? 'mut' : t.cls), t.txt));
+    var head0 = opts.tip || nameOf(sym);
+    SKT.ui.tip(b, (head0 ? head0 + ' · ' : '') + (t.late ? fmt().dayShort(t.day) : 'Today') + ' C : P ' + t.txt + '. ' + t.tip);
+    return b;
+  }
+
+
+
+  function todCol(symOf, sideOf) {
+    return { k: 'tod', label: 'Today C\u00a0:\u00a0P', sub: 'opened ' + todDay(), cls: 'vx-tdc',
+      cardLabel: function (x) { var t = todOf(symOf(x)); return (t && t.late ? fmt().dayShort(t.day) : 'Today') + ' opened'; },
+      tip: 'Calls : puts opened on the newest settle (' + todDay() + '), whatever the window; muted = the previous settle while the newest fills in',
+      v: function (x) { return todShare(symOf(x), sideOf(x)); }, f: function (x) { return todCell(symOf(x), { w: 56, sub: false }); },
+      cf: function (x) { return todCell(symOf(x), { w: 84 }); } };
+  }
+
+  function todLate(syms) { return syms.some(function (sym) { var t = todOf(sym); return !!(t && t.late); }); }
+
+  function cpTxt(c, p) {
+    c = +c || 0; p = +p || 0;
+    if (c > 0 && p > 0) { var hi = Math.max(c, p), lo = Math.min(c, p); return fmt().ratio(c, p, hi / lo >= 10 ? 0 : 1); }
+    return c > 0 ? 'calls only' : p > 0 ? 'puts only' : c || p ? 'both down' : 'no change';
+  }
+  function cpCls(c, p) { c = +c || 0; p = +p || 0; return c > 0 && p > 0 ? (c >= 2 * p ? 'up' : p >= 2 * c ? 'down' : '') : c > 0 ? 'up' : p > 0 ? 'down' : 'mut'; }
+  function cpShare(c, p, side) { c = +c || 0; p = +p || 0; if (c + p <= 0) return null; return side === 'P' ? p / (c + p) : c / (c + p); }
+
   function cellsFor(sym, sessions, opts) {
     opts = opts || {};
     var r = SKT.row(sym), ses = (SKT.D && SKT.D.sessions) || [], idx = {};
@@ -175,8 +237,11 @@
     var frag = el('div', 'vx-dual'), st = sortState();
     var list = sortBy(rows, cols);
     var hasSort = cols.some(function (c) { return c.k && c.k === st.k && c.v; });
-    var tbl = SKT.ui.table(cols, list, { sort: hasSort ? st : null, onSort: onSort, cls: 'vx-desk vx-tbl', empty: opts.empty,
+    var hasTod = cols.some(function (c) { return c.k === 'tod' && c.cls === 'vx-tdc'; });
+    var tbl = SKT.ui.table(cols, list, { sort: hasSort ? st : null, onSort: onSort, cls: 'vx-desk vx-tbl' + (hasTod ? ' vx-tdt' : ''), empty: opts.empty,
       rowCls: opts.rowCls });
+    var ths = tbl.querySelectorAll('thead th');
+    cols.forEach(function (c, i) { if (c.sub && ths[i]) ths[i].appendChild(el('small', 'vx-ths', c.sub)); });
     frag.appendChild(tbl);
     var cards = el('div', 'vx-cards');
     var sortable = cols.filter(function (c) { return c.k && c.v && c.sort !== false; });
@@ -202,11 +267,12 @@
     cols.forEach(function (col) {
       if (col.card === 'skip') return;
       var v;
-      try { v = col.f ? col.f(r) : col.v ? col.v(r) : null; } catch (e) { v = null; }
+      try { v = col.cf ? col.cf(r) : col.f ? col.f(r) : col.v ? col.v(r) : null; } catch (e) { v = null; }
       if (v == null || v === '') return;
       if (col.card === 'head') { add(hd, typeof v === 'string' || typeof v === 'number' ? el('span', 'vx-chx', String(v)) : v); return; }
       if (col.card === 'wide') { add(c, add(el('div', 'vx-cw'), v)); return; }
-      kv.appendChild(el('span', 'vx-k', col.label));
+      var kl = typeof col.cardLabel === 'function' ? col.cardLabel(r) : col.cardLabel;
+      kv.appendChild(el('span', 'vx-k', kl || col.label));
       kv.appendChild(add(el('span', 'vx-v'), v));
     });
     c.insertBefore(hd, c.firstChild);
@@ -226,13 +292,14 @@
     safe(bar);
     if (S.v) safe(function () { render(S.v, S.vp); });
   }
-  var searchAsked = false;
+  var searchAsked = false, searchFail = false;
   function wantSearch() {
     if (SKT.SEARCH || searchAsked || !SKT.loadSearch) return;
     searchAsked = true;
-    SKT.loadSearch().then(function () { searchAsked = false; refresh(); }, function () {  });
+    SKT.loadSearch().then(function () { searchAsked = false; searchFail = false; refresh(); },
+      function () { searchFail = true; refresh();  });
   }
-  SKT.on && SKT.on('data', function () { vErr = null; searchAsked = false; });
+  SKT.on && SKT.on('data', function () { vErr = null; searchAsked = false; searchFail = false; });
 
 
   var DEFS = [
@@ -367,7 +434,7 @@
     (c.flipped || []).forEach(function (x) { if (x && inL(x[0]) && (ss.indexOf(x[1]) >= 0 || ss.indexOf(x[2]) >= 0)) FL.push({ sym: x[0], from: x[1], to: x[2] }); });
     J.sort(function (a, b) { return (a.r || 999) - (b.r || 999); });
     M.sort(function (a, b) { return Math.abs(b.d) - Math.abs(a.d); });
-    if (LF.some(function (x) { return !SKT.row(x.sym); })) wantSearch();
+    if (LF.concat(NJ).some(function (x) { return !SKT.row(x.sym); })) wantSearch();
     var both = ss.length > 1;
 
     var tiles = el('div', 'vx-tiles');
@@ -380,6 +447,7 @@
     } else tiles.appendChild(tile('Biggest rank move', '–', 'no rank moved'));
     tiles.appendChild(tile('Flipped side', String(FL.length), FL.length ? FL.slice(0, 3).map(function (x) { return x.sym; }).join(' · ') : 'none'));
     root.appendChild(tiles);
+    root.appendChild(todLegend(J.concat(LF, M, FL).map(function (x) { return x.sym; }), 'Today on each row'));
     var grid = el('div', 'vx-grid');
 
     var sj = section('Joined', J.length, 'vx-s-join', 'Ranked now, not on the list at the ' + f.dayShort(V.prev) + ' settle');
@@ -390,6 +458,7 @@
       li.appendChild(el('span', 'vx-rk', isNum(x.r) ? '#' + x.r : ''));
       li.appendChild(stock(x.sym));
       if (both) li.appendChild(sidePill(x.s));
+      li.appendChild(todMini(x.sym));
       return li;
     });
     grid.appendChild(sj);
@@ -402,6 +471,7 @@
       li.appendChild(el('span', 'vx-rk mut', isNum(x.pr) ? 'was #' + x.pr : ''));
       li.appendChild(stock(x.sym));
       if (both) li.appendChild(sidePill(x.s));
+      li.appendChild(todMini(x.sym));
       if (x.why) li.appendChild(el('span', 'vx-why', x.why));
       return li;
     });
@@ -415,6 +485,7 @@
       li.appendChild(stock(x.sym));
       if (both) li.appendChild(sidePill(x.s));
       li.appendChild(el('span', 'vx-rr', '#' + x.pr + ' → #' + x.r));
+      li.appendChild(todMini(x.sym));
       sm.appendChild(li);
     });
     grid.appendChild(sm);
@@ -429,6 +500,7 @@
       t.appendChild(document.createTextNode(' → '));
       t.appendChild(el('span', x.to === 'P' ? 'down' : 'up', sideWord(x.to)));
       li.appendChild(t);
+      li.appendChild(todMini(x.sym));
       sf.appendChild(li);
     });
     grid.appendChild(sf);
@@ -437,8 +509,9 @@
     if (NJ.length) {
       var sn = section('Not judged today', NJ.length, 'vx-s-nj vx-wide', 'On the list at the previous settle, with no reading on the newest one yet');
       sn.appendChild(el('p', 'src', 'On the list at the ' + f.dayShort(V.prev) + ' settle with no reading on the newest settle yet (it may still be filling in), so not judged.'));
+      sn.appendChild(todLegend(NJ.map(function (x) { return x.sym; }), 'The ratio on a chip'));
       var chips = el('div', 'vx-tks');
-      capped(chips, NJ, 80, function (x) { return tk(x.sym, x.s); });
+      capped(chips, NJ, 80, function (x) { return tkTod(x.sym, x.s); });
       sn.appendChild(chips);
       root.appendChild(sn);
     }
@@ -467,6 +540,8 @@
     var rows = [];
     ss.forEach(function (s) { rows = rows.concat(entries(blk, s)); });
     if (rows.some(function (x) { return !SKT.row(x.e[0]); })) wantSearch();
+    var tdSyms = rows.map(function (x) { return x.e[0]; });
+    if (todLate(tdSyms)) root.appendChild(todLegend(tdSyms, 'Today C : P'));
     var both = ss.length > 1;
     function cnt(x) { return (x.e[1] || []).reduce(function (a, b) { return a + (b ? 1 : 0); }, 0); }
     function status(x) {
@@ -511,6 +586,7 @@
           '): touched = the price reached it at or after its first ranked day; short = how far it still has to go');
         return w3;
       } },
+      todCol(function (x) { return x.e[0]; }, function (x) { return x.s; }),
       { k: 'held', label: 'Held calls : puts', num: true, v: function (x) { return heldShare(x.e[0]); }, f: function (x) { return heldCell(x.e[0], x.e[9]); } },
       { k: 'biz', label: 'Business', num: true, v: function (x) { var r = SKT.row(x.e[0]); return r ? r.biz : null; }, f: function (x) { return bizCell(x.e[0]); } }
     ].filter(Boolean);
@@ -530,8 +606,62 @@
     var cut = s.slice(0, 17), i = cut.lastIndexOf(' ');
     return (i > 8 ? cut.slice(0, i) : cut).replace(/[ &,]+$/, '') + '…';
   }
+
+
+  var CT = { key: null, by: {} };
+  function crowdToday(id) {
+    var D = SKT.D, ready = !!SKT.SEARCH || searchFail, key = (D ? D.generated : '') + '|' + (SKT.SEARCH ? 1 : 0) + '|' + (searchFail ? 1 : 0);
+    if (!ready) return undefined;
+    if (CT.key !== key) {
+      CT = { key: key, by: {} };
+      var seen = {};
+      [D && D.rows, SKT.SEARCH && SKT.SEARCH.rows].forEach(function (rows) {
+        if (!rows) return;
+        Object.keys(rows).forEach(function (sym) {
+          var cw = rows[sym] && rows[sym].cw;
+          if (seen[sym] || !Array.isArray(cw) || !cw.length) return;
+          seen[sym] = 1;
+          var t = todOf(sym);
+          cw.forEach(function (cid) {
+            var o = CT.by[cid] || (CT.by[cid] = { c: 0, p: 0, n: 0, lc: 0, lp: 0, ln: 0, lday: null, tot: 0 });
+            o.tot++;
+            if (!t) return;
+            if (t.late) { o.lc += t.c; o.lp += t.p; o.ln++; if (!o.lday || t.day > o.lday) o.lday = t.day; }
+            else { o.c += t.c; o.p += t.p; o.n++; }
+          });
+        });
+      });
+    }
+    return CT.by[id] || null;
+  }
+  function crowdTodShare(c, side) {
+    var o = crowdToday(c.id);
+    if (!o) return null;
+    return o.n ? cpShare(o.c, o.p, side) : o.ln ? cpShare(o.lc, o.lp, side) : null;
+  }
+  function crowdTodCell(c) {
+    var f = fmt(), ui = SKT.ui, d = el('div', 'vx-c-tod'), o = crowdToday(c.id), L = SKT.D && SKT.D.latest;
+    d.appendChild(el('span', 'vx-k', 'Today C : P'));
+    if (o === undefined) { d.appendChild(el('span', 'mut', '…')); return d; }
+    if (!o || (!o.n && !o.ln)) { d.appendChild(el('span', 'mut', '–')); ui.tip(d, f.day(L) + ': no member reading yet'); return d; }
+    var late = !o.n, cc = late ? o.lc : o.c, pp = late ? o.lp : o.p, day = late ? o.lday : L;
+    var v = el('span', 'vx-ctv');
+    if (late) v.appendChild(el('span', 'vx-tdk', f.dayShort(day) + ' '));
+    v.appendChild(el('b', late ? 'mut' : cpCls(cc, pp), cpTxt(cc, pp)));
+    d.appendChild(v);
+    d.appendChild(ui.splitBar(cc, pp, { w: 84, mid: true, thin: late }));
+    d.appendChild(el('small', 'sub', f.sk(cc) + ' C · ' + f.sk(pp) + ' P'));
+    if (late) d.appendChild(el('small', 'sub v2', f.dayShort(day) + ' · ' + f.dayShort(L) + ' not in yet'));
+    else if (o.ln) d.appendChild(el('small', 'sub v2', o.n + ' of ' + (o.n + o.ln) + ' in'));
+    if (late) d.classList.add('late');
+    ui.tip(d, 'Calls : puts opened on the ' + f.day(day) + ' settle, summed over ' + (late ? o.ln : o.n) + ' of the ' + o.tot + ' members read: ' +
+      f.sk(cc) + ' calls · ' + f.sk(pp) + ' puts, every expiry still open.' +
+      (late ? ' ' + f.day(L) + ' has not landed for any member yet.' : o.ln ? ' ' + o.ln + ' more members have not landed yet and are left out.' : ''));
+    return d;
+  }
   RENDER.crowds = function (root, V) {
     var S = SKT.S, f = fmt(), ui = SKT.ui, w = win(), ss = sides(), all = (V.crowds || []).filter(Boolean);
+    wantSearch();
     var avail = KINDS.filter(function (k) { return all.some(function (c) { return c.kind === k[1]; }); });
     head(root, 'Crowds', 'Sectors, industries and themes: how many members lean ' + (S.side === 'B' ? 'each way' : 'to ' + sideWord(S.side)) +
       ' on the ' + SKT.winLabel(w).toLowerCase() + ' window, and how big the crowd’s net build is against its combined book.');
@@ -584,13 +714,19 @@
       { k: 'net', label: 'Crowd net', v: function (c) { var p = (c.pct || {})[w]; return isNum(p) ? (S.side === 'P' ? -p : p) : null; } },
       { k: 'shr', label: 'Share leaning', v: function (c) { var a = (c.share || {})[w]; if (!a) return null; var n = 0; ss.forEach(function (s) { n += a[s === 'P' ? 1 : 0] || 0; }); return n; } },
       { k: 'med', label: 'Median', tip: 'The middle member’s net build as a share of its own book', v: function (c) { var p = (c.med || {})[w]; return isNum(p) ? (S.side === 'P' ? -p : p) : null; } },
+      { k: 'tod', label: 'Today C : P', tip: 'Calls : puts opened on the newest settle (' + todDay() + '), summed over the crowd’s members', v: function (c) { return crowdTodShare(c, S.side === 'P' ? 'P' : 'C'); } },
       { k: 'spk', label: 'Each session', tip: 'The crowd’s daily net as a share of its book, last 21 sessions', sort: false },
       { k: 'wd', label: 'Moving', sort: false }
     ];
     var st = sortState(), sorted = list.slice().sort(function (a, b) { return ((a.rank || {})[w] || 999) - ((b.rank || {})[w] || 999); });
     if (st.k && cols.some(function (c) { return c.k === st.k && c.v; })) sorted = sortBy(sorted, cols);
+    var memSyms = [];
+    sorted.forEach(function (c) { ss.forEach(function (s) { (((c.syms || {})[w] || {})[s] || []).forEach(function (sym) { if (inL(sym)) memSyms.push(sym); }); }); });
+    root.appendChild(todLegend(memSyms, 'Today C : P (summed over each crowd’s members) and the ratio on a member chip'));
     var sec = el('div', 'vx-crowds');
-    sec.appendChild(SKT.ui.hdrSort(cols, st.k, st.dir, onSort, { cls: 'vx-crh' }));
+    var crh = SKT.ui.hdrSort(cols, st.k, st.dir, onSort, { cls: 'vx-crh' }), ti = cols.map(function (c) { return c.k; }).indexOf('tod');
+    if (ti >= 0 && crh.children[ti]) crh.children[ti].appendChild(el('small', 'vx-ths', 'opened ' + todDay()));
+    sec.appendChild(crh);
     sorted.forEach(function (c) { sec.appendChild(crowdRow(c, w, ss)); });
     root.appendChild(sec);
   };
@@ -620,7 +756,7 @@
       var line = el('div', 'vx-c-ml');
       line.appendChild(el('span', 'vx-c-n ' + (s === 'P' ? 'down' : 'up'), n + ' ' + (s === 'P' ? 'put' : 'call') + (n === 1 ? '' : 's')));
       var shown = syms.filter(inL);
-      shown.forEach(function (sym) { line.appendChild(tk(sym, s, { on: true })); });
+      shown.forEach(function (sym) { line.appendChild(tkTod(sym, s, { on: true })); });
       if (n > syms.length) line.appendChild(el('span', 'mut vx-c-more', '+' + (n - syms.length) + ' more'));
       if (!n) line.appendChild(el('span', 'mut', 'none ranked'));
       memb.appendChild(line);
@@ -644,6 +780,7 @@
     ui.tip(sh, 'Share of the crowd’s tracked members ranked on ' + sideWord(ss.length > 1 ? 'B' : ss[0]) + ' in this window');
     row.appendChild(sh);
     row.appendChild(numCell('vx-c-med', 'Median member', (c.med || {})[w], 'The middle member’s net build as a share of its own book', true));
+    row.appendChild(crowdTodCell(c));
     var sp = el('div', 'vx-c-spk');
     if (Array.isArray(c.spark) && c.spark.length) {
       sp.appendChild(ui.spark(c.spark, { w: 126, h: 26 }));
@@ -763,6 +900,15 @@
       'call share of its ranked names ' + f.pct(p.x, 0) + ' · ' + (Math.round(Math.abs(p.y) * 100) === 0 ? '' : p.y > 0 ? '+' : '−') + Math.round(Math.abs(p.y) * 100) + ' pts vs a week earlier'));
     var word = (c.word || {})[w];
     if (word) { ro.appendChild(document.createTextNode(' · ')); ro.appendChild(el('span', 'vx-q q-' + (WORD_CLS[word] || ''), word)); }
+    var o = crowdToday(c.id);
+    if (o && (o.n || o.ln)) {
+      var late = !o.n, cc = late ? o.lc : o.c, pp = late ? o.lp : o.p, t2 = el('span', 'vx-tdr');
+      t2.appendChild(el('span', 'vx-tdk', (late ? f.dayShort(o.lday) : 'Today') + ' '));
+      t2.appendChild(el('b', late ? 'mut' : cpCls(cc, pp), cpTxt(cc, pp)));
+      t2.appendChild(el('span', 'mut', ' summed over ' + (late ? o.ln : o.n) + ' members'));
+      ro.appendChild(document.createTextNode(' · '));
+      ro.appendChild(t2);
+    }
   }
   function hoverDev() { try { return matchMedia('(hover: hover)').matches; } catch (e) { return true; } }
   function quadEvents(h) {
@@ -988,6 +1134,8 @@
           var b = el('button', 'vx-mk ' + (p.s === 'P' ? 'p' : 'c'), ''); b.type = 'button';
           b.appendChild(el('span', 'vx-mkn', String(p.no)));
           b.appendChild(document.createTextNode(' ' + p.sym));
+          var t = todOf(p.sym);
+          if (t) { b.appendChild(el('span', 'vx-tkr ' + (t.late ? 'mut' : t.cls), t.txt)); SKT.ui.tip(b, p.sym + ' · ' + (t.late ? fmt().dayShort(t.day) : 'Today') + ' C : P ' + t.txt + '. ' + t.tip); }
           b.setAttribute('aria-label', 'Gold dot ' + p.no + ': ' + p.sym + ', open it');
           b.addEventListener('click', function () { open(p.sym); });
           kb.appendChild(b);
@@ -1028,6 +1176,8 @@
     var nm = nameOf(p.sym) ? ' ' + nameOf(p.sym) : '';
     ro.appendChild(document.createTextNode(nm + ' · ' + W2.lean + ' · ' + (SKT.oneWords(st, p.s, false) || 'one-sided ' + f.pct(p.x, 1)) + ' · net ' + f.sk(st.net) + ' = ' + f.pct(p.y, 1) +
       ' of its book · book ' + f.k(p.bk) + ' contracts '));
+    var td = todRatio(p.sym);
+    if (td) { ro.appendChild(document.createTextNode('· ')); ro.appendChild(td); ro.appendChild(document.createTextNode(' ')); }
     var b = el('button', 'linkbtn vx-ro-open', 'Open ' + p.sym + ' ›'); b.type = 'button';
     b.addEventListener('click', function () { open(p.sym); });
     ro.appendChild(b);
@@ -1133,7 +1283,7 @@
         if (!syms.length) return;
         any = true;
         var line = el('div', 'vx-tks');
-        syms.forEach(function (sym) { line.appendChild(tk(sym, s, { on: !!ranked[s + sym], tip: tipFor(sym, c.d), day: c.d })); });
+        syms.forEach(function (sym) { line.appendChild(tkTod(sym, s, { on: !!ranked[s + sym], tip: tipFor(sym, c.d), day: c.d })); });
         col.appendChild(line);
       });
       if (!any) col.appendChild(el('span', 'mut vx-dnone', '–'));
@@ -1151,7 +1301,7 @@
         var line = el('div', 'vx-tks');
         syms.forEach(function (sym) {
           var tr = D.tape.rows && D.tape.rows[sym], must = tr ? tr[s === 'P' ? 'fP' : 'fC'] : null;
-          line.appendChild(tk(sym, s, { on: !!ranked[s + sym], tip: (nameOf(sym) ? nameOf(sym) + ' · ' : '') + 'traded ' + f.day(D.tape.T) +
+          line.appendChild(tkTod(sym, s, { on: !!ranked[s + sym], tip: (nameOf(sym) ? nameOf(sym) + ' · ' : '') + 'traded ' + f.day(D.tape.T) +
             (isNum(must) ? ': ' + f.sk(must) + ' ' + (s === 'P' ? 'puts' : 'calls') + ' must be new' : '') }));
         });
         tc.appendChild(line);
@@ -1160,6 +1310,10 @@
       grid.appendChild(tc);
     }
     if (!cols.length && !D.tape) { root.appendChild(ui.note('No sessions in this window yet.', 'muted')); return; }
+    var shownSyms = [];
+    Array.prototype.forEach.call(grid.querySelectorAll('.vx-tk'), function (b) { shownSyms.push(b.firstChild ? b.firstChild.nodeValue : ''); });
+    if (shownSyms.some(function (sym) { return sym && !SKT.row(sym); })) wantSearch();
+    root.appendChild(todLegend(shownSyms.filter(Boolean), 'The ratio on each chip (in every column)'));
     root.appendChild(grid);
   };
 
@@ -1172,6 +1326,9 @@
     head(root, title, 'ON = every check passes; Almost = one check is missing (named on the row). Read on the 1 week window.');
     var line = EXT.preLine ? safe(EXT.preLine) : '';
     if (line) root.appendChild(el('p', 'src vx-preline', line));
+    var preSyms = [];
+    ss.forEach(function (s) { (P[s] || []).forEach(function (e) { if (e && inL(e[0])) preSyms.push(e[0]); }); });
+    if (todLate(preSyms)) root.appendChild(todLegend(preSyms, 'Today C : P'));
     var ses = sessionsOf('1w');
     var any = false;
     ss.forEach(function (s) {
@@ -1207,6 +1364,7 @@
             if (st && isNum(st.ret)) w3.appendChild(el('span', 'mut', f.spct(st.ret)));
             return w3;
           } },
+          todCol(function (x) { return x.sym; }, function (x) { return x.s; }),
           { k: 'held', label: 'Held calls : puts', num: true, v: function (x) { return heldShare(x.sym); }, f: function (x) { return heldCell(x.sym); } },
           { k: 'biz', label: 'Business', num: true, v: function (x) { var r = SKT.row(x.sym); return r ? r.biz : null; }, f: function (x) { return bizCell(x.sym); } }
         ].filter(Boolean);

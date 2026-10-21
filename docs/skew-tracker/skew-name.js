@@ -258,6 +258,13 @@
     } else if (c.has) {
       add(one, [el('b', st.near ? 'amber' : 'down', st.near ? 'Near miss' : 'Not ranked'), ' on ' + winShort(w) + ' ' + sideW(c.lean) + (st.why ? ': ' + st.why : '')]);
     } else add(one, [el('b', 'mut', 'No reading'), ' on ' + winShort(w)]);
+    var td = SKT.todayCP(c.sym);
+    if (td) {
+      var ts = el('span', 'nv-rtod' + (td.late ? ' late' : ''));
+      add(ts, [' · ', el('span', 'mut', td.late ? F().dayShort(td.day) + ' ' : 'today '), el('b', td.late ? 'mut' : td.cls || 'flat', td.txt)]);
+      if (td.late && D.latest) add(ts, el('span', 'mut', ' · ' + F().dayShort(D.latest) + ' not in yet'));
+      add(one, tip(ts, td.tip));
+    }
     b.appendChild(one);
     var others = [];
     WINS.forEach(function (x) {
@@ -1146,12 +1153,20 @@
     var S = SKT.S, syms = stepList(), w = S.w === 'tape' ? '1d' : S.w;
     var h = el('div', 'nv-lh');
     add(h, [el('span', null, F().num(syms.length) + ' ' + (S.side === 'P' ? 'put' : S.side === 'B' ? '' : 'call') + (S.side === 'B' ? 'ranked' : '-leaning') + ' · ' + winShort(S.w)), el('span', 'mut', 'of book')]);
+    var LD = SKT.D && SKT.D.latest;
+    add(h, tip(el('span', 'nv-lh2', 'Under ticker: Today C : P' + (LD ? ' · opened ' + F().dayShort(LD) : '')),
+      'Calls : puts opened on the newest settle' + (LD ? ' (' + F().day(LD) + ')' : '') + ', whatever the window. Grey = that name’s newest settle has not landed yet; the previous settle’s reading is shown.'));
     box.appendChild(h);
+    function todTag(s) {
+      var t = SKT.todayCP(s);
+      if (!t) return tip(el('span', 'nv-ltd mut', '–'), (LD ? F().day(LD) + ': ' : '') + 'no reading for ' + s + ' yet');
+      return tip(el('span', 'nv-ltd ' + (t.late ? 'mut late' : t.cls || 'flat'), t.txt), t.tip);
+    }
     function item(s, i) {
       var r = SKT.row(s) || {}, st = (r.w && r.w[w]) || {};
       var b = el('button', 'nv-li' + (s === sym ? ' sel' : ''));
       b.type = 'button';
-      add(b, [el('span', 'mut nv-lr', i ? String(i) : ''), el('span', 'nv-lt', s)]);
+      add(b, [el('span', 'mut nv-lr', i ? String(i) : ''), el('span', 'nv-ln', [el('span', 'nv-lt', s), todTag(s)])]);
       var gl = SKT.ui.glyph(st.gb, { w: 92, h: 22 });
       b.appendChild(gl);
       add(b, el('span', 'nv-lv ' + (st.side === 'P' ? 'down' : 'up'), isNum(st.pct) ? F().pct(Math.abs(st.pct), 1) : ''));

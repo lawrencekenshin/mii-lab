@@ -37,6 +37,19 @@
 .nv-li .glyph{width:100%;height:22px}
 .nv-li .nv-lv{text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums}
 
+.nv-lh{flex-wrap:wrap;row-gap:2px}
+.nv-lh .nv-lh2{flex:1 0 100%;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.nv-li{padding-top:3px;padding-bottom:3px}
+.nv-li .nv-ln{display:flex;flex-direction:column;justify-content:center;align-self:stretch;min-width:0;line-height:1.1;background:var(--panel2)}
+.nv-li .nv-ln .nv-lt{background:none}
+.nv-li .nv-ltd{font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)}
+.nv-li .nv-ltd.up{color:var(--up)} .nv-li .nv-ltd.down{color:var(--down)} .nv-li .nv-ltd.mut{color:var(--muted);font-weight:500}
+.nv-li .nv-ltd.flat{color:var(--white)}
+.nv-rtod{white-space:nowrap}
+.nv-r1 .nv-rtod b{font-size:14px;font-weight:650;font-variant-numeric:tabular-nums}
+.nv-r1 .nv-rtod b.flat{color:var(--white)}
+@media (max-width:419px){.nv-rtod{white-space:normal}}
+
 
 .nv-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
 .nv-ph3{display:flex;align-items:baseline;justify-content:space-between;gap:4px 10px;flex-wrap:wrap;margin-bottom:6px}

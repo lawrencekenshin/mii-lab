@@ -149,10 +149,15 @@
 
 
 
+
+
+
+
+
 (function () {
   'use strict';
   var SKT = window.SKT = window.SKT || {};
-  SKT.V = '20261020g';
+  SKT.V = '20261021b';
   SKT.LIVE_SITE = location.hostname === 'lawrencekenshin.github.io';
   SKT.BASE = SKT.LIVE_SITE ? 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/skew-tracker-data/skew-tracker/' : 'snap/';
   SKT.HOME = false;
@@ -511,6 +516,49 @@
   };
   SKT.oneSided = function (st) { var a = SKT.addShare(st, 'C'); return a == null ? null : Math.max(a, 1 - a); };
   SKT.netShare = function (st, sd) { return st && isNum(st.skn) ? (sd === 'P' ? 1 - st.skn : 1 + st.skn) / 2 : null; };
+
+
+  function addRatio(c, p) {
+    c = +c || 0; p = +p || 0;
+    if (c > 0 && p > 0) { var hi = Math.max(c, p), lo = Math.min(c, p); return SKT.fmt.ratio(c, p, hi / lo >= 10 ? 0 : 1); }
+    return c > 0 ? 'calls only' : p > 0 ? 'puts only' : c || p ? 'both down' : 'no change';
+  }
+  function addLean(c, p) { c = +c || 0; p = +p || 0; return c > 0 && p > 0 ? (c >= 2 * p ? 'up' : p >= 2 * c ? 'down' : '') : c > 0 ? 'up' : p > 0 ? 'down' : 'mut'; }
+  SKT.todayCP = function (sym) {
+    var D = SKT.D, r = SKT.row(sym), F = SKT.fmt;
+    if (!D || !r) return null;
+    var L = D.latest, ses = D.sessions || [], i = -1, j, x;
+    for (j = ses.length - 1; j >= 0; j--) if (ses[j] && ses[j][0] === L) { i = j; break; }
+    var at = function (k) { var y = k >= 0 ? (r.d || [])[k] : null; return y && (isNum(y[2]) || isNum(y[3])) ? y : null; };
+    var w1 = r.w && r.w['1d'], c = null, p = null, day = L, late = false, joined = 1;
+    if (w1 && (isNum(w1.aC) || isNum(w1.aP))) { c = w1.aC; p = w1.aP; x = at(i); if (x && x[0] > 1) joined = x[0]; }
+    else if ((x = at(i))) { c = x[2]; p = x[3]; joined = x[0] || 1; }
+    else if (i > 0 && (x = at(i - 1))) { c = x[2]; p = x[3]; day = ses[i - 1][0]; late = true; joined = x[0] || 1; }
+    if (!isNum(c) && !isNum(p)) return null;
+    c = +c || 0; p = +p || 0;
+    var tip = 'Opened on the ' + F.day(day) + ' settle' + (late ? '' : ' (the newest)') + ': ' + F.sk(c) + ' calls · ' + F.sk(p) +
+      ' puts, every expiry still open' + (joined > 1 ? '; this reading covers ' + joined + ' sessions (the days between were not saved)' : '') + '.';
+    if (late) tip += ' ' + F.day(L) + ' has not landed for ' + sym + ' yet.';
+    return { c: c, p: p, txt: addRatio(c, p), cls: addLean(c, p), day: day, late: late, joined: joined, tip: tip,
+             share: c + p > 0 ? c / (c + p) : null };
+  };
+
+
+  SKT.todayCell = function (sym, opts) {
+    opts = opts || {};
+    var U = SKT.ui, F = SKT.fmt, t = SKT.todayCP(sym), w = U.el('span', 'sk-tod');
+    if (!t) { w.appendChild(U.el('span', 'mut', '–')); U.tip(w, F.day(SKT.D && SKT.D.latest) + ': no reading for ' + sym + ' yet'); return w; }
+    if (t.late) w.classList.add('late');
+    var v = U.el('span', 'v');
+    if (opts.label) v.appendChild(U.el('span', 'k', (t.late ? F.dayShort(t.day) : opts.label) + ' '));
+    v.appendChild(U.el('b', t.late ? 'mut' : t.cls, t.txt));
+    w.appendChild(v);
+    w.appendChild(U.splitBar(t.c, t.p, { w: opts.w || 84, mid: true, thin: t.late }));
+    if (opts.sub !== false) w.appendChild(U.el('small', 'sub', F.sk(t.c) + ' C · ' + F.sk(t.p) + ' P'));
+    if (t.late) w.appendChild(U.el('small', 'sub v2', F.dayShort(t.day) + ' · ' + F.dayShort(SKT.D.latest) + ' not in yet'));
+    U.tip(w, t.tip);
+    return w;
+  };
   SKT.oneWords = function (st, sd, net) {
     var a = SKT.addShare(st, sd), o = sd === 'P' ? 'C' : 'P', sw = function (x) { return x === 'P' ? 'puts' : 'calls'; };
     if (a == null) return '';
