@@ -90,7 +90,7 @@ function gexCollapsed() {
 const pubOpen = m => { const s = m && m.session, t = Date.now() / 1000; return !!(s && t >= s.open && t < s.close); };
 const pubDay = ymd => (ymd ? new Date(ymd + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }) : '');
 const cadence = s => (!s ? '2 min' : s < 60 ? s + ' s' : Math.round(s / 60) + ' min');
-const srcName = p => (!p ? '—' : p.source === 'delayed' ? 'delayed ~15 min' : p.source === 'close' ? 'daily close' : p.source === 'finnhub' ? 'real-time feed' : p.source === 'bitstamp' ? 'Bitstamp (live)' : p.source === 'yahoo' ? 'Yahoo' : p.source === 'last daily close' ? 'last close' : (p.source || 'Yahoo'));
+const srcName = p => (!p ? '—' : p.source === 'delayed' ? 'delayed ~15 min' : p.source === 'close' ? 'daily close' : 'last close');
 
 function renderHead() {
   const m = meta || state, bars = (state && state.di && state.di.bars) || [];
@@ -108,7 +108,7 @@ function renderHead() {
   const errs = Object.entries(Object.assign({}, m.errors || {}, (state && state.di && state.di.errors) || {}))
     .map(([k, v]) => `<span class="err">${esc(k)}: ${esc(v)}</span>`).join(' · ');
   const pubTxt = m.published ? ` · updated after each close${m.published.live ? ', this ticker every 15 min in the session (hourly charts after the close)' : ''}` : '';
-  $('ind').innerHTML = `${CLASSIC_PAGE ? 'Classic Indicators · RSI, MACD, Stoch RSI, KDJ, OBV MACD, Williams %R, BB %B, WMSR + GEX' : 'Eagle Eye Technicals · Desktop Integrated + GEX'} · options: ${m.kind === 'crypto' ? 'none yet for crypto' : 'saved Cboe chain ' + (d ? esc(d.build_et) : '—')} · price: ${esc(srcName(m.price))}${m.published ? pubTxt : ', every ' + cadence(m.poll_s)}` +
+  $('ind').innerHTML = `${CLASSIC_PAGE ? 'Classic Indicators · Volume, RSI, MACD, Stoch RSI, KDJ, OBV MACD, Williams %R, BB %B, WMSR + GEX' : 'Eagle Eye Technicals · Desktop Integrated + GEX'} · options: ${m.kind === 'crypto' ? 'none yet for crypto' : 'saved Cboe chain ' + (d ? esc(d.build_et) : '—')} · price: ${esc(srcName(m.price))}${m.published ? pubTxt : ', every ' + cadence(m.poll_s)}` +
     ' · charts: <a class="credit" href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>' +
     (errs ? '<br>' + errs : '');
   const ib = $('infobtn'); if (ib) ib.classList.toggle('err', !!errs);
@@ -472,11 +472,12 @@ function drawClassic(c, cb, g, paneW) {
 }
 
 $('chartbox').addEventListener('mousemove', e => {
-  if (!markerHits.length) { const t = $('mtip'); if (t) t.hidden = true; return; }
+  if (!markerHits.length && !vpDrawn) { const t = $('mtip'); if (t) t.hidden = true; return; }
   const r = $('chartbox').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   let best = null, bd = Infinity;
 
   markerHits.forEach(h => { const d = Math.hypot(h.x - x, h.y - y); if (d <= h.r && d <= bd) { bd = d; best = h; } });
+  if (!best) best = vpTipAt(x, y);
   let t = $('mtip');
   if (!best) { if (t) t.hidden = true; return; }
   if (!t) { t = document.createElement('div'); t.id = 'mtip'; $('chartbox').appendChild(t); }
@@ -484,6 +485,21 @@ $('chartbox').addEventListener('mousemove', e => {
   t.style.left = Math.min(x + 12, r.width - t.offsetWidth - 4) + 'px'; t.style.top = Math.max(0, y - 30) + 'px';
 });
 $('chartbox').addEventListener('mouseleave', () => { const t = $('mtip'); if (t) t.hidden = true; });
+
+
+let vpDrawn = null, vpNoteKey = '';
+function vpSpan() { return null; }
+function vpTipAt() { return null; }
+function drawVolumeProfile() {}
+function drawVpLabels() {}
+
+
+
+function gexX0(g2, labsRaw, paneW, histW) {
+  const labW = Math.max(...labsRaw.map(l => g2.measureText(l[1]).width)) + 24;
+  const anchor = chart.timeScale().logicalToCoordinate(nBars - 1 + 3);
+  return Math.max(0, Math.min(anchor != null ? anchor : 1e9, paneW - histW - labW));
+}
 
 
 function chamfer(g2, x, y, w, h, r) {
@@ -550,6 +566,7 @@ function draw() {
     if (sig !== 'empty') {
       ['under', 'overlay'].forEach(id => { const c = $(id); c.getContext('2d').clearRect(0, 0, c.width, c.height); });
       $('cards').innerHTML = ''; $('maxbtns').innerHTML = ''; $('ohlc').innerHTML = ''; sig = 'empty';
+      vpDrawn = null; if ($('vpnote')) { $('vpnote').hidden = true; vpNoteKey = ''; }
     }
     return;
   }
@@ -587,6 +604,7 @@ function draw() {
       }
     });
   }
+  drawVolumeProfile(cb, paneW, paneH, di);
   if (di.price && di.price.markers && layerOn('dots')) {
     di.price.markers.forEach(m => {
       if (m.price == null || m.i < 0) return;
@@ -641,9 +659,7 @@ function draw() {
     const histW = HISTW();
     c.font = '600 11px -apple-system, BlinkMacSystemFont, Roboto, sans-serif';
     const labsRaw = gexLabels(lv);
-    const labW = Math.max(...labsRaw.map(l => c.measureText(l[1]).width)) + 24;
-    const anchor = ts.logicalToCoordinate(nBars - 1 + 3);
-    const x0 = Math.max(0, Math.min(anchor != null ? anchor : 1e9, paneW - histW - labW));
+    const x0 = gexX0(c, labsRaw, paneW, histW);
 
     const ci = gexBars === 'oi' ? 4 : 2;
     const split = gexBars !== 'net' && lv.strikes.length && lv.strikes[0].length > ci + 1;
@@ -702,6 +718,7 @@ function draw() {
       c.fill(); c.globalAlpha = 1; c.fillStyle = '#131722'; c.fillText(l.t, lx + 6, l.y + 0.5);
     }
   }
+  drawVpLabels(c, paneH);
   c.restore(); cb.restore();
   drawFrames(cb, c, g, dW);
   drawGhosts(c, g, dW);
@@ -741,13 +758,16 @@ async function loadState(force) {
   inflight = true;
   const want = tf, wantS = sym;
   try {
-    const s = await getJSON(api('/api/state?tf=' + encodeURIComponent(want) + (wantN[want] ? '&n=' + wantN[want] : '')));
+    const url = api('/api/state?tf=' + encodeURIComponent(want) + (wantN[want] ? '&n=' + wantN[want] : ''));
+    const s = await getJSON(url);
     lastOkPoll = Date.now();
     if (want !== tf || wantS !== sym) return;
     if (loadedTf !== tf) { structKey = ''; nBars = 0; }
     state = s; version = s.version; loadedTf = tf;
     if (!s.levels || !s.levels.h || s.levels.h === gexH) meta = s; else refreshGex();
     try { render(); } catch (e) { console.error(e); $('ind').innerHTML = `<span class="err">page error: ${esc(e.message)}</span>`; }
+
+    if (!url.includes('&vp=1') || (vpRange !== 'vis' && !url.includes('&vpr=' + vpRange))) vpEnsure();
   } catch (e) {
     if (wantS !== sym) return;
     $('ind').innerHTML = e.status === 404 ? `<span class="err">${esc(e.message)} · pick another ticker</span>`

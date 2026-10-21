@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#131722">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Volume, RSI, MACD, Stoch RSI, KDJ, OBV MACD, Williams %R, BB %B and WMSR panels under the price chart and GEX levels, with a volume profile, rebuilt after each close.">
+<title>Classic Indicators · live</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='3' width='9' height='3' fill='%2326a69a'/%3E%3Crect x='2' y='7' width='12' height='3' fill='%23f5d63d'/%3E%3Crect x='2' y='11' width='6' height='3' fill='%23ef5350'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css?v=20261021cls3">
+<link rel="stylesheet" href="classic.css?v=20261021cls3">
+</head>
+<body>
+<header class="top">
+  <div class="topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="../yellow-dots/"><span class="t-long">Yellow Dots × Business</span><span class="t-short">Dots</span></a>
+      <a class="tab" href="../classic-buys/"><span class="t-long">Classic Buys</span><span class="t-short">Buys</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Classic Indicators</span><span class="t-short">Classic</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div id="bar">
+  <span id="symwrap"><input id="symin" spellcheck="false" autocomplete="off" autocapitalize="characters" aria-label="Ticker" title="Ticker: type to search (or just start typing anywhere)"><div id="symlist" hidden></div></span>
+  <span id="tfs"></span>
+  <span id="layerwrap"><button id="layerbtn" title="Show / hide price layers and indicator panels">Layers ▾</button><div id="layers" hidden></div></span>
+  <span id="status"><span id="dot"></span><span id="stxt">loading…</span></span>
+</div>
+<div id="head">
+  <span class="t"><span id="symname"></span> · <span id="tfname"></span><span id="exch"></span></span>
+  <span class="ohlc" id="ohlc"></span>
+  <span class="ind" id="ind"></span>
+</div>
+<div id="main">
+  <div id="chartbox">
+    <canvas id="under"></canvas>
+    <div id="chart"></div>
+    <div id="dchart"></div>
+    <canvas id="overlay"></canvas>
+    <div id="cards"></div>
+    <table id="gex" title="click to collapse"><tbody id="gexb"></tbody></table>
+    <div id="maxbtns"></div>
+    <div id="hsplit" title="Drag to resize the price chart vs the indicators"></div>
+    <div id="empty" hidden></div>
+  </div>
+  <div id="vsplit" title="Drag to resize the table"></div>
+  <div id="side">
+    <div id="sidemax" class="maxbtn" title="Expand the table (or double-click it)">⤢</div>
+    <table id="ditable"><tbody id="ditb"></tbody></table>
+    <div id="difoot"></div>
+    <div id="episode" style="display:none"></div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js" integrity="sha384-KkYqTZlM13Zya6fVUF3IGCBOQ1ehFeJVVgxaVvD/0MebineF9EI8Jkd3NnWNChqN" crossorigin="anonymous"></script>
+<script src="classic.js?v=20261021cls3"></script>
+<script src="app.js?v=20261021cls3"></script>
+<script src="sizing.js?v=20261021cls3"></script>
+<script src="symbols.js?v=20261021cls3"></script>
+<script src="app_ui.js?v=20261021cls3"></script>
+</body>
+</html>

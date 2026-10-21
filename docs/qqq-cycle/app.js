@@ -272,6 +272,7 @@ function cards() {
   const med3 = comp.length ? comp.map((c) => c.m3).sort((x, y) => x - y)[Math.floor(comp.length / 2)] : null;
   const r21 = (k) => d.range[k][21] ? d.range[k][21][1] : null;
   const o1 = d.odds.rows.find((r) => r.h === 21);
+  const ck = (d.checks && d.checks.rows) || [], ckUp = ck.filter((r) => r.tone === "up").length, ckDn = ck.filter((r) => r.tone === "down").length;
   const turn = m && m.turns && m.turns[0];
   const C = [];
   C.push(`<div class="card"><div class="k">QQQ ${d.live ? `so far · ${d.live.t ? clock(d.live.t * 1000, ET_TZ) + " ET" : "today"}` : `close ${dstr(d.asof)}`}</div><div class="v">${fmt(px)}</div>
@@ -292,6 +293,8 @@ function cards() {
     <div class="s">80% range by ${dstr(d.future[20])} · 50%: ${fmt(r21("p25"), 0)} – ${fmt(r21("p75"), 0)}</div></div>`);
   if (o1 && o1.all) C.push(`<div class="card"><div class="k">Within a month, at this VXN</div><div class="v">${o1.all.dd5}% <span style="font-size:13px;color:var(--text-2)">chance of a 5% dip</span></div>
     <div class="s">10% dip ${o1.all.dd10}% · 5% pop ${o1.all.ru5}% · up after a month ${o1.all.up}%</div></div>`);
+  if (ck.length) C.push(`<div class="card"><div class="k">Technical checks</div><div class="v"><span class="up">${ckUp}</span> / <span class="down">${ckDn}</span></div>
+    <div class="s">pointing up / down of ${ck.length} checks · the rest neutral (tables below)</div></div>`);
   $("now").innerHTML = C.join("");
   $("vint").innerHTML = `Data to the ${dstr(d.asof, true)} close${d.live && d.live.t ? ` · today so far ${etLocal(d.live.t * 1000)}` : ""}<br>updated ${etLocal(Date.parse(S.man.generated_utc), true)}`;
 }
@@ -309,6 +312,27 @@ function renderCycles() {
   $("shapetab").innerHTML = `<thead><tr><th>#</th><th class="l">Nasdaq-100 stretch</th><th>Size</th><th>Fit</th><th>Next 1M</th><th>3M</th><th>6M</th></tr></thead><tbody>` +
     sh.map((s, i) => `<tr data-pick="s${i}" class="${S.pick === "s" + i ? "sel" : ""}"><td>${i + 1}</td><td class="l">${dstr(s.start, true)} → ${dstr(s.end, true)}</td>
     <td>${speedTxt(s.beta)}</td><td>${fmt(s.corr, 3)}</td><td class="${cls(s.m1)}">${sgn(s.m1)}</td><td class="${cls(s.m3)}">${sgn(s.m3)}</td><td class="${cls(s.m6)}">${sgn(s.m6)}</td></tr>`).join("") + "</tbody>";
+}
+
+const CHECK_GROUP = { KDJ: "the current week, 2-week bar and month read as if they closed today", Ranges: "made a month ago, from what was known that day",
+  Swings: "from completed sessions" };
+function renderChecks() {
+  const c = S.doc.checks;
+  $("checks").hidden = !c; $("jchecks").hidden = !c;
+  if (!c) return;
+  $("chksub").textContent = `${c.live ? "with today so far" : "at the " + dstr(S.doc.asof) + " close"} · QQQ ${fmt(c.price)}`;
+  const table = (rows) => {
+    const body = []; let g = null;
+    for (const r of rows) {
+      if (r.group !== g) { g = r.group; body.push(`<tr class="grp"><td colspan="2">${esc(g)}${CHECK_GROUP[g] ? `<span class="gsub">${CHECK_GROUP[g]}</span>` : ""}</td></tr>`); }
+      body.push(`<tr><td class="l lb">${esc(r.label)}${r.note ? `<span class="sub2">${esc(r.note)}</span>` : ""}</td>` +
+        `<td class="l st"><span class="cv num">${esc(r.value)}</span><span class="cs ${r.tone || ""}">${esc(r.state)}</span></td></tr>`);
+    }
+    return `<thead><tr><th class="l">Check</th><th class="l">Now</th></tr></thead><tbody>${body.join("")}</tbody>`;
+  };
+  const left = new Set(["Trend", "KDJ"]);
+  $("chktab").innerHTML = table(c.rows.filter((r) => left.has(r.group)));
+  $("chktab2").innerHTML = table(c.rows.filter((r) => !left.has(r.group)));
 }
 
 function renderOdds() {
@@ -384,10 +408,10 @@ async function load() {
   S.man = man; S.doc = doc; S.doc.asof = S.doc.as_of;
   readHash();
   if (!chart) makeChart();
-  controls(); cards(); renderCycles(); renderOdds(); renderBackfill(); renderWF();
+  controls(); cards(); renderCycles(); renderChecks(); renderOdds(); renderBackfill(); renderWF();
   draw();
   const anchor = location.hash.slice(1);
-  if (!S.jumped && /^(now|cycles|odds|record)$/.test(anchor)) {
+  if (!S.jumped && /^(now|cycles|checks|odds|record)$/.test(anchor) && !$(anchor).hidden) {
     S.jumped = true; setTimeout(() => $(anchor).scrollIntoView({ block: "start" }), 80);
   }
 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QQQ Cycle Model · live</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23151a23%22/%3E%3Cpath d=%22M2 12 C5 12 5 4 8 5 S11 11 14 3%22 stroke=%22%235b8def%22 stroke-width=%221.7%22 fill=%22none%22/%3E%3C/svg%3E">
-<link rel="stylesheet" href="app.css?v=20261021qqc2">
+<link rel="stylesheet" href="app.css?v=20261021qqc3">
 </head>
 <body>
 <a class="skip" href="#now">Skip to the readings</a>
@@ -38,7 +38,7 @@
     <div class="fg"><span class="lab">Show</span><span id="shows"></span></div>
     <div class="fg"><span class="lab">Back</span><span id="ranges"></span></div>
     <div class="fg"><span class="lab">Past forecast</span><select id="pastsel" class="sel"></select></div>
-    <nav class="jump"><a href="#now">Now</a><a href="#cycles">Cycles</a><a href="#odds">Odds</a><a href="#record">Record</a></nav>
+    <nav class="jump"><a href="#now">Now</a><a href="#cycles">Cycles</a><a href="#checks" id="jchecks" hidden>Checks</a><a href="#odds">Odds</a><a href="#record">Record</a></nav>
   </div>
 
   <section id="now" class="cards"></section>
@@ -54,6 +54,14 @@
     <div class="tscroll"><table class="grid num rows" id="cyctab"></table></div>
     <h2>Recent-shape matches <span class="h2s">the last six months or so against every stretch of the same length of the Nasdaq-100 since 1985</span></h2>
     <div class="tscroll"><table class="grid num rows" id="shapetab"></table></div>
+  </section>
+
+  <section id="checks" hidden>
+    <h2>Technical checks <span class="h2s" id="chksub"></span></h2>
+    <div class="chk2">
+      <div class="tscroll"><table class="grid chk" id="chktab"></table></div>
+      <div class="tscroll"><table class="grid chk" id="chktab2"></table></div>
+    </div>
   </section>
 
   <section id="odds">
@@ -91,6 +99,19 @@
     <p><b>Cycle phase</b> — the four stages of a market cycle (Weinstein's stages, the same four as Wyckoff's phases), read
       from the long-term average and its recent slope. Markup = price above a rising average; Markdown = below a falling
       one; otherwise Distribution after Markup, Accumulation after Markdown.</p>
+    <p><b>Technical checks</b> — plain readings of QQQ's own bars and of this board's own ranges. <b>Averages</b>: QQQ
+      against its 20-day, 50-day and 200-day averages of daily closes, whether each is rising or falling, and their order
+      (stacked up = the shorter averages above the longer ones). <b>KDJ</b>: the KDJ oscillator on weekly, 2-week and
+      monthly bars, the current bar read as if it closed today. A golden cross is K crossing above D, a death cross K
+      crossing below it; coiling = K still on the other side of D but turned toward it and closing in. J washed out = J
+      has dropped through the floor of its scale, stretched = through the ceiling; D's low / high zone = near the bottom /
+      top of its range. A recent golden cross "came out of a washout" when J or D was there going in; a recent death
+      cross "came off a high" when J was stretched or D in its high zone going in. <b>VXN level</b>:
+      today's VXN against every session of the past year and since 2013; calm = among the lowest fifth of the past year,
+      elevated = the top fifth, very high = the top twentieth. <b>Ranges made a month ago</b>: where today's price sits
+      in the VXN range and the analog spread this board drew a month ago. <b>Swings</b>: the latest daily high (low)
+      that no session within about a week on either side went above (below), from completed sessions; the 1-year high
+      is the highest price of the past year.</p>
     <p><b>Odds</b> — every session since 2013 with VXN close to today's level, and what QQQ did next.</p>
     <p><b>Record</b> — the model line rebuilt every Friday since January 2025 and the forecasts saved after each close,
       each made only from data known that day and scored against what QQQ did after; the walk-forward test reruns the
@@ -101,6 +122,6 @@
   </footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
-<script src="app.js?v=20261021qqc2"></script>
+<script src="app.js?v=20261021qqc3"></script>
 </body>
 </html>

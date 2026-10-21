@@ -1,6 +1,8 @@
 'use strict';
 const LW = LightweightCharts;
-const TFS = ['5m', '1H', '2H', '3H', '4H', '1D', '3D', '1W', '2W', '1M'].filter(t => !(window.EET_STATIC && t === '5m'));
+
+const TFS = ['5m', '1H', '2H', '3H', '4H', '1D', '3D', '1W', '2W', '1M'].filter(t => !(window.EET_STATIC &&
+  (t === '5m' || (window.EET_STATIC.tfs && !window.EET_STATIC.tfs.includes(t)))));
 const TFNAME = { '5m': '5', '1H': '1h', '2H': '2h', '3H': '3h', '4H': '4h', '1D': 'D', '3D': '3D', '1W': 'W', '2W': '2W', '1M': 'M' };
 const INTRADAY = new Set(['5m', '1H', '2H', '3H', '4H']);
 const C = { up: '#26a69a', dn: '#ef5350', king: '#f5d63d', call: '#00e676', put: '#ff5252', flip: '#e0e3eb', warn: '#ff9800' };
@@ -33,7 +35,8 @@ let gexBars = (() => { try { const v = localStorage.getItem('gexdash.gexbars'); 
 
 let tableLive = (() => { try { return localStorage.getItem('gexdash.tablelive') === '1'; } catch (e) { return false; } })();
 const api = path => path + (path.includes('?') ? '&' : '?') + 's=' + encodeURIComponent(sym) + '&h=' + encodeURIComponent(gexH) +
-  (tableLive ? '&live=1' : '') + (CLASSIC_PAGE && path.startsWith('/api/state') ? '&panes=classic' : '');
+  (tableLive ? '&live=1' : '') + (CLASSIC_PAGE && path.startsWith('/api/state') ? '&panes=classic' : '') +
+  (vpAsk() && path.startsWith('/api/state') ? '&vp=1' + (vpRange !== 'vis' ? '&vpr=' + vpRange : '') : '');
 let tf = (() => { try { return localStorage.getItem('gexdash.tf') || '1W'; } catch (e) { return '1W'; } })();
 if (!TFS.includes(tf)) tf = '1W';
 let meta = null, state = null, version = -1, loadedTf = null, lastOkPoll = 0, inflight = false;
@@ -48,6 +51,28 @@ let wantN = {}, dLen = 0, moreBusy = false;
 let lastTimes = [], lastPt = [];
 
 
+
+
+const VP_KEY = CLASSIC_PAGE ? 'vprofile_classic' : 'vprofile';
+const VP_RANGES = [['vis', 'Visible'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['YTD', 'YTD']];
+const VP_RANGE_KEY = 'gexdash.vprange' + (CLASSIC_PAGE ? '.classic' : '');
+let vpRange = (() => { try { const v = localStorage.getItem(VP_RANGE_KEY); return VP_RANGES.some(r => r[0] === v) ? v : 'vis'; } catch (e) { return 'vis'; } })();
+
+
+const VP_LAYER = !window.EET_STATIC || !!window.EET_STATIC.vp;
+const vpOn = () => VP_LAYER && layerOn(VP_KEY);
+
+
+
+const vpAsk = () => vpOn() && !window.EET_STATIC;
+
+function vpShort() {
+  const vp = state.di.vp, bars = state.di.bars || [];
+  if (vpRange === 'vis' || !vp || !bars.length) return false;
+  const want = vpSpan(bars);
+  return !!want && want[0] < (vp.from != null ? vp.from : bars[0][0]);
+}
+function vpEnsure() { if (vpAsk() && state && state.di && (!state.di.vp || vpShort())) loadState(true); }
 const LAYERS = [
   { group: 'BMSB bands', key: 'bmsb_4H', label: '4H BMSB', sw: '#FFEB3B' },
   { group: 'BMSB bands', key: 'bmsb_D', label: 'Daily BMSB' },
@@ -67,10 +92,12 @@ const LAYERS = [
   ...(window.EET_STATIC ? [] : [{ group: 'Other', key: 'woevents', label: 'Washout R / C / B+ / X / E markers', sw: '#42a5f5' }]),
   { group: 'Other', key: 'profile', label: 'Cost profile (blue levels)', sw: '#00A9E0' },
   { group: 'Other', key: 'candles4', label: 'Four-colour candles' },
+  ...(VP_LAYER ? [{ group: 'Volume', key: VP_KEY, label: 'Volume profile (left)', sw: '#ffb74d' }] : []),
 ];
 
 
 const PANES = CLASSIC_PAGE ? [
+  { id: 'c_vol', label: 'Volume' },
   { id: 'c_rsi', label: 'RSI' }, { id: 'c_macd', label: 'MACD' }, { id: 'c_stochrsi', label: 'Stoch RSI' },
   { id: 'c_kdj', label: 'KDJ' }, { id: 'c_obvmacd', label: 'OBV MACD (pivot buy / sell)' }, { id: 'c_willr', label: 'Williams %R' },
   { id: 'c_bbpct', label: 'BB %B' }, { id: 'c_wmsr', label: 'WMSR' },
@@ -89,7 +116,7 @@ function filterPanes(di) {
 const diHidden = () => !!(state && state.di && state.di.panes && state.di.panes._all && !state.di.panes.sections.length);
 function applySideVisibility() { document.body.classList.toggle('no-side', !sideOn()); }
 let layerState = (() => { try { return JSON.parse(localStorage.getItem('gexdash.layers') || '{}'); } catch (e) { return {}; } })();
-const DEFAULT_OFF = new Set(['woevents']);
+const DEFAULT_OFF = new Set(['woevents', ...(CLASSIC_PAGE ? [] : [VP_KEY])]);
 const layerOn = key => (key in layerState ? layerState[key] !== false : !DEFAULT_OFF.has(key));
 applySideVisibility();
 
@@ -126,6 +153,9 @@ function renderLayerPanel() {
     if (L.group !== grp) { grp = L.group; html += `<div class="grp">${grp}</div>`; }
     html += `<label><input type="checkbox" data-k="${L.key}"${layerOn(L.key) ? ' checked' : ''}>` +
       (L.sw ? `<span class="sw" style="background:${L.sw}"></span>` : '') + `${L.label}</label>`;
+    if (L.key === VP_KEY) html += `<div class="vpr" title="Candles the volume profile counts (fixed ranges end at the last candle)">` +
+      VP_RANGES.map(([k, t]) => `<span data-vpr="${k}"${vpOn() && vpRange === k ? ' class="on"' : ''}>${t}</span>`).join('') +
+      `<span data-vpr="off"${vpOn() ? '' : ' class="on"'}>Off</span></div>`;
   });
   html += `<div class="grp">Indicator panels</div>`;
   html += `<label><input type="checkbox" data-k="panes_all"${PANES.every(P => paneOn(P.id)) ? ' checked' : ''}><b>All panels</b></label>`;
@@ -146,6 +176,7 @@ $('layers').addEventListener('change', e => {
   layerState[k] = e.target.checked;
   if (k.startsWith('pane_')) { saveLayers(); renderLayerPanel(); applyLayers(true); return; }
   if (k === 'lockAxes') { saveLayers(); renderLayerPanel(); applyLayers(); if (e.target.checked) syncAxes('p'); return; }
+  if (k === VP_KEY) { saveLayers(); renderLayerPanel(); applyLayers(); vpEnsure(); return; }
   saveLayers(); applyLayers();
 });
 $('layers').addEventListener('click', e => {
@@ -153,7 +184,16 @@ $('layers').addEventListener('click', e => {
   LAYERS.forEach(L => { layerState[L.key] = act === 'all'; });
   if (act === 'none') layerState.candles4 = true;
   if (act === 'all') { PANES.forEach(P => { layerState['pane_' + P.id] = true; }); layerState.side = true; }
-  saveLayers(); renderLayerPanel(); applyLayers(true);
+  saveLayers(); renderLayerPanel(); applyLayers(true); vpEnsure();
+});
+$('layers').addEventListener('click', e => {
+  const v = e.target.dataset && e.target.dataset.vpr; if (!v) return;
+  if (v === 'off') layerState[VP_KEY] = false;
+  else {
+    layerState[VP_KEY] = true; vpRange = v;
+    try { localStorage.setItem(VP_RANGE_KEY, v); } catch (x) {  }
+  }
+  saveLayers(); renderLayerPanel(); applyLayers(); vpEnsure();
 });
 
 
@@ -368,6 +408,9 @@ function buildSeries(di) {
     drawn.forEach(x => {
       const common = { priceLineVisible: false, lastValueVisible: false, title: '' };
 
+
+      if (s.id === 'c_vol') common.priceFormat = { type: 'custom', minMove: 1e-4, formatter: fmtAxisVol };
+
       common.autoscaleInfoProvider = () => secRange[s.id] || fixed;
       let ser;
       if (x.kind === 'histogram') ser = dchart.addSeries(LW.HistogramSeries, Object.assign({ color: x.color || '#5d606b', base: x.base || 0 }, common), pane);
@@ -401,6 +444,10 @@ function pts(times, values, colors) {
 }
 
 
+const fmtAxisVol = v => {
+  const a = Math.abs(v), [d, u] = a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : a >= 1e3 ? [1e3, 'K'] : [1, ''];
+  return (v < 0 ? '−' : '') + Number((a / d).toPrecision(3)) + u;
+};
 const roundUp2 = x => { if (!(x > 0)) return 1; const e = Math.floor(Math.log10(x)) - 1, p = Math.pow(10, e); return Math.ceil(x / p) * p; };
 
 const hostOf = s => {
