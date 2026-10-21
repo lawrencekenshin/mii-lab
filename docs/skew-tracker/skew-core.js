@@ -154,10 +154,12 @@
 
 
 
+
+
 (function () {
   'use strict';
   var SKT = window.SKT = window.SKT || {};
-  SKT.V = '20261021b';
+  SKT.V = '20261021c';
   SKT.LIVE_SITE = location.hostname === 'lawrencekenshin.github.io';
   SKT.BASE = SKT.LIVE_SITE ? 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/skew-tracker-data/skew-tracker/' : 'snap/';
   SKT.HOME = false;
@@ -516,6 +518,18 @@
   };
   SKT.oneSided = function (st) { var a = SKT.addShare(st, 'C'); return a == null ? null : Math.max(a, 1 - a); };
   SKT.netShare = function (st, sd) { return st && isNum(st.skn) ? (sd === 'P' ? 1 - st.skn : 1 + st.skn) / 2 : null; };
+
+
+  SKT.QUICK_W = [['1d', 'Today'], ['1w', '1 week'], ['1m', '1 month'], ['all', 'Total']];
+  SKT.winSeg = function (opts) {
+    opts = opts || {};
+    var D = SKT.D || {}, items = SKT.QUICK_W.map(function (x) {
+      var has = !!(D.windows && D.windows[x[0]]), n = has && opts.count ? opts.count(x[0]) : null;
+      return { k: x[0], label: x[1], n: isNum(n) ? n : null, off: !has, tip: has ? 'Show the ' + SKT.winLabel(x[0]).toLowerCase() + ' window' : 'Not in this build' };
+    });
+    var box = SKT.ui.seg(items, SKT.S.w, function (k) { if (k !== SKT.S.w) SKT.go({ w: k }); }, { aria: 'Time frame', cls: 'sk-wseg' + (opts.cls ? ' ' + opts.cls : '') });
+    return box;
+  };
 
 
   function addRatio(c, p) {

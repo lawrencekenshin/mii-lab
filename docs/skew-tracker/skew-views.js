@@ -668,9 +668,12 @@
     tapeNote(root);
     if (!avail.length) { root.appendChild(ui.note('This build has no crowd data.', 'muted')); return; }
     var kp = avail.filter(function (k) { return k[0] === S.vp; })[0] || avail[0];
-    root.appendChild(ui.chips(avail.map(function (k) {
+    var ctl = el('div', 'vx-ctl');
+    ctl.appendChild(ui.chips(avail.map(function (k) {
       return { k: k[0], label: k[2], n: all.filter(function (c) { return c.kind === k[1]; }).length };
     }), kp[0], function (k) { SKT.go({ vp: k }); }, { cls: 'vx-vp', aria: 'Crowd kind' }));
+    ctl.appendChild(SKT.winSeg({ cls: 'vx-wseg' }));
+    root.appendChild(ctl);
     var list = all.filter(function (c) { return c.kind === kp[1]; });
     function lean(c, s) { var a = c.lean && c.lean[w]; return a ? (a[s === 'P' ? 1 : 0] || 0) : 0; }
     function mem(c) { var n = 0; ss.forEach(function (s) { n += lean(c, s); }); return n; }
@@ -722,6 +725,10 @@
     if (st.k && cols.some(function (c) { return c.k === st.k && c.v; })) sorted = sortBy(sorted, cols);
     var memSyms = [];
     sorted.forEach(function (c) { ss.forEach(function (s) { (((c.syms || {})[w] || {})[s] || []).forEach(function (sym) { if (inL(sym)) memSyms.push(sym); }); }); });
+    var th = el('div', 'vx-ctl vx-ctl2');
+    th.appendChild(el('h3', 'vx-sh', 'Crowds ranked · ' + SKT.winLabel(w)));
+    th.appendChild(SKT.winSeg({ cls: 'vx-wseg' }));
+    root.appendChild(th);
     root.appendChild(todLegend(memSyms, 'Today C : P (summed over each crowd’s members) and the ratio on a member chip'));
     var sec = el('div', 'vx-crowds');
     var crh = SKT.ui.hdrSort(cols, st.k, st.dir, onSort, { cls: 'vx-crh' }), ti = cols.map(function (c) { return c.k; }).indexOf('tod');

@@ -1905,6 +1905,7 @@
     h.appendChild(el('h2', 'acc-h', t));
     var meta = el('span', 'bd-lmeta', F.num(total) + (ctx.tape ? ' names' : S.show === 'out' ? ' left out' : ' ranked') + (total > shown ? ' · showing ' + F.num(shown) : '') + ' · ' + (S.w === 'tape' ? 'tape' : SKT.winLabel(S.w).toLowerCase()) + (S.w !== 'tape' && S.w !== '1d' ? ' ' + sinceTxt(S.w) : ''));
     h.appendChild(meta);
+    h.appendChild(SKT.winSeg({ cls: 'bd-wseg', count: function (w) { return SKT.board.count(w, S.side, S.list); } }));
     box.appendChild(h);
     if (S.so) {
       var n = el('p', 'bd-snote');
@@ -1992,6 +1993,7 @@
     var back = el('button', 'linkbtn', 'back to the ranked list'); back.type = 'button';
     back.addEventListener('click', function () { go({ an: '' }); });
     h.appendChild(back);
+    h.appendChild(SKT.winSeg({ cls: 'bd-wseg' }));
     box.appendChild(h);
     if (!SKT.SEARCH) { box.appendChild(el('p', 'empty', 'Loading every tracked name…')); needSearch(); }
     var pool = {}, list = [];

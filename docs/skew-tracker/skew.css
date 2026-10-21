@@ -274,3 +274,13 @@ html.puts #hero h1,.acc-h{color:var(--head)}
 .sk-tod b{color:var(--white)} .sk-tod b.up{color:var(--up)} .sk-tod b.down{color:var(--down)} .sk-tod b.mut{color:var(--muted)}
 .sk-tod.late{color:var(--muted)} .sk-tod.late .sbar{opacity:.55}
 .sk-tod small.sub{white-space:nowrap}
+
+
+.sk-wseg{display:inline-flex;flex-wrap:wrap;gap:4px}
+.sk-wseg .sg{min-height:34px;padding:0 11px;font-size:13px}
+.bd-lhead .sk-wseg{margin-left:auto;align-self:center}
+.vx-ctl{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin:6px 0 10px}
+.vx-ctl .chips{margin:0}
+.vx-ctl2{margin-top:22px}
+.vx-ctl2 .vx-sh{margin:0}
+@media (max-width:759px){.bd-lhead .sk-wseg{margin-left:0;width:100%}.sk-wseg .sg{flex:1 1 auto;padding:0 8px}}
