@@ -316,7 +316,7 @@
     ['best', ['★ Best skew × classic', '★ Best'], r => !!M(r).best,
       'a Holy grail or W·2W·M golden-cross name with a high classic score, an open book among the most call-heavy of all stocks, and more calls than puts added last week'],
     ['biz60', 'Business 60+', r => hasFl(r, 'biz60'), 'business score 60 or more'],
-    ['king70', 'Strong king', r => hasFl(r, 'king70'), 'a King GEX strength among the strongest of the tracked names (current maps)'],
+    ['strong', 'Strong king', r => hasFl(r, 'strong'), 'a King GEX strength among the strongest of the tracked names (current maps)'],
     ['above', ['King above price', 'King above'], r => hasFl(r, 'above'), 'the king strike is above the close (current maps)'],
     ['calls', 'Calls leaning', r => hasFl(r, 'calls'), 'an open book among the most call-heavy of all stocks, or more calls than puts added last week'],
     ['build', 'Building', r => hasFl(r, 'build'), 'a FRESH king: open interest piling up at the king contract over the last week of settles, with a large part of it new (current maps)']

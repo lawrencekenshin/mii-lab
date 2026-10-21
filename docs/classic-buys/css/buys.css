@@ -502,7 +502,7 @@ button, input, select { font-family: inherit; }
   .chips { display: contents; }
   .chips .lbl { display: none; }
   .chip { padding: 4px 8px; font-size: 12px; gap: 5px; }
-  .chip[data-chip="biz60"] { order: 1; } .chip[data-chip="king70"] { order: 2; } .chip[data-chip="build"] { order: 3; }
+  .chip[data-chip="biz60"] { order: 1; } .chip[data-chip="strong"] { order: 2; } .chip[data-chip="build"] { order: 3; }
   .chip[data-chip="above"] { order: 4; } .chip[data-chip="calls"] { order: 5; }
   .chip[data-chip="best"] { order: 0; }
   .chip .lf { display: none; } .chip .ls { display: inline; }
