@@ -55,8 +55,19 @@
     return done || null;
   }
 
+
+
+  function staggerRows(xs, gap) {
+    var rows = [], last = [-Infinity, -Infinity];
+    (xs || []).forEach(function (x) {
+      var r = x - last[0] >= gap ? 0 : (x - last[1] >= gap ? 1 : 0);
+      rows.push(r); last[r] = x;
+    });
+    return rows;
+  }
+
   var api = { resolveMode: resolveMode, countdownWords: countdownWords, etDateKey: etDateKey, pickVariant: pickVariant, tagsMatch: tagsMatch,
-    timedText: timedText, nextUpText: nextUpText };
+    timedText: timedText, nextUpText: nextUpText, staggerRows: staggerRows };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 
 
@@ -174,16 +185,19 @@
     var box = h('figure', 'viz viz-tl'); box.setAttribute('aria-label', v.label);
     var host = h('div', 'viz-svg'); box.appendChild(host);
     sized(host, function (W) {
-      var H = 62, P = 26, cy = 30, ts = v.items.map(function (i) { return Date.parse(i.at_utc); });
+      var P = 26, ts = v.items.map(function (i) { return Date.parse(i.at_utc); });
       var t0 = ts[0], t1 = ts[ts.length - 1];
       var X = function (t) { return P + (W - 2 * P) * (t1 > t0 ? (t - t0) / (t1 - t0) : 0.5); };
+
+
+      var rows = staggerRows(ts.map(X), 46), two = rows.indexOf(1) >= 0, cy = two ? 44 : 30, H = two ? 92 : 62;
       var svg = sv('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, 'aria-hidden': 'true' }, host);
       sv('line', { x1: P, x2: W - P, y1: cy, y2: cy, stroke: COL.line, 'stroke-width': 2 }, svg);
       v.items.forEach(function (it, i) {
-        var x = X(ts[i]), c = it.label === 'CPI' ? color('core_cpi') : color('core_pce');
+        var x = X(ts[i]), c = color(it.label === 'CPI' ? 'core_cpi' : it.label === 'PPI' ? 'core_ppi' : 'core_pce');
         sv('circle', { cx: x, cy: cy, r: 6, fill: c, stroke: '#131722', 'stroke-width': 2 }, svg);
-        var a = sv('text', { x: x, y: cy - 12, 'text-anchor': 'middle', fill: COL.white, 'font-size': 11.5, 'font-weight': 700 }, svg); a.textContent = it.label;
-        var b = sv('text', { x: x, y: cy + 24, 'text-anchor': 'middle', fill: COL.text, 'font-size': 10.5 }, svg); b.textContent = it.text;
+        var a = sv('text', { x: x, y: cy - 12 - 15 * rows[i], 'text-anchor': 'middle', fill: COL.white, 'font-size': 11.5, 'font-weight': 700 }, svg); a.textContent = it.label;
+        var b = sv('text', { x: x, y: cy + 24 + 15 * rows[i], 'text-anchor': 'middle', fill: COL.text, 'font-size': 10.5 }, svg); b.textContent = it.text;
       });
     });
     return box;

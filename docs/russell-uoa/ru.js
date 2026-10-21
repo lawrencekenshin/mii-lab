@@ -1197,7 +1197,9 @@
       <h3>Business score and Calls : Puts</h3>
       <p class="txt"><b>Business</b> (0–100) scores six numbers about the company (revenue growth year on year, EPS growth, PEG, free cash flow growth and margin, revenue growth quarter on quarter), each ranked against the S&amp;P 500 + Nasdaq-100. Funds (IWM, IWB) and companies that report too few of the six numbers have none. It is shown for context only: <b>it is not used in the ranking</b> or the tiers. Green = strong, amber = middling, grey = weak.</p>
       <p class="txt"><b>Calls : Puts</b> counts every open call contract against every open put contract, at all strikes, in the expiries of each window (1M, 3M, 6M and 1Y+ = all; the board shows 1Y+), from the newest chain settle saved for the name. "6.7× calls" means 6.7 calls open for every put; the white tick and ▲/▼ show the calls share a week earlier over the same expiries. One contract counts once whatever its price, and the split says nothing about who is long or short. A thin book is greyed. Also display only.</p>
-      <h3>When each part lands</h3>
+      ${gexList() ? `<h3>GEX levels on the price chart</h3>
+      <p class="txt">A name's price chart carries its <b>GEX</b> (gamma exposure) by strike: for every strike, the call GEX minus the put GEX, in dollars per 1% move of the stock, over the expiries inside the chosen window (1M, 3M, 6M, or 1Y+ = all), from the name's newest saved option chain. Green bars lean positive, red negative. <b>King</b> is the strike with the largest net GEX either way; <b>call wall</b> and <b>put wall</b> are the strikes with the most call and the most put GEX; <b>flip</b> is the price where the total turns from negative to positive. The line under the chart gives the open-interest settle and the close the map was priced at. The same map as on GEX Hunt.</p>
+      ` : ''}<h3>When each part lands</h3>
       <ul class="txt">
         <li><b>Unusual contracts</b>: once a name's whole-session chain is saved after the close. A session stays <i>partial</i> until chains are in for nearly as many names as the previous complete session had.</li>
         <li><b>Next-day status</b> (Opened / Closed / Mixed / Gone): with the next session's chain, which carries the settled open interest. Older days fill in after the fact.</li>
@@ -1230,7 +1232,58 @@
 
 
 
+
+
+
+
+  function fmG(v) {
+    if (v == null) return '–';
+    const a = Math.abs(v);
+    if (a < 1000) return a < 1 ? '$0' : '<$1K';
+    return (v < 0 ? '−' : '') + '$' + (a >= 1e9 ? (a / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (a / 1e6).toFixed(a >= 1e8 ? 0 : 1) + 'M' : (a / 1e3).toFixed(0) + 'K');
+  }
+  const pcG = (v, d) => { if (v == null || !isFinite(v)) return '–'; const t = Math.abs(v * 100).toFixed(d || 0); return (+t === 0 ? '' : v >= 0 ? '+' : '−') + t + '%'; };
   const pxG = v => v == null || !isFinite(v) ? '–' : v >= 1000 ? v.toFixed(0) : v >= 100 ? v.toFixed(1) : v.toFixed(2);
+  const GEX_HS = ['1M', '3M', '6M', '1Y+'], GH_KEY = 'ru.gh1', GH_DEF = '1Y+';
+  function ghGet() { try { const v = localStorage.getItem(GH_KEY); return GEX_HS.concat('off').indexOf(v) >= 0 ? v : GH_DEF; } catch (e) { return GH_DEF; } }
+  function ghSet(v) { try { localStorage.setItem(GH_KEY, v); } catch (e) {  } }
+  let GEXS = null;
+  function gexList() {
+    const g = META && META.gex;
+    if (!g || !Array.isArray(g.syms) || typeof g.tag !== 'string') return null;
+    if (!GEXS || GEXS.tag !== g.tag) GEXS = { tag: g.tag, set: new Set(g.syms) };
+    return GEXS;
+  }
+  const GEXC = new Map();
+  function loadGex(sym) {
+    const L = gexList();
+    if (!L) return Promise.resolve(null);
+    if (!L.set.has(sym)) return Promise.resolve({ error: 'none' });
+    if (!GEXC.has(sym)) {
+      GEXC.set(sym, fetch(BASE + 'gex/' + encodeURIComponent(sym) + '.json?g=' + encodeURIComponent(L.tag), { cache: 'no-cache' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(g => (g && typeof g === 'object' ? g : { error: 'load' }))
+        .catch(() => { GEXC.delete(sym); return { error: 'load' }; }));
+    }
+    return GEXC.get(sym);
+  }
+  const gexOk = g => !!(g && !g.error && g.H && GEX_HS.some(h => g.H[h] && g.H[h].lv && Array.isArray(g.H[h].bars)));
+  function gexH(g, pick) {
+    if (!gexOk(g) || pick === 'off') return null;
+    return g.H[pick] ? pick : ['1Y+', '6M', '3M', '1M'].find(h => g.H[h]) || null;
+  }
+  function gexBarHTML(g, pick) {
+    if (!gexOk(g)) return '';
+    const cur = gexH(g, pick), L = cur ? g.H[cur].lv : null;
+    return `<span class="lab">GEX</span>${GEX_HS.filter(h => g.H[h]).map(h => `<button class="btn sm${h === cur ? ' on' : ''}" data-gh="${h}">${h}</button>`).join('')}<button class="btn sm${pick === 'off' ? ' on' : ''}" data-gh="off">off</button>` +
+      (L ? `<span class="muted">King <b class="kg">${pxG(L.king)}</b> · net ${fmG(L.net)}${isNum(L.flip) ? ' · flip ' + pxG(L.flip) : ''}${L.call_wall != null ? ' · call wall ' + pxG(L.call_wall) : ''}${L.put_wall != null ? ' · put wall ' + pxG(L.put_wall) : ''}</span>` : '');
+  }
+  function gexCapHTML(g, T) {
+    if (g === undefined) return '<span class="muted">GEX: loading the levels…</span>';
+    if (!gexOk(g)) return `<span class="muted">${g && g.error === 'load' ? 'GEX levels could not be loaded.' : 'No GEX levels for this name.'}</span>`;
+    const newer = T && g.px_day && g.px_day > T;
+    return `<span class="muted">GEX from the option chain · OI ${esc(expShort(g.settle, g.settle))} settle · priced at the ${esc(expShort(g.px_day, g.px_day))} close, spot ${px2(g.spot)} · $ per 1% move${newer ? ' · <span class="am">newer than the selected session</span>' : ''}</span>`;
+  }
   function niceStep(range, n) {
     const raw = range / (n || 6), p = Math.pow(10, Math.floor(Math.log10(raw)));
     return [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw) || 10 * p;
@@ -1259,6 +1312,63 @@
     const lp = cs[N - 1];
     s += `<rect x="${padL + cw + 2}" y="${(y(lp) - 9).toFixed(1)}" width="${padR - 4}" height="18" fill="#2962ff" rx="2"/><text x="${padL + cw + 6}" y="${(y(lp) + 4).toFixed(1)}" font-size="11" fill="#fff">${pxG(lp)}</text>`;
     return s + '</svg>';
+  }
+  function gexChartSVG(bars, g, gh, W, H) {
+    const O = (bars || []).filter(b => b && isNum(b[1])), N = O.length;
+    if (N < 2) return '<div class="empty small">No price history.</div>';
+    const G = gh ? g.H[gh] : null, narrowG = W < 700;
+    const padL = 6, padR = 60, cw = W - padL - padR, cwP = G ? cw * (narrowG ? 0.55 : 0.62) : cw, step = cwP / N, X = i => padL + (i + 0.5) * step;
+    const pTop = 22, pBot = H - 24;
+    const cs = O.map(r => r[1]), hs = O.map(r => isNum(r[2]) ? r[2] : r[1]), ls = O.map(r => isNum(r[3]) ? r[3] : r[1]);
+    let lo = Math.min.apply(null, ls), hi = Math.max.apply(null, hs);
+    const S0 = G && isNum(g.spot) ? g.spot : cs[N - 1];
+    if (G) {
+      const L = G.lv, pos = G.bars.filter(b => b[1] > 0 && b[0] > S0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(b => b[0]);
+      const neg = G.bars.filter(b => b[1] < 0 && b[0] < S0).sort((a, b) => a[1] - b[1]).slice(0, 2).map(b => b[0]);
+      [L.king, L.call_wall, L.put_wall].concat(pos, neg).filter(k => isNum(k) && k >= S0 * 0.7 && k <= S0 * 1.4)
+        .forEach(k => { lo = Math.min(lo, k); hi = Math.max(hi, k); });
+    }
+    if (hi - lo < hi * 1e-6) { hi += Math.max(0.01, hi * 0.01); lo -= Math.max(0.01, lo * 0.01); }
+    const padY = (hi - lo) * 0.06; lo -= padY; hi += padY;
+    const y = p => pTop + (hi - p) / (hi - lo) * (pBot - pTop);
+    let s = `<svg class="gch" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${N}-day price${G ? ' with net GEX by strike (' + gh + ')' : ''}" style="display:block;font-variant-numeric:tabular-nums;font-family:inherit">`;
+    const gs = niceStep(hi - lo);
+    for (let p = Math.ceil(lo / gs) * gs; p < hi; p += gs) s += `<line x1="${padL}" x2="${padL + cw}" y1="${y(p).toFixed(1)}" y2="${y(p).toFixed(1)}" stroke="#1e2230"/><text x="${padL + cw + 6}" y="${(y(p) + 4).toFixed(1)}" fill="#787b86" font-size="11">${p.toFixed(gs < 1 ? 2 : gs < 10 ? 1 : 0)}</text>`;
+    s += `<line x1="${padL + cw}" x2="${padL + cw}" y1="${pTop}" y2="${pBot}" stroke="#2a2e39"/><line x1="${padL}" x2="${padL + cw}" y1="${pBot}" y2="${pBot}" stroke="#2a2e39"/>`;
+    if (O.some(r => isNum(r[2]) && isNum(r[3]))) {
+      const up = O.map((r, i) => `${X(i).toFixed(1)},${y(hs[i]).toFixed(1)}`).join(' '), dn = O.map((r, i) => `${X(N - 1 - i).toFixed(1)},${y(ls[N - 1 - i]).toFixed(1)}`).join(' ');
+      s += `<polygon points="${up} ${dn}" fill="rgba(209,212,220,.10)"/>`;
+    }
+    s += `<polyline points="${O.map((r, i) => `${X(i).toFixed(1)},${y(cs[i]).toFixed(1)}`).join(' ')}" fill="none" stroke="#d1d4dc" stroke-width="1.4" stroke-linejoin="round"/>`;
+    let lastM = -1, lastX = -99;
+    O.forEach((r, i) => { const d = D(r[0]), mo = d.getUTCMonth(); if (mo !== lastM) { lastM = mo; if (X(i) - lastX < 34) return; lastX = X(i); s += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${pBot}" y2="${pBot + 4}" stroke="#363a45"/><text x="${(X(i) + 2).toFixed(1)}" y="${H - 6}" fill="#787b86" font-size="11">${MON[mo]}</text>`; } });
+    if (G) s += gexLayer(G, gh, y, lo, hi, padL, cw, cwP, pTop, pBot, S0, narrowG);
+    const lp = cs[N - 1];
+    s += `<rect x="${padL + cw + 2}" y="${(y(lp) - 9).toFixed(1)}" width="${padR - 4}" height="18" fill="#2962ff" rx="2"/><text x="${padL + cw + 6}" y="${(y(lp) + 4).toFixed(1)}" font-size="11" fill="#fff">${pxG(lp)}</text>`;
+    return s + '</svg>';
+  }
+  function gexLayer(G, gh, y, lo, hi, padL, cw, cwP, pTop, pBot, S0, narrow) {
+    const L = G.lv, bx0 = padL + cwP + 10, bx1 = padL + cw - (narrow ? 58 : 150);
+    const bars = G.bars.filter(b => b[0] > lo && b[0] < hi && b[1] !== 0);
+    const mx = Math.max(1, Math.max.apply(null, bars.map(b => Math.abs(b[1])).concat(0)));
+    const kk = bars.map(b => b[0]).sort((a, b) => a - b); let gap = Infinity;
+    for (let i = 1; i < kk.length; i++) gap = Math.min(gap, kk[i] - kk[i - 1]);
+    const bh = Math.max(2, Math.min(14, isFinite(gap) ? (y(0) - y(gap)) * 0.75 : 6)), blen = v => Math.abs(v) / mx * (bx1 - bx0);
+    let s = `<line x1="${padL + cwP + 4}" x2="${padL + cwP + 4}" y1="${pTop}" y2="${pBot}" stroke="#2a2e39"/>`;
+    s += `<text x="${bx0.toFixed(1)}" y="${pTop - 6}" fill="#787b86" font-size="11">${narrow ? 'GEX ' + gh : 'Net GEX by strike · ' + gh + ' · $ per 1% move'}</text>`;
+    bars.forEach(([k, net, c, p]) => { const len = blen(net); if (len < 0.5) return;
+      const king = k === L.king;
+      s += `<rect x="${bx0.toFixed(1)}" y="${(y(k) - bh / 2).toFixed(1)}" width="${len.toFixed(1)}" height="${bh.toFixed(1)}" fill="${net > 0 ? (king ? '#3fbfae' : '#26a69a') : '#ef5350'}" opacity=".88"><title>${pxG(k)} (${pcG(k / S0 - 1, 1)}): net ${fmG(net)} · calls ${fmG(c)} · puts ${fmG(-Math.abs(p))}</title></rect>`; });
+    const tag = (k, txt, col, tc, dash) => {
+      if (k == null || k <= lo || k >= hi) return '';
+      const b = bars.find(r => r[0] === k), tw = txt.length * 6.3 + 10, lx = Math.min(padL + cw - txt.length * 6.3 - 16, bx0 + (b ? blen(b[1]) : 0) + 6);
+      return `<line x1="${padL}" x2="${padL + cw}" y1="${y(k).toFixed(1)}" y2="${y(k).toFixed(1)}" stroke="${col}" stroke-width="1.2"${dash ? ' stroke-dasharray="4,3"' : ''} stroke-opacity=".85"/>` +
+        `<rect x="${lx.toFixed(1)}" y="${(y(k) - 9).toFixed(1)}" width="${tw.toFixed(1)}" height="18" rx="3" fill="${col}"/><text x="${(lx + tw / 2).toFixed(1)}" y="${(y(k) + 4).toFixed(1)}" font-size="11" fill="${tc}" text-anchor="middle" font-weight="700">${txt}</text>`;
+    };
+    if (L.put_wall != null && L.put_wall !== L.king) s += tag(L.put_wall, `PUT WALL ${pxG(L.put_wall)}`, '#ef5350', '#fff', true);
+    if (L.call_wall != null && L.call_wall !== L.king) s += tag(L.call_wall, `CALL WALL ${pxG(L.call_wall)}`, '#26a69a', '#fff', true);
+    s += tag(L.king, `KING ${pxG(L.king)} ${pcG(L.king / S0 - 1, 1)}${narrow ? '' : ' · ' + fmG(L.king_gex)}`, '#f5d63d', '#131722', false);
+    return s;
   }
 
 
@@ -1299,6 +1409,7 @@
     const all = info.sessions || [];
     const sessions = all.filter(s => upToT(s.T));
     const ccols = contractCols(T, false).map(c => Object.assign({}, c, { get: false }));
+    const gxOn = !!gexList();
     const groups = [];
     let nUA = 0;
     for (const s of sessions) {
@@ -1312,7 +1423,7 @@
       ${nf.__err ? `<div class="banner">No detail file for ${esc(sym)} yet (${esc(nf.__err.message)}). The numbers above come from the session's name list.</div>` : ''}
       ${rankBlockHTML(rrows, T, row)}
       <div class="charts one">
-        <div class="card2 pcard"><h4><span>Price, ${bars.length} days to ${esc(expShort(T || (bars.length ? bars[bars.length - 1][0] : ''), T))}</span></h4><div id="pchart"></div></div>
+        <div class="card2 pcard"><h4><span>Price, ${bars.length} days to ${esc(expShort(T || (bars.length ? bars[bars.length - 1][0] : ''), T))}</span>${gxOn ? '<span id="gexlab"></span>' : ''}</h4>${gxOn ? '<div class="gexbar" id="gexbar"></div>' : ''}<div id="pchart"></div>${gxOn ? `<div class="gexcap" id="gexcap">${gexCapHTML(undefined, T)}</div>` : ''}</div>
       </div>
       <div class="bcgrid">${bizCardHTML(bizD, idx, mcap, sector)}${cpCardHTML(cpD, T)}</div>
       <div class="nsecbar"><span class="t">Unusual contracts <span class="c">${int(nUA)}</span></span><span class="muted">${sessions.length ? `${int(sessions.length)} ${sessions.length === 1 ? 'session' : 'sessions'} to ${esc(dateLong(sessions[0].T))}` : 'no sessions up to this date'}</span></div>
@@ -1337,15 +1448,23 @@
       d.addEventListener('toggle', fill);
       fill();
     });
+    const gx = { g: undefined, pick: ghGet() };
     const drawPrice = () => {
       const box = $('#pchart', main);
       if (!box || seq !== renderSeq) return;
       const W = Math.max(240, Math.floor(box.clientWidth || 600));
-      box.innerHTML = priceSVG(bars, W, window.innerWidth <= 760 ? 260 : 340);
+      if (!gxOn) { box.innerHTML = priceSVG(bars, W, window.innerWidth <= 760 ? 260 : 340); return; }
+      box.innerHTML = gexChartSVG(bars, gx.g, gexH(gx.g, gx.pick), W, window.innerWidth <= 760 ? 300 : 420);
+      $('#gexbar', main).innerHTML = gexBarHTML(gx.g, gx.pick);
+      $('#gexcap', main).innerHTML = gexCapHTML(gx.g, T);
+      $('#gexlab', main).textContent = gexOk(gx.g) ? 'GEX levels' : '';
     };
     drawPrice();
     redrawName = drawPrice;
+    if (gxOn) loadGex(sym).then(g => { if (seq !== renderSeq) return; gx.g = g; drawPrice(); });
     main.addEventListener('click', e => {
+      const gb = e.target.closest('[data-gh]');
+      if (gb) { gx.pick = gb.dataset.gh; ghSet(gx.pick); drawPrice(); return; }
       const m = e.target.closest('[data-more]');
       if (m) { const d = m.closest('details.sgrp'); if (d) $('.gbody', d).innerHTML = bodyHTML(groups[+d.dataset.i], true); }
     });
@@ -1440,7 +1559,7 @@
     $('#upd').addEventListener('click', e => {
       if (!e.target.closest('a')) return;
       e.preventDefault();
-      cache.clear(); DS = {}; $('#upd').innerHTML = '';
+      cache.clear(); GEXC.clear(); DS = {}; $('#upd').innerHTML = '';
       getJSON('meta.json').then(m => { META = m; bustFor(m); lastRoute = null; route(); });
     });
     window.addEventListener('hashchange', () => route());

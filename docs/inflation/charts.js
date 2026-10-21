@@ -18,6 +18,7 @@
   var BLUE = ['#2B62C0', '#6E9BEA', '#B5CDF6'];
   var PAL = {
     core_cpi: CAT[0], head_cpi: CAT[1], c_head_cpi: CAT[1], core_pce: CAT[2], head_pce: CAT[3],
+    core_ppi: NEUTRAL[0], head_ppi: NEUTRAL[1],
     c_ann3: CAT[0], c_ann6: CAT[1], c_yoy: CAT[2], c_rev: CAT[0], c_first: CAT[0], c_gap: NEUTRAL[0], c_rev2: NEUTRAL[0],
     c_mct: '#E6E8EE', c_supply: BLUE[0], c_demand: BLUE[2], c_ambig: '#5D6170', c_total: '#E6E8EE',
     c_goods: BLUE[0], c_serv: BLUE[1], c_house: BLUE[2],

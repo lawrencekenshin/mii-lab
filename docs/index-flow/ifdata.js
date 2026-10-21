@@ -28,9 +28,16 @@
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
   function nowET() { const p = {}; for (const x of fmt.formatToParts(new Date())) p[x.type] = x.value;
     return `${p.year}-${p.month}-${p.day}T${p.hour === "24" ? "00" : p.hour}:${p.minute}:${p.second}`; }
+  const wfmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "2-digit", hour12: false });
+  function futOpen() {
+    const p = {}; for (const x of wfmt.formatToParts(new Date())) p[x.type] = x.value;
+    const h = +p.hour % 24, w = p.weekday;
+    if (w === "Sat" || (w === "Sun" && h < 18) || (w === "Fri" && h >= 17)) return false;
+    return h !== 17;
+  }
   function live(st) {
     const t = Date.now() / 1000;
-    return { now: nowET(), in_session: (st.sessions || []).some((s) => s[1] <= t && t <= s[2]), fut_open: false, live: {},
+    return { now: nowET(), in_session: (st.sessions || []).some((s) => s[1] <= t && t <= s[2]), fut_open: futOpen(), live: {},
       versions: Object.assign({}, st.versions) };
   }
   async function get(u) {
@@ -50,7 +57,7 @@
     }
     throw new Error("not on this page");
   }
-  window.IFDATA = { get };
+  window.IFDATA = { get, has: (s) => !!(status && (status.pages || []).includes(s)) };
   function showTab() {
     const t = document.querySelector(".top .tab[aria-current=page]"), row = t && t.parentNode;
     if (!row || row.scrollWidth <= row.clientWidth) return;

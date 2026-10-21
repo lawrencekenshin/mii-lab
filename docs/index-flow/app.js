@@ -1,5 +1,6 @@
 
 
+
 "use strict";
 const LW = window.LightweightCharts;
 const COL = { call: "#26a69a", put: "#ef5350", blue: "#3d7fe6", orange: "#c98317", purple: "#9d5bd6",
@@ -9,9 +10,9 @@ const PCOL = { SPY: "#3987e5", SPX: "#d95926", QQQ: "#199e70", NDX: "#c98500", I
 const FAM = { sp: { name: "S&P", etf: "SPY", idx: "SPX", c: "#3987e5" }, nq: { name: "Nasdaq", etf: "QQQ", idx: "NDX", c: "#c98500" },
   ru: { name: "Russell", etf: "IWM", idx: "RUT", c: "#9085e9" } };
 const FAMOF = { SPY: "sp", SPX: "sp", SPYSPX: "sp", ES: "sp", QQQ: "nq", NDX: "nq", QQQNDX: "nq", NQ: "nq", IWM: "ru", RUT: "ru", IWMRUT: "ru", RTY: "ru" };
-const TABS = [["S&P", [["SPY", "SPY"], ["SPX", "SPX"], ["SPYSPX", "SPY+SPX"]]],
-  ["Nasdaq", [["QQQ", "QQQ"], ["NDX", "NDX"], ["QQQNDX", "QQQ+NDX"]]],
-  ["Russell", [["IWM", "IWM"], ["RUT", "RUT"], ["IWMRUT", "IWM+RUT"]]], ["", [["TOTAL", "Total"]]]];
+const TABS = [["S&P", [["SPY", "SPY"], ["SPX", "SPX"], ["SPYSPX", "SPY+SPX"], ["ES", "ES"]]],
+  ["Nasdaq", [["QQQ", "QQQ"], ["NDX", "NDX"], ["QQQNDX", "QQQ+NDX"], ["NQ", "NQ"]]],
+  ["Russell", [["IWM", "IWM"], ["RUT", "RUT"], ["IWMRUT", "IWM+RUT"], ["RTY", "RTY"]]], ["", [["TOTAL", "Total"]]]];
 const FUTNAME = { ES: "E-mini S&P 500", NQ: "E-mini Nasdaq-100", RTY: "E-mini Russell 2000" };
 const AGG_STEP = { SPX: 10, NDX: 50, RUT: 10 };
 const MEGA = ["NVDA", "MSFT", "AAPL", "AMZN", "GOOGL", "META", "AVGO", "TSLA", "ORCL", "AMD", "MU", "PLTR", "TSM", "SMH", "SOXX", "EWY", "EWT"];
@@ -122,6 +123,8 @@ async function loadState() {
     S.d = d; S.v = d.v; S.live = d;
     render();
   } catch (e) {
+    if (FUTNAME[S.sym] && !window.IFDATA.has(S.sym)) {
+      S.sym = "SPY"; history.replaceState(null, "", "?s=SPY"); renderTabs(); return loadState(); }
     $("stxt").textContent = "no data yet (" + e.message + ")"; $("dot").className = "err";
   }
 }
@@ -287,7 +290,7 @@ function renderTilesFut() {
   out.push(tile(`${F.sym} · ${FUTNAME[F.sym]}`, `${f(p)}` + (ch != null ? `<small class="${ch >= 0 ? "up" : "dn"}">${sgn(ch, f)} (${sgn(ch / F.prev_close * 100, (x) => x.toFixed(2))}%)</small>` : ""),
     `${etDT(F.last_ts)} ET · change vs the previous day's close`));
   out.push(tile(`Basis vs ${F.base}`, `${sgn(F.basis, (x) => x.toFixed(2))}<small>pts</small>`,
-    `${F.sym} − ${F.base}, median of the last 30 cash minutes to ${etDT(F.basis_ts)} ET · every ${F.base} level + basis = ${F.sym}`));
+    `${F.sym} − ${F.base} on their latest shared 5-minute closes, to ${etDT(F.basis_ts)} ET · every ${F.base} level + basis = ${F.sym}`));
   const em = d.em && d.em.em, c0 = d.prev_close;
   if (em && c0) { const used = Math.abs(p - c0) / em * 100;
     out.push(tile("Expected move", `±${f(em)}<small>${f(c0 - em)} – ${f(c0 + em)}</small>`,
@@ -991,7 +994,7 @@ function renderCal() {
 function renderFoot() {
   const d = S.d;
   const combo = isFut() ? `<b>${d.sym}.</b> The ${d.etf}+${d.base} options book moved onto ${d.sym}: every ${d.base} level + the basis (${d.sym} − ${d.base}, ` +
-    `last 30 cash minutes). Futures bars: CME, sessions 18:00–17:00 ET; intraday bands run from the 18:00 open. ` :
+    `on their latest shared 5-minute closes). Futures bars: CME, sessions 18:00–17:00 ET; intraday bands run from the 18:00 open. ` :
     isPair() ? `<b>${d.etf}+${fs()}.</b> One book in ${fs()} points: ${d.etf} strikes × (${fs()} ÷ ${d.etf}); dollar gamma adds across products; volume is premium in $ because the contracts differ in size. ` :
     isTotal() ? `<b>Total.</b> SPY, SPX, QQQ, NDX, IWM and RUT. Gamma rows are % from each product's own price; volume is premium in $. ` : "";
   $("foot").innerHTML = combo + `<b>Sources.</b> Options: Cboe delayed quotes (about 15 minutes behind), every 15 minutes in the session; this page refreshes after each pull and after the close. Open interest is the previous settle. Price: 5-minute bars (no live quote here; between bars the price is the options snapshot's). VIX odds and typical moves: our own volatility model. Net gamma = call gamma minus put gamma.`;
@@ -1195,7 +1198,8 @@ function renderTabs() {
   const extra = isMega() || S.sym === "VIX" ? `<span class="tsep"></span><span class="tg">Open</span><button data-s="${S.sym}" class="on">${S.sym}</button>` +
     `<button class="tclose" data-close="1" title="Back to ${S.back || "SPY"}">×</button>` : "";
   $("tabs").innerHTML = TABS.map(([g, items], i) => (i ? '<span class="tsep"></span>' : "") + (g ? `<span class="tg">${g}</span>` : "") +
-    items.map(([k, t]) => `<button data-s="${k}" class="${k === S.sym ? "on" : ""}">${t}</button>`).join("")).join("") + extra;
+    items.filter(([k]) => !FUTNAME[k] || window.IFDATA.has(k))
+      .map(([k, t]) => `<button data-s="${k}" class="${k === S.sym ? "on" : ""}">${t}</button>`).join("")).join("") + extra;
   $("tabs").querySelectorAll("button[data-s]").forEach((b) => b.onclick = () => openSym(b.dataset.s));
   const x = $("tabs").querySelector("[data-close]");
   if (x) x.onclick = () => openSym(S.back || "SPY");

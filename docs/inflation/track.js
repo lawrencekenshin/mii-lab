@@ -29,14 +29,30 @@
     var t = o.at_utc ? Date.parse(o.at_utc) : NaN;
     return (isFinite(t) && isFinite(nowMs) && nowMs >= t && o.after) ? o.after : o.text;
   }
-  var api = { tagsMatch: tagsMatch, pickVariant: pickVariant, openView: openView, lineText: lineText };
+
+  function trackMeasures(track) {
+    var seen = {};
+    ['backtest', 'live'].forEach(function (vn) {
+      var V = (track && track.views && track.views[vn]) || {};
+      (V.blocks || []).forEach(function (b) {
+        if (b.id !== 'inflation') return;
+        (b.variants || []).forEach(function (v) { if (v.tags && v.tags.measure) seen[v.tags.measure] = true; });
+      });
+    });
+    return seen;
+  }
+  var api = { tagsMatch: tagsMatch, pickVariant: pickVariant, openView: openView, lineText: lineText, trackMeasures: trackMeasures };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 
 
   var NS = 'http://www.w3.org/2000/svg';
   var COL = { line: '#2A2E39', grid: '#22262F', muted: '#8A8E99', text: '#D1D4DC', white: '#FFFFFF', zero: '#5D6170',
     accent: '#7E57C2', light: '#B39DDB', up: '#26A69A', down: '#EF5350', amber: '#F2B04B', bg: '#131722' };
-  var MEASURES = [['core_cpi', 'Core CPI'], ['cpi', 'CPI'], ['core_pce', 'Core PCE'], ['pce', 'PCE']];
+  var MEASURES = [['core_cpi', 'Core CPI'], ['cpi', 'CPI'], ['core_pce', 'Core PCE'], ['pce', 'PCE'], ['core_ppi', 'Core PPI'], ['ppi', 'PPI']];
+
+
+
+  var OPTIONAL_MEASURES = { core_ppi: true, ppi: true };
   function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function sv(name, attrs, parent) { var e = document.createElementNS(NS, name); for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
@@ -262,9 +278,11 @@
         var s = h('section', 'tr-blk'); s.id = 'tr-' + b.id;
         var bh = h('div', 'tr-bh'); var hh = h('div', 'tr-bt'); hh.appendChild(h('h3', '', b.title)); hh.appendChild(ctx.info(b.note_id, b.title)); bh.appendChild(hh);
         if (b.id === 'inflation') {
+          var inTrack = trackMeasures(track);
           var ms = h('div', 'seg tr-mseg'); ms.setAttribute('role', 'group'); ms.setAttribute('aria-label', 'Measure');
           MEASURES.forEach(function (m) {
             var has = (b.variants || []).some(function (v) { return v.tags && v.tags.measure === m[0]; });
+            if (!has && OPTIONAL_MEASURES[m[0]] && !inTrack[m[0]]) return;
             var btn = h('button', '', m[1]); btn.type = 'button'; btn.setAttribute('data-v', m[0]); btn.disabled = !has;
             btn.setAttribute('aria-pressed', st.measure === m[0] ? 'true' : 'false');
             btn.addEventListener('click', function () { st.measure = m[0]; paint(); var t = document.getElementById('tr-inflation'); if (t) t.scrollIntoView({ block: 'start' }); });
@@ -304,5 +322,5 @@
     paint(); ctx.onRefresh(paint);
   }
 
-  root.ILTrack = { tagsMatch: tagsMatch, pickVariant: pickVariant, openView: openView, lineText: lineText, mountTrack: mountTrack };
+  root.ILTrack = { tagsMatch: tagsMatch, pickVariant: pickVariant, openView: openView, lineText: lineText, trackMeasures: trackMeasures, mountTrack: mountTrack };
 })(typeof window !== 'undefined' ? window : this);

@@ -3,6 +3,7 @@
 
 
 
+
 (function () {
   'use strict';
   var IL = window.ILCharts, SP = window.ILSimple, TR = window.ILTrack;
@@ -140,10 +141,15 @@
     TR.mountTrack($('track'), D.track, ctx);
     refreshAll();
   }
-  function load(first) {
-    return fetch(URL_, { cache: 'no-cache' }).then(function (r) {
+  function getJson(u) {
+    return fetch(u, { cache: 'no-cache' }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status); return r.json();
-    }).then(function (j) {
+    });
+  }
+  function load(first) {
+    var p = getJson(URL_);
+    if (URL_ !== RAW) p = p.catch(function () { return getJson(RAW); });
+    return p.then(function (j) {
       if (!j || j.kind !== 'inflation' || j.schema !== 2) throw new Error('unexpected file');
       if (!first && j.built_utc === built) return;
       D = j; built = j.built_utc; render();

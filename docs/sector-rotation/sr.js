@@ -72,6 +72,23 @@
   function tk(s) { return IND ? (ABBR[s.key] || String(s.short || s.name).split(/[ &,]/)[0].slice(0, 10)) : s.etf; }
   function subName(s) { return IND ? s.fear.listed + ' members' : s.etf; }
 
+  function memWords(s, n) {
+    var out = s.outside || [];
+    return out.length ? n + ' members: ' + (n - out.length) + ' S&amp;P 500 names plus ' + out.map(esc).join(', ') + ' (' + esc(s.etf || 'fund') + ' holdings listed outside the S&amp;P 500)' : n + ' S&amp;P 500 members';
+  }
+
+  function semisWords(I) {
+    var s = I && I.sectors && I.sectors.semiconductors;
+    if (!s || !s.br) return '';
+    var out = s.outside || [], also = [], where = {};
+    Object.keys(s.br.mem || {}).sort().forEach(function (x) {
+      I.keys.forEach(function (k) { var o = I.sectors[k]; if (k !== 'semiconductors' && o && o.br && o.br.mem && x in o.br.mem) { if (also.indexOf(x) < 0) also.push(x); where[o.name] = 1; } });
+    });
+    var add = (also.length ? also.map(esc).join(', ') + ' (also in ' + Object.keys(where).map(esc).join(', ') + ')' : '') + (also.length && out.length ? ' and ' : '') +
+      (out.length ? out.map(esc).join(', ') + ' (listed outside the S&amp;P 500, counted in this group only)' : '');
+    return ' <b>Semiconductors</b> follows the SMH fund: the S&amp;P chip makers without the solar-panel makers the GICS code files with them (First Solar)' + (add ? ', plus SMH\'s holdings ' + add : '') + '.';
+  }
+
 
   function bind() {
     var I = RAW.families && RAW.families.industries;
@@ -239,7 +256,7 @@
     if (!RAW) return;
     var ch = chipFor(), chip = $('chip');
     chip.textContent = ch.text; chip.className = 'chip ' + ch.cls;
-    var mapped = KEYS.reduce(function (a, k) { return a + S[k].fear.listed; }, 0), listed = MK.fear.listed;
+    var mapped = IND && SR.n_mapped != null ? SR.n_mapped : KEYS.reduce(function (a, k) { return a + S[k].fear.listed; }, 0), listed = MK.fear.listed;
     $('asof').textContent = IND ? KEYS.length + ' industry groups (12+ S&P members each) · ' + mapped + ' of ' + listed + ' S&P members in a group · equal-weight indexes'
       : 'The ' + KEYS.length + ' S&P 500 sectors · ' + mapped + ' of ' + listed + ' S&P members mapped to a sector · SPDR sector funds';
     var v = vintageLine(), vl = $('vintage');
@@ -868,7 +885,7 @@
       var king = m && m.king_strike != null ? '<span class="gold">' + strike(m.king_strike) + '</span> <span class="muted">' + fd(m.king_expiry) + ' · ' + sgnPct(m.king_pct_away) + '</span>' : '<span class="no">–</span>';
       return '<tr><td class="l"><span class="symw">' + symA(sym) + oiBtn(sym) + '</span></td><td class="' + cls(rr) + '">' + sgnPct(rr) + '</td><td>' + (sc ? '<span class="zone zone-normal" style="margin-right:8px">scared</span>' : '') + ebar + '</td><td class="c20">' + yn(bm && bm[0]) + '</td><td>' + yn(bm && bm[1]) + '</td><td>' + yn(bm && bm[3]) + '</td><td>' + gam + '</td><td>' + king + '</td><td>' + (m && m.setup ? '<span class="' + setupCls(m.setup) + '">' + m.setup + '</span>' : '<span class="no">–</span>') + '</td></tr>';
     }).join('');
-    var memT = '<section class="card"><div class="card-head"><div class="card-title"><h2>Members</h2><p class="sub">' + syms.length + ' S&amp;P 500 members, most scared first. Scared = the member counts as scared on the daily candle (the Fear meter page\'s rule); gamma, king node and setup come from each member\'s own options map.</p></div></div>' +
+    var memT = '<section class="card"><div class="card-head"><div class="card-title"><h2>Members</h2><p class="sub">' + memWords(s, syms.length) + ', most scared first. Scared = the member counts as scared on the daily candle (the Fear meter page\'s rule); gamma, king node and setup come from each member\'s own options map.</p></div></div>' +
       '<div class="tbl-scroll"><table class="mem"><thead><tr><th class="l">Member</th><th>1M</th><th><span class="t-l">Fear today</span><span class="t-s">Fear</span></th><th class="c20">Above 20-day</th><th><span class="t-l">Above 50-day</span><span class="t-s">50d</span></th><th><span class="t-l">Above 200-day</span><span class="t-s">200d</span></th><th>Gamma</th><th><span class="t-l">King node</span><span class="t-s">King</span></th><th>Setup</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
     return head + tiles + chart + mapCard + '<section class="card" style="border-top:0;margin-top:0;padding-top:0">' + mini + '</section>' + memT;
   }
@@ -878,13 +895,13 @@
     var un = RAW.universe || {}, man = un.manual || [], listed = RAW.market.fear.listed;
     var mappedSec = RAW.keys.reduce(function (a, k) { return a + (RAW.sectors[k] && RAW.sectors[k].fear ? RAW.sectors[k].fear.listed : 0); }, 0);
     var I = RAW.families && RAW.families.industries;
-    var p1 = '<p><b>Sectors</b> = the 11 GICS sectors of today\'s S&amp;P 500 members, each with its SPDR fund (XLK … XLRE). <b>Industries</b> = the industry groups with at least 12 S&amp;P members' + (I ? ' (' + I.keys.length + ' today)' : '') + '; a group\'s rotation line is the equal-weight index of its members (each member\'s daily return counted the same) against the equal-weight index of all S&amp;P members, with the same rotation-map maths as the sectors. ' +
+    var p1 = '<p><b>Sectors</b> = the 11 GICS sectors of today\'s S&amp;P 500 members, each with its SPDR fund (XLK … XLRE). <b>Industries</b> = the industry groups with at least 12 S&amp;P members' + (I ? ' (' + I.keys.length + ' today)' : '') + '; a group\'s rotation line is the equal-weight index of its members (each member\'s daily return counted the same) against the equal-weight index of all S&amp;P members, with the same rotation-map maths as the sectors.' + semisWords(I) + ' ' +
       '<b>Fear meter</b> = % of the members scared on the daily candle (the same rule as the Fear meter page); its alarm line = a high reading by the ' + 'group\'s own history. ' +
       '<b>Breadth</b> = % of members above their 20/50/100/200-day average; washout = the 50-day line drops to a deeply washed-out level after it had recovered since the previous washout (the Breadth page\'s rule); TURN = breadth climbs back through its turn line after a washout; RECOVERING = after a washout, before the TURN. <b>Rotation</b> = strength against the benchmark (RS-Ratio) and its momentum (RS-Momentum), weekly, 100 = even. ' +
       '<b>Gamma</b> = the dealer options map: king node = the biggest single + strike × expiry, flip = where dealer gamma turns from − to +, long gamma = price above the flip. Group funds: Semiconductors SMH, Software IGV, Banks KRE, Energy XLE, Utilities XLU, Real Estate XLRE, Staples XLP; other groups show their members\' maps only.</p>';
     var mf = RAW.market.fear;
     var p2 = '<p>Counts: ' + listed + ' S&amp;P members, ' + mappedSec + ' of them with a sector' + ((un.unmapped || []).length ? ' (' + un.unmapped.join(', ') + ' not mapped yet, counted in the S&amp;P row only)' : '') +
-      (I ? '; ' + I.keys.reduce(function (a, k) { return a + (I.sectors[k].fear ? I.sectors[k].fear.listed : 0); }, 0) + ' in one of the industry groups' : '') + '. Breadth counts every member; the fear meter counts the ' + mf.n + ' with enough price history' + ((mf.short_history || []).length ? ' (' + mf.short_history.join(', ') + ' are too new)' : '') + '.' +
+      (I ? '; ' + (I.n_mapped != null ? I.n_mapped : I.keys.reduce(function (a, k) { return a + (I.sectors[k].fear ? I.sectors[k].fear.listed : 0); }, 0)) + ' in one of the industry groups' : '') + '. Breadth counts every member; the fear meter counts the ' + mf.n + ' with enough price history' + ((mf.short_history || []).length ? ' (' + mf.short_history.join(', ') + ' are too new)' : '') + '.' +
       (man.length ? ' Mapped by hand (new S&amp;P names): ' + man.map(function (m) { var sec = RAW.sectors[m.sector]; return '<b>' + esc(m.sym) + '</b> → ' + esc(sec ? sec.short : m.sector) + (m.group ? ' / ' + esc(m.group) : ''); }).join(', ') + '.' : '') + '</p>';
     var base = bf('fear'), d = [];
     if (base) d.push('fear and breadth from the ' + fdw(base) + ' close' + (bf('breadth') && bf('breadth') !== base ? ' (breadth ' + fdw(bf('breadth')) + ')' : ''));

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQQ Cycle Model · live</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23151a23%22/%3E%3Cpath d=%22M2 12 C5 12 5 4 8 5 S11 11 14 3%22 stroke=%22%235b8def%22 stroke-width=%221.7%22 fill=%22none%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css?v=20261021qqc2">
+</head>
+<body>
+<a class="skip" href="#now">Skip to the readings</a>
+<header class="sitehdr">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">QQQ Cycle Model</span><span class="t-short">Cycle</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>QQQ <span>Cycle Model</span></h1>
+      <div class="sub">Where QQQ sits in its market cycle, the past cycles that looked most like this one, and what came next. Every line is scored against what really happened.</div>
+    </div>
+    <div class="vint num" id="vint">Loading…</div>
+  </header>
+
+  <div class="controls">
+    <div class="fg"><span class="lab">Show</span><span id="shows"></span></div>
+    <div class="fg"><span class="lab">Back</span><span id="ranges"></span></div>
+    <div class="fg"><span class="lab">Past forecast</span><select id="pastsel" class="sel"></select></div>
+    <nav class="jump"><a href="#now">Now</a><a href="#cycles">Cycles</a><a href="#odds">Odds</a><a href="#record">Record</a></nav>
+  </div>
+
+  <section id="now" class="cards"></section>
+
+  <section class="chartbox">
+    <div class="legend" id="legend"></div>
+    <div id="chart"></div>
+    <div class="readout num" id="readout"></div>
+  </section>
+
+  <section id="cycles">
+    <h2>The ten closest past cycles <span class="h2s" id="cycsub"></span></h2>
+    <div class="tscroll"><table class="grid num rows" id="cyctab"></table></div>
+    <h2>Recent-shape matches <span class="h2s">the last six months or so against every stretch of the same length of the Nasdaq-100 since 1985</span></h2>
+    <div class="tscroll"><table class="grid num rows" id="shapetab"></table></div>
+  </section>
+
+  <section id="odds">
+    <h2>Odds at today's volatility <span class="h2s" id="oddsub"></span></h2>
+    <div class="tscroll"><table class="grid num" id="oddtab"></table></div>
+  </section>
+
+  <section id="record">
+    <h2>Record: the model line, rebuilt every Friday since Jan 2025 <span class="h2s">each one made only from data known that day</span></h2>
+    <div class="statrow" id="bfstats"></div>
+    <div class="tscroll"><table class="grid num rows" id="bftab"></table></div>
+    <h2>Record: live forecasts <span class="h2s">saved after each close, never edited</span></h2>
+    <div class="tscroll"><table class="grid num" id="livetab"></table></div>
+    <h2>Record: walk-forward test 2013 → now <span class="h2s" id="wfsub"></span></h2>
+    <div class="filters"><div class="fg"><span class="lab">Method</span><span id="wfmeth"></span></div><div class="fg"><span class="lab">Horizon</span><span id="wfh"></span></div></div>
+    <div class="tscroll"><table class="grid num" id="wftab"></table></div>
+    <h2>Record: VXN ranges <span class="h2s">share of real QQQ moves that landed inside each range</span></h2>
+    <div class="tscroll"><table class="grid num" id="vxtab"></table></div>
+    <h2>Model line changes</h2>
+    <div class="tscroll"><table class="grid" id="swtab"></table></div>
+  </section>
+
+  <footer class="defs" id="defs">
+    <p><b>Model line</b> — the anchored analog. The anchor is the current cycle low: the lowest close of about the past
+      year, reached after a correction and not undercut since, with price now well above it. The path since that low is
+      matched against the path after every past cycle low of the Nasdaq-100 (1985+) and the S&amp;P 500 (1950+). A past
+      cycle may run faster or slower and bigger or smaller than this one; the match score (fit) is the correlation of the
+      two paths, with one cycle per historical episode. The best match is <b>locked</b> and its projection frozen; it
+      stays the model line until a new cycle low, or until price has stayed well away from it for about a week.</p>
+    <p><b>Other cycles</b> — the next nine matches, each projected the same way. <b>Analog spread</b> — the 10–90% spread
+      of all ten, weighted by match score. <b>Recent-shape matches</b> — the last six months or so of QQQ against every
+      stretch of the same length of the Nasdaq-100.</p>
+    <p><b>Range</b> — 50% and 80% ranges from today's VXN (the Nasdaq-100 volatility index), widening with time, with a
+      small upward drift. How often real moves landed inside them is in the Record.</p>
+    <p><b>Cycle phase</b> — the four stages of a market cycle (Weinstein's stages, the same four as Wyckoff's phases), read
+      from the long-term average and its recent slope. Markup = price above a rising average; Markdown = below a falling
+      one; otherwise Distribution after Markup, Accumulation after Markdown.</p>
+    <p><b>Odds</b> — every session since 2013 with VXN close to today's level, and what QQQ did next.</p>
+    <p><b>Record</b> — the model line rebuilt every Friday since January 2025 and the forecasts saved after each close,
+      each made only from data known that day and scored against what QQQ did after; the walk-forward test reruns the
+      model over 2013 → now the same way. <b>Gap</b> — the average distance between a line and the real closes after it
+      was made; <b>flat-line gap</b> — the same for a flat line at that day's close.</p>
+    <p class="dim">Prices: daily bars of QQQ, the Nasdaq-100, the S&amp;P 500 and VXN. Rebuilt after each close; today's
+      so-far candle updates during US hours.</p>
+  </footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="app.js?v=20261021qqc2"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfect Bottom Finder · live</title>
+<meta name="description" content="Stocks washed out on the daily, weekly, 2-week and monthly KDJ at once, and how far each has climbed the turn back up. Rebuilt after each close.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/pbf.css?v=20261021a">
+</head>
+<body>
+<a class="skip" href="#app">Skip to the board</a>
+<header class="sitehdr">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Perfect Bottom Finder</span><span class="t-short">Bottom</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div class="rainbow"></div>
+<div class="pbar">
+  <a class="pbrand" href="#board"><span class="mark"></span>PERFECT BOTTOM FINDER</a>
+  <input class="search" id="find" list="syms" placeholder="Find a ticker" autocomplete="off" spellcheck="false" aria-label="Find a ticker">
+  <datalist id="syms"></datalist>
+  <div class="vintage" id="vintage"></div>
+</div>
+<main class="wrap" id="app"><p class="lede">Loading the board…</p></main>
+<script src="js/charts.js?v=20261021a"></script>
+<script src="js/pbf.js?v=20261021a"></script>
+</body>
+</html>

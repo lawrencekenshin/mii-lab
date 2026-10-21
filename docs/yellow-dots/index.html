@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yellow Dots × Business · live</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23e3b341'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css?v=20261021b">
+</head><body>
+<a class="skip" href="#lst">Skip to the board</a>
+<header class="sitehdr">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">Yellow Dots × Business</span><span class="t-short">Dots</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div id="bar">
+ <span class="brand"><i></i>Yellow Dots × Business</span>
+ <span class="grp" data-k="tf"><span class="gl">Dots</span><span class="chip" data-v="all">All</span><span class="chip" data-v="D">D</span><span class="chip" data-v="W">W</span><span class="chip" data-v="2W">2W</span><span class="chip" data-v="M">M</span><span class="chip tog" data-t="now">Now only</span></span>
+ <span class="grp" data-k="cut"><span class="gl">Business</span><span class="chip" data-v="50">50+</span><span class="chip" data-v="60">60+</span><span class="chip" data-v="70">70+</span></span>
+ <span class="grp" data-k="l"><span class="gl">List</span><span class="chip" data-v="all">All</span><span class="chip" data-v="spx">S&amp;P</span><span class="chip" data-v="ndx">QQQ</span><span class="chip" data-v="rui">R1000</span><span class="chip" data-v="ai">AI</span></span>
+ <span class="grp" data-k="c"><span class="gl">Calls</span><span class="chip" data-v="any">Any</span><span class="chip" data-v="top10">Top 10%</span><span class="chip" data-v="build">Building calls</span></span>
+ <span class="sp"></span>
+ <input id="q" class="srch" placeholder="Search ticker…" autocomplete="off" spellcheck="false">
+ <span id="status"><b></b><span>loading…</span></span>
+</div>
+<div id="tiles" class="tiles"></div>
+<div class="main">
+ <div id="lst"></div>
+ <div id="det"></div>
+</div>
+<div id="foot"></div>
+<footer class="defs">
+ <p><b>Yellow dot</b> — the Washout indicator's yellow dot (the same dot as on the Eagle Eye charts): the candle on which a
+  stock is marked washed out after a deep sell-off. D · W · 2W · M = daily, weekly, 2-week and monthly candles. A filled
+  chip = a dot on the last finished candle; an outlined chip = a dot 1–2 candles ago.</p>
+ <p><b>Business</b> — a 0–100 score of the business: revenue and earnings growth, PEG, free-cash-flow growth and margin and
+  last quarter's revenue, each ranked against the S&amp;P 500 + Nasdaq-100 and blended. The board lists names at 50+ and
+  opens on 60+; mortgage REITs are left out.</p>
+ <p><b>Calls : puts held</b> — open call contracts against open put contracts over every strike and expiry at the latest
+  settle. Top / bottom 10% = among the most call-heavy / put-heavy tenth of all stocks with a real options book.</p>
+ <p><b>New positions</b> — call and put contracts added over the last week's settles, with the side the Skew Tracker reads
+  for each window (1D · 1W · 2W · 1M: green calls, red puts, grey no clear side); a list tag is the name's rank on the Skew
+  Tracker's call or put list.</p>
+ <p><b>King GEX</b> — the King GEX Tracker's king node for the name (the strike with the most call gamma), how strong it is
+  against every tracked name, and how many sessions it has held. FRESH = open interest piling up at the king contract over
+  the last week of settles, with a large part of it new. PUTS &gt; KING = a put-heavy cluster carries more gamma than the
+  king.</p>
+ <p><b>From high</b> — the last close against the 52-week high. <b>KDJ</b> — the state on each candle size: GC = golden
+  cross, coil, up, down.</p>
+</footer>
+<script src="app.js?v=20261021b"></script>
+</body></html>
