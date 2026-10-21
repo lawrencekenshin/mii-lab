@@ -281,7 +281,7 @@
   var GEO = { o: null };
   var hover = { o: null };
 
-  var OUT = null, ROWS = [], GROUPS = [], RBY = {}, GBY = {}, REF = null, REFIDX = null, OPEN = {}, LIVE = false, CPON = true;
+  var OUT = null, ROWS = [], GROUPS = [], RBY = {}, GBY = {}, REF = null, REFIDX = null, OPEN = {}, LIVE = false, CPON = true, SICON = false;
   var SDOC = {}, SDOC_ORDER = [], GDOC = {};
   var F = { kind: normKind(stored(PFX + 'Kind')) || 'all', idx: normIdx(stored(PFX + 'Idx')) || 'all', q: '', all: false };
   var CK = normCK(stored(PFX + 'Crowd')) || 'all', CALL = false;
@@ -336,6 +336,7 @@
     GROUPS.forEach(function (g) { GBY[g.id] = g; });
     LIVE = d.meta.state === 'LIVE';
     CPON = !(d.context && d.context.cp_public === false);
+    SICON = !!(d.context && d.context.industries === 'sec');
     if (!CPON) {
       FCOLS = FCOLS.filter(function (c) { return c.k !== 'cpsh'; });
       FSORT = FSORT.filter(function (o) { return o[0] !== 'cpsh'; });
@@ -725,7 +726,7 @@
   function peerNote(r) {
     var p = r.peer || {};
     if (p.level === 'theme') return 'compared with its ' + themeShort(p.name) + ' crowd, more ' + ADJ + ' today than its industry' + (p.chain && p.chain.name ? ' (' + p.chain.name + ')' : '');
-    if (p.level === 'sector') return 'compared with its sector';
+    if (p.level === 'sector') return !SICON ? 'compared with its sector' : r.industry ? 'compared with its sector: few ' + r.industry + ' stocks on the board' : 'no industry code on file, so compared with its sector';
     if (p.level === 'market') return 'compared with every stock on the board';
     return null;
   }
