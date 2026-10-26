@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="kdjwash.css?v=7">
 <link rel="stylesheet" href="newlows.css?v=4">
 <link rel="stylesheet" href="tbreadth.css?v=1">
+<link rel="stylesheet" href="gcross.css?v=2">
 </head>
 <body>
 <a class="skip" href="#daily">Skip to the chart</a>
@@ -94,6 +95,61 @@
       <div class="box">
         <div class="box-row"><b>How to read it</b><span><span id="howTo"></span><span class="box-p zone-key" id="zoneKey"></span></span></div>
         <div class="box-row"><b>Right now</b><span id="rightNow"></span></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="gcross" aria-labelledby="tgc">
+      <div class="card-head">
+        <div class="card-title">
+          <h2 id="tgc">Golden cross / death cross<span class="tsep"> · </span><span class="tspan" data-gcspan>last year</span></h2>
+          <p class="sub">When the blue 50-day line crosses the orange 200-day line on the S&amp;P 500</p>
+        </div>
+      </div>
+      <p class="panel-asof" id="asofGC"></p>
+      <p class="banner banner-warn" id="errGC" hidden></p>
+      <p class="gc-na" id="naGC" hidden></p>
+      <div id="bodyGC" hidden>
+        <div class="gc-top">
+          <div class="gc-now" id="nowGC" aria-live="polite"></div>
+          <div class="gc-side">
+            <div class="readout readout-grid"><div class="rg" id="tilesGC"></div></div>
+            <div id="idxWrapGC">
+              <p class="gc-idxh">The other two indexes, at their last close</p>
+              <div class="gc-idx" id="idxGC"></div>
+            </div>
+          </div>
+        </div>
+        <div class="controls gc-controls">
+          <div class="seg seg-range gc-range" role="group" aria-label="Golden cross chart time window">
+            <button type="button" data-gcr="1Y" aria-pressed="true" aria-label="Last year">1Y</button>
+            <button type="button" data-gcr="3Y" aria-pressed="false" aria-label="Last 3 years">3Y</button>
+            <button type="button" data-gcr="All" aria-pressed="false" aria-label="All data since 2013">Since 2013</button>
+          </div>
+        </div>
+        <div class="readout gc-ro" id="roGC" aria-live="polite"></div>
+        <div class="gc-chart" id="chartGC" role="img" aria-label="SPY above; the 50-day and 200-day breadth lines below, with the big crosses marked"></div>
+        <p class="legend" id="lgGC"></p>
+        <div class="gc-h3row">
+          <h3 class="gc-h3">What SPY did next</h3>
+          <div class="seg gc-base" role="group" aria-label="Years in the summary">
+            <button type="button" data-gcb="2021" aria-pressed="true">Since 2021</button>
+            <button type="button" data-gcb="2013" aria-pressed="false">Since 2013</button>
+          </div>
+        </div>
+        <p class="gc-cap" id="capGC"></p>
+        <div class="table-scroll"><table class="gc-table gc-sum" id="sumGC"></table></div>
+        <h3 class="gc-h3">Golden crosses <span class="muted">· newest first</span></h3>
+        <div class="table-scroll"><table class="gc-table" id="tabG"></table></div>
+        <button type="button" class="gc-more-btn" id="moreG" data-gcmore="g" aria-controls="tabG" hidden></button>
+        <h3 class="gc-h3">Death crosses <span class="muted">· newest first</span></h3>
+        <div class="table-scroll"><table class="gc-table" id="tabD"></table></div>
+        <button type="button" class="gc-more-btn" id="moreD" data-gcmore="d" aria-controls="tabD" hidden></button>
+        <p class="eli5 gc-eli5" id="eli5GC"></p>
+        <div class="box">
+          <div class="box-row"><b>How to read it</b><span id="howGC"></span></div>
+        </div>
+        <p class="src gc-src" id="srcGC"></p>
       </div>
     </section>
 
@@ -237,7 +293,6 @@
       </div>
       <p class="small" id="tbData"></p>
     </section>
-
 
 
     <section class="card" id="vixts" aria-labelledby="tvx">
@@ -593,5 +648,6 @@
 <script src="kdjwash.js?v=7" defer></script>
 <script src="newlows.js?v=4" defer></script>
 <script src="tbreadth.js?v=1" defer></script>
+<script src="gcross.js?v=2" defer></script>
 </body>
 </html>
