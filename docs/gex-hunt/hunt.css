@@ -74,6 +74,9 @@ tr.other td.why { color:var(--sub); }
 .kd.COIL { background:#4a3a10; border-color:#8a6d1a; color:#ffd77a; }
 .kd.UP { border-color:#26a69a; color:#7fd3c9; }
 .kd.DOWN { border-color:#7a2d2d; color:#e88a88; }
+.kd.old { opacity:.45; }
+.kdr { white-space:nowrap; }
+.kdr + .kdr { margin-top:3px; }
 .sc { display:inline-flex; align-items:center; gap:6px; }
 .sc i { display:inline-block; width:50px; height:6px; border-radius:3px; background:#2a2e39; position:relative; overflow:hidden; }
 .sc i b { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg, #26a69a, #f5d63d); }

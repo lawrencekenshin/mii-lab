@@ -146,11 +146,14 @@ function glyph(r, w = (WIDE() ? 210 : MID() ? 150 : 120), hgt = 46) {
     s += `<rect x="${(i * step + 0.6).toFixed(1)}" y="${(v > 0 ? base - hgtB : base).toFixed(1)}" width="${(step - 1.2).toFixed(1)}" height="${hgtB.toFixed(1)}" fill="${col}"/>`; });
   return s + `<line x1="0" x2="${w}" y1="${base + .5}" y2="${base + .5}" stroke="#363a45"/><line x1="${x0}" x2="${x0}" y1="2" y2="${hgt - 2}" stroke="#2962ff" stroke-dasharray="2,2"/></svg>`;
 }
+
 function kdj(r) {
   if (!r.tf || !Object.keys(r.tf).length) return '<span class="muted">–</span>';
-  return ['1W', '2W', '1M'].map(t => { const x = r.tf[t]; if (!x) return `<span class="kd">${t} –</span>`;
+  const chip = t => { const x = r.tf[t]; if (!x) return `<span class="kd">${t} –</span>`;
     const lab = { GOLDEN: 'GC', COIL: 'coil', UP: 'up', DOWN: 'dn' }[x[0]] || x[0].toLowerCase();
-    return `<span class="kd ${x[0]}" title="${t} KDJ ${x[0]}${x[1] != null ? ', ' + x[1] + ' bars' : ''}${x[2] ? ', washout' : ''}">${t} ${lab}</span>`; }).join('');
+    return `<span class="kd ${x[0]}${x[4] ? ' old' : ''}" title="${t} KDJ ${x[0]}${x[1] != null ? ', ' + x[1] + ' bars' : ''}${x[2] ? ', washout' : ''}${x[3] != null ? ', J ' + Math.round(x[3]) : ''}${x[4] ? ', as of the ' + day(x[4]) + ' close' : ''}">${t} ${lab}</span>`; };
+  const line = ts => `<div class="kdr">${ts.map(chip).join('')}</div>`;
+  return line(['1W', '2W', '1M']) + (['1H', '4H', '1D'].some(t => r.tf[t]) ? line(['1H', '4H', '1D']) : '');
 }
 function chips(r, max = (WIDE() ? 4 : MID() ? 3 : 2)) {
   const g = hh(r), tk = g.kt;
@@ -333,7 +336,7 @@ function cols() {
   const w = W();
   return [['rk', '#', 0], ['s', 'Stock', 1], ['px', 'Price · 20d', 1, 'r'], ['b', `GEX by strike<br><span class="thsub">below ← price → above</span>`, 0],
     ['up', w.stack, 1, 'r'], ['dn', w.other, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 1], ['com', 'Centre', 1, 'r'],
-    ['fr', w.added, 1, 'r'], ['cp', 'Calls : Puts', 1], ['tf', 'KDJ 1W · 2W · 1M', 0], ['biz', 'Business', 1], ['sc', 'Score', 1]];
+    ['fr', w.added, 1, 'r'], ['cp', 'Calls : Puts', 1], ['tf', `KDJ 1W · 2W · 1M<br><span class="thsub">1H · 4H · 1D</span>`, 0], ['biz', 'Business', 1], ['sc', 'Score', 1]];
 }
 function headRow(C) {
   const [sk0, sd] = SORT();
@@ -396,7 +399,7 @@ async function renderBoard() {
   wireViewBar();
 }
 function foot() {
-  return `<div class="foot">Bars are GEX by strike: net calls − puts per strike, $ per 1% move, priced at the close, every expiry in the ${S.h} window. Green = mostly call open interest, red = mostly puts. "${W().added}" = ${W().mine} open interest at the stack's levels vs the settle a week earlier, same expiries still open. "Calls : Puts" = all open call vs put contracts in the window's expiries (every strike); the white tick and ▲/▼ = the call share a week earlier, same expiries. Rebuilt once a day from end-of-day options open interest. ${D.canonical ? '' : `<span class="am">This build already carries the ${day(D.settle)} settle (next-morning data) with the ${day(D.day)} close; saved days and the record use the evening build.</span>`} History starts ${day(D.history.first_day)}; days before the live build were rebuilt from saved open-interest snapshots.</div>`;
+  return `<div class="foot">Bars are GEX by strike: net calls − puts per strike, $ per 1% move, priced at the close, every expiry in the ${S.h} window. Green = mostly call open interest, red = mostly puts. "${W().added}" = ${W().mine} open interest at the stack's levels vs the settle a week earlier, same expiries still open. "Calls : Puts" = all open call vs put contracts in the window's expiries (every strike); the white tick and ▲/▼ = the call share a week earlier, same expiries. KDJ = 9,3,3 on each timeframe's last closed candle at the close (1H / 4H from that session's hourly bars, 4H = the 09:30 and 13:30 ET blocks): GC = golden cross in the last few candles, coil = K closing in on D from below, up / dn = K above / below D. Rebuilt once a day from end-of-day options open interest. ${D.canonical ? '' : `<span class="am">This build already carries the ${day(D.settle)} settle (next-morning data) with the ${day(D.day)} close; saved days and the record use the evening build.</span>`} History starts ${day(D.history.first_day)}; days before the live build were rebuilt from saved open-interest snapshots.</div>`;
 }
 
 
