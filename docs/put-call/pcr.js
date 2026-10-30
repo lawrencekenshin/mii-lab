@@ -687,7 +687,8 @@
     var L = liveSyms(), lt = L[SIDE];
     var pathAge = lt && lt.updated ? (Date.now() - new Date(lt.updated).getTime()) / 60000 : null;
 
-    var behind = live && etNow().min >= 615 && (!lt || lt.session !== today || pathAge == null || pathAge > 55);
+
+    var behind = live && etNow().min >= 630 && (!lt || lt.session !== today || pathAge == null || pathAge > 55);
     var lost = (Date.now() - LAST_OK) / 60000 > 35;
     chip.className = 'chip ' + (lost ? 'chip-stale' : behind ? 'chip-late' : live ? 'chip-live' : 'chip-closed');
     chip.textContent = lost ? 'NO CONNECTION' : behind ? 'LATE' : live ? 'LIVE' : 'CLOSED';

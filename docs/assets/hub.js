@@ -96,7 +96,7 @@
       line: 'Are traders loading up on puts or calls against their own history? Cboe put/call ratios (S&P 500 index options, stocks, ETFs, VIX and every option) read against SPY and QQQ, with KDJ, peaks and turns, odds tables and today’s 15-minute path.',
       when: 'Every 15 min in US hours; Cboe’s daily file in the evening ET',
       feed: { file: 'put-call-data/put-call/manifest.json', due: 900, live: 45,
-        read: function (j) { return { day: j.open && j.session ? j.session : j.as_of, ts: j.generated_utc, state: j.state }; } } },
+        read: function (j) { return { day: j.open && j.session && j.as_of >= prevSession(j.session) ? j.session : j.as_of, ts: j.generated_utc, state: j.state }; } } },
     { id: 'volume-signals', live: true, name: 'Volume Signals', url: 'volume-signals/',
       line: 'Are the index ETFs breaking out on light volume, capitulating, or trading their lowest volume in a year? Buy zones, caution and volume by price.',
       when: 'Every 15 min in US hours, plus an update after the close',
