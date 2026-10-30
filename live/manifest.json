@@ -1,0 +1,29 @@
+{
+ "schema": 1,
+ "generated_at": 1793397040,
+ "generated_utc": "2026-10-30T21:50:40+00:00",
+ "state": "CLOSED",
+ "as_of": "2026-10-30",
+ "as_of_utc": "2026-10-30T21:50:40+00:00",
+ "files": {
+  "fear.json": {
+   "sha256": "e2b821053f354e30ea36f6afa26ef5ff9320c04b7b8626c9785aa8697122c786",
+   "bytes": 222985,
+   "as_of": "2026-10-30"
+  },
+  "breadth.json": {
+   "sha256": "059fc0e9ecf1c40827592e5fabfd4a5a201c0214fc0cbee3d3c23786ad5c9c73",
+   "bytes": 426381,
+   "as_of": "2026-10-30",
+   "generated_at": 1793397040,
+   "state": "CLOSED"
+  },
+  "vix.json": {
+   "sha256": "0db32fc3446685c004ad78f3dafbc18329983e14feecb6eadb2610f084176f85",
+   "bytes": 50585,
+   "as_of": "2026-10-30",
+   "generated_at": 1793397040,
+   "state": "CLOSED"
+  }
+ }
+}
