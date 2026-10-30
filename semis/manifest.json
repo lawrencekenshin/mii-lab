@@ -1,0 +1,15 @@
+{
+ "schema": 1,
+ "generated_at": 1793400326,
+ "generated_utc": "2026-10-30T22:45:26+00:00",
+ "state": "CLOSED",
+ "as_of": "2026-10-30",
+ "kind": "close",
+ "files": {
+  "semis.json": {
+   "sha256": "6839b5f8c4a65375b7a2993ba82ff3ae310c800f1a89ff5d21d98bec457e2354",
+   "bytes": 244046,
+   "as_of": "2026-10-30"
+  }
+ }
+}
