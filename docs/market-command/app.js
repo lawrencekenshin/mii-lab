@@ -635,7 +635,7 @@
     panic: e => [e.armed === true ? `armed${ok(e.age) ? `, day ${int(e.age)}` : ''}` : e.armed === false ? 'not armed' : '',
                  str(e.latest_panic) ? `last panic day ${dayY(e.latest_panic)}` : '', str(e.confirmed) ? `last demand confirmation ${dayY(e.confirmed)}` : ''],
     putcall: e => [ok(e.pct) ? `higher than ${Math.round(e.pct)}% of past readings` : '',
-                   ok(obj(e.tot).ratio) ? `all Cboe options ${num(e.tot.ratio, 2)}${str(e.tot.zone) ? ` (${e.tot.zone})` : ''}` : ''],
+                   ok(obj(e.spx).ratio) ? `SPX ${num(e.spx.ratio, 2)}${str(e.spx.zone) ? ` (${e.spx.zone})` : ''}` : ''],
     washout: e => [e.on === true ? `washout day ${int(e.day)}${str(e.since) ? ` since ${day(e.since)}` : ''}` : '', str(e.thrust_line) ? e.thrust_line : '',
                    str(e.cross) ? `${e.cross} cross${ok(e.cross_run) ? `, ${plural(e.cross_run, 'day')}` : ''}${e.cross_big === true ? ' (a big one)' : ''}` : ''],
     newlows: e => [ok(e.n) && ok(e.e) ? `${int(e.n)} of ${int(e.e)} listings` : ''],
