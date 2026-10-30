@@ -1,0 +1,153 @@
+{
+ "schema": 2,
+ "kind": "neocloud-fear",
+ "generated_utc": "2026-10-30T20:21:19+00:00",
+ "state": "CLOSED",
+ "as_of": "2026-10-30",
+ "as_of_utc": "2026-10-30T20:21:19+00:00",
+ "files": {
+  "neocloud.json": {
+   "sha256": "8106aac22492dc388a7fb44c49cc478b22d1976132f3ee800a6b0ecb59fe26ae",
+   "bytes": 368783,
+   "as_of": "2026-10-30"
+  }
+ },
+ "stocks": {
+  "version": "0dcae41f296db517",
+  "dir": "stocks/",
+  "files": {
+   "ABTC": {
+    "sha256": "18f3ce937638118405102eaa4fdafc4e4eb237ce94136c0f2070d02623c5e337",
+    "bytes": 10816
+   },
+   "AIRJ": {
+    "sha256": "cf70e7a622d6d67690749f524617f6b852aa667969df3fd94f98bf96f7a005a2",
+    "bytes": 23527
+   },
+   "APLD": {
+    "sha256": "647c389b88beca370931ac9aa3186c16972fb5793d6ab27cdd8ddf93f52fc928",
+    "bytes": 39964
+   },
+   "BRUN": {
+    "sha256": "d883a3e82cb7217dde42b30ff077959e13cb0983966f9eae1a6851b2e9c15034",
+    "bytes": 5340
+   },
+   "BTDR": {
+    "sha256": "ddcc0eac6289d3913328b7a3cfa6c55a55481a19e5d55ce995568f43ab138988",
+    "bytes": 31701
+   },
+   "CAN": {
+    "sha256": "70c19541f4dfc691b42abb7221a007c6e74035ee70b642b70b967cc6d375607c",
+    "bytes": 54208
+   },
+   "CANG": {
+    "sha256": "827531ac4a89661903813a033812854da537879c0307357bc48f63911b2475f3",
+    "bytes": 17916
+   },
+   "CHRN": {
+    "sha256": "f0f3610ca363e727306bfe868b1386f8b5a81a9bd7397906200d702be415aaca",
+    "bytes": 7893
+   },
+   "CIFR": {
+    "sha256": "06dcd4c0e9ff0966a0e5190387d0347b2a7b05d12495bc126d68e62d2969418b",
+    "bytes": 45482
+   },
+   "CLSK": {
+    "sha256": "e97f50d0758958c31e8fef22da4d9d6d7ed9936b9b7cb7745bdaa0163e2020e4",
+    "bytes": 54240
+   },
+   "CORZ": {
+    "sha256": "b8d8dd50778f0fabcb1d10f06dd3b02a5eacce4aaa3e893c671ad3fa5a0a5142",
+    "bytes": 24727
+   },
+   "CRWV": {
+    "sha256": "748103deeaa1263a28907ac1bf82b3d29380a31449719abb89c602f418896587",
+    "bytes": 14505
+   },
+   "DGXX": {
+    "sha256": "c435b2732c6f5c21e39aac013ea15850d35adba832e1708039e287cd015763e9",
+    "bytes": 50914
+   },
+   "FUFU": {
+    "sha256": "bb65a733cfa082f43b1bf2f3df237c1847b8d1b6d31ae98bdc66535f3ac56f86",
+    "bytes": 23662
+   },
+   "GLXY": {
+    "sha256": "231a280c8ad2f24375e17042fd507d41ea8ad78eb5f180385c818e99667dcfbc",
+    "bytes": 13234
+   },
+   "HIVE": {
+    "sha256": "57be61c6a7e9636ed7b8c292da4916411df2d64dfac64baea2f04af0c160439e",
+    "bytes": 53806
+   },
+   "HUT": {
+    "sha256": "3f9c11d2176c26af4bf64f17e3963038700be947ef6d89cf23a75b5dae4deb3b",
+    "bytes": 53949
+   },
+   "IREN": {
+    "sha256": "e3b44cdb13e3794890a9294c24d7b9250411e4e0cd122dab3fdc68e19ba4b8b6",
+    "bytes": 43879
+   },
+   "KEEL": {
+    "sha256": "7c7fadec800a8c35e23d5b70bbf94685f3f5fb70c0301b96bcb48fc325de2c8d",
+    "bytes": 53533
+   },
+   "MARA": {
+    "sha256": "644196d7d74d54bc9af894928ad79e68f173ced3021e1f5ca0b9c02a54f5bdc5",
+    "bytes": 54527
+   },
+   "NBIS": {
+    "sha256": "bab11a616ad91e159881aed393f4af045e2111200ca157a8e114edc4dc2f302f",
+    "bytes": 18445
+   },
+   "NCLD": {
+    "sha256": "8a56800306112289beb50f66c1ad58b76fac1079c805b4b7b4b59ac9a8691a5e",
+    "bytes": 2628
+   },
+   "NVDA": {
+    "sha256": "2e5e35c58cc6ca0a5ee921afe0b9bdbb3a426ad61c90129a4a7d61bcea59929d",
+    "bytes": 54180
+   },
+   "ORCL": {
+    "sha256": "f4f51016ab37ce74e4a097f981866e03b4ba7271893e23233b6b90b49b2ce8ef",
+    "bytes": 55047
+   },
+   "RIOT": {
+    "sha256": "51a05a080e66106f7767311b55dfb3044f8a29f9ea458a1f11d3ca04fd8d1948",
+    "bytes": 54344
+   },
+   "RUM": {
+    "sha256": "96587f8883aaa4fd2ac21949c64c3107e33c1e857bc7eb214dece15ae607e902",
+    "bytes": 36386
+   },
+   "SHAZ": {
+    "sha256": "7c858d912717e10e67344195079a9a3004f5ad456e315e3f460f6795ccdd2da7",
+    "bytes": 6421
+   },
+   "SLNH": {
+    "sha256": "79b5219426c92d4c4cc3165639266958c1a8ed3c7d374aec5af0f7be531f6fe0",
+    "bytes": 54777
+   },
+   "TSM": {
+    "sha256": "1e3f7f727f8796248f18b6a59cca0c66537d054f753c8b38de038ee92a450bc1",
+    "bytes": 54929
+   },
+   "WGMI": {
+    "sha256": "8fe5fef12eac02a3e2ddb9521f9ccddd9e591234e8d441fe0fc5004cab58d126",
+    "bytes": 42308
+   },
+   "WULF": {
+    "sha256": "6dace8fa1e047396b965e8acd31ab41534165c015936f676a57d80c167a4d95c",
+    "bytes": 42950
+   },
+   "WYFI": {
+    "sha256": "7185ad366b62b14982434b45f837e901448b53624c57dc641db29f55763d0e59",
+    "bytes": 11331
+   },
+   "XYZ": {
+    "sha256": "d5272a4ff80f2daa65089368348b4f60ccf1608762e19bb3661e8acd22f42688",
+    "bytes": 54793
+   }
+  }
+ }
+}
