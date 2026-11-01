@@ -122,7 +122,9 @@
   const ratio = x => (!ok(x) ? DASH : x >= 99 ? 'calls only' : (x >= 9.95 ? x.toFixed(0) : x.toFixed(1)) + '×');
   function isoDate(d) {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d == null ? '' : d));
-    return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+    if (!m) return null;
+    const t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return t.getUTCMonth() === +m[2] - 1 && t.getUTCDate() === +m[3] ? t : null;
   }
   function day(d) { const t = isoDate(d); return t ? `${MON[t.getUTCMonth()]} ${t.getUTCDate()}` : DASH; }
   const dayNum = d => { const t = isoDate(d); return t ? t.getTime() : null; };
@@ -359,23 +361,30 @@
 
 
   const expired = d => obj(d).expd === true;
-  function betTxt(d) {
+
+
+  const vsTxt = od => (od ? `vs the ${day(od)} close` : 'vs price');
+
+
+  function betTxt(d, put, od) {
     if (!ok(d.k)) return '';
-    if (expired(d)) return `${fk(d.k)}C · expired${d.exp ? ' ' + expTxt(d.exp) : ''}`;
-    return `${fk(d.k)}C${d.exp ? ' ' + expTxt(d.exp) : ''}${ok(d.away) ? ' (' + pcs(d.away) + ' vs price)' : ''}`;
+    const k = fk(d.k) + (put ? 'P' : 'C');
+    if (expired(d)) return `${k} · expired${d.exp ? ' ' + expTxt(d.exp) : ''}`;
+    return `${k}${d.exp ? ' ' + expTxt(d.exp) : ''}${ok(d.away) ? ` (${pcs(d.away)} ${vsTxt(od)})` : ''}`;
   }
   const dteTxt = n => (n === 0 ? 'expires today' : `${n} ${n === 1 ? 'day' : 'days'} from today`);
 
 
 
-  function dRows(d, fam, src, put) {
+
+  function dRows(d, fam, src, put, od) {
     d = obj(d);
     const out = [];
     if (ok(d.place)) out.push(['Place', '#' + d.place + (ok(d.of) ? ' of ' + d.of : '') + ' on its list']);
     if (str(d.tier) || ok(d.tier)) out.push(['Tier', String(d.tier)]);
     if (ok(d.score)) out.push(['Board score', t1(d.score)]);
     if (ok(d.cO) || ok(d.pO)) out.push(['Opened', `${ok(d.cO) ? kcs(d.cO) + ' calls' : ''}${ok(d.cO) && ok(d.pO) ? ' · ' : ''}${ok(d.pO) ? kcs(d.pO) + ' puts' : ''}`]);
-    if (ok(d.pct)) out.push(['Share of book', pcu(d.pct) + " of the name's open contracts (net call lean)"]);
+    if (ok(d.pct)) out.push(['Share of book', pcu(d.pct) + ` of the name's open contracts (net ${put ? 'put' : 'call'} lean)`]);
     if (ok(d.sk)) out.push(['One-sided', pcu(d.sk)]);
     if (ok(d.prem)) {
       const pw = arr((put ? PREM_PUT : PREM)[src]);
@@ -384,7 +393,7 @@
     }
     if (ok(d.pile)) out.push(['Pile value', money(d.pile) + ' (the whole pile, not new money)']);
     if (ok(d.bs)) out.push(['Bought share', pcu(d.bs) + ' at the ask']);
-    if (ok(d.k)) out.push(['Main contract', betTxt(d)]);
+    if (ok(d.k)) out.push(['Main contract', betTxt(d, put, od)]);
     else if (expired(d) && d.exp) out.push(['Expiry', 'expired ' + expTxt(d.exp)]);
     if (ok(d.dte) && !expired(d)) out.push(['Days to expiry', dteTxt(d.dte)]);
     if (ok(d.cp)) out.push(['Calls : puts', ratio(d.cp) + ' on this board']);
@@ -397,9 +406,9 @@
     if (ok(fl.n) && fl.n > 1) t += `${t ? ', ' : ''}${fl.n} days`;
     return t;
   }
-  function flagTip(fm, fl, put) {
+  function flagTip(fm, fl, put, od) {
     const bits = [str(fl.lab) ? fl.lab : `${fm.label || fm.id}${fl.t != null ? ' ' + fl.t : ''}`];
-    const d = dRows(fl.d, fm.id, fl.src, put).filter(x => x[0] !== 'Tier').map(x => `${x[0].toLowerCase()} ${x[1]}`);
+    const d = dRows(fl.d, fm.id, fl.src, put, od).filter(x => x[0] !== 'Tier').map(x => `${x[0].toLowerCase()} ${x[1]}`);
     if (d.length) bits.push(d.join(', '));
     const w = whenTxt(fl);
     if (w) bits.push(w);
@@ -410,13 +419,13 @@
     if (fl.gone) bits.push('no longer on ' + srcName(fl.src));
     return bits.join(' · ');
   }
-  function chip(fm, fl, put) {
+  function chip(fm, fl, put, od) {
     fl = obj(fl);
     const short = fm.short || fm.label || fm.id, t = fl.t == null ? '' : String(fl.t);
     const cls = `fc ${famCls(fm.id)}${put ? ' put' : ''}${isSold(fl) && !put ? ' sold' : ''}${fl.stale ? ' stale' : ''}`;
     const when = fl.stale ? (str(fl.last) ? fl.last : srcAsOf(fl.src)) : null;
     const body = put ? `▼ ${esc(short)}` : `<i></i>${esc(short)}${t ? ` <b>${esc(t)}</b>` : ''}`;
-    return `<span class="${cls}" title="${esc(flagTip(fm, fl, put))}">${body}${when ? ` <em>${esc(day(when))}</em>` : ''}</span>`;
+    return `<span class="${cls}" title="${esc(flagTip(fm, fl, put, od))}">${body}${when ? ` <em>${esc(day(when))}</em>` : ''}</span>`;
   }
 
   function famFlags(f) {
@@ -432,7 +441,8 @@
     return `<span class="nfc" title="${esc(tip)}"><b>${r.nf}</b>${cov ? '/' + cov : ''}${long ? ' boards' : ''}</span>`;
   }
   function chipsHTML(r) {
-    return famFlags(r.f).map(([fm, fl]) => chip(fm, fl, false)).join('') + famFlags(r.x).map(([fm, fl]) => chip(fm, fl, true)).join('');
+    const od = oldDay(nameOf(r.s));
+    return famFlags(r.f).map(([fm, fl]) => chip(fm, fl, false, od)).join('') + famFlags(r.x).map(([fm, fl]) => chip(fm, fl, true, od)).join('');
   }
 
 
@@ -474,13 +484,13 @@
     if (m.how === 'tape' && m.usd > 0) return { how: 'tape', usd: m.usd, oc: num(m.oc), rd: null, ns: null };
     return null;
   }
-  function mainTip(r) {
+  function mainTip(r, od) {
     const m = obj(r.main), src = srcById(m.src), fm = famById(m.fam), c = mainMoney(r), bits = [];
     if (ok(m.k)) {
       bits.push(`main bet ${fk(m.k)}C${m.exp ? ' ' + expTxt(m.exp) : ''}` + (src || fm ? ` from ${src ? src.name || src.id : fm.label || fm.id}` : '') +
         (fm && src && fm.label && fm.label !== src.name ? ` (${fm.label})` : ''));
       if (ok(m.dte)) bits.push(dteTxt(m.dte));
-      if (ok(m.away)) bits.push(pcs(m.away) + ' vs price');
+      if (ok(m.away)) bits.push(`${pcs(m.away)} ${vsTxt(od)}`);
     }
 
     const cts = (n, w) => (n > 0 ? `${int(n)} ${w}${n === 1 ? '' : 's'}` : '');
@@ -499,10 +509,15 @@
     return bits.join(' · ');
   }
   function mainHTML(r) {
-    const m = obj(r.main), q = arr(r.q).filter(str), c = mainMoney(r);
+    const m = obj(r.main), c = mainMoney(r), od = oldDay(nameOf(r.s));
+
+
+
+    let q = ok(m.k) ? qOf(obj(r.f)[m.fam]) : [];
+
 
     const l1 = ok(m.k) ? `<span class="mbk"><b>${fk(m.k)}C</b>${m.exp ? ' ' + expTxt(m.exp) : ''}</span>${ok(m.dte) && m.dte >= 0 ? ` <span class="mbd">${m.dte}d</span>` : ''}` +
-      `${ok(m.away) ? ` <span class="mba">${pcs(m.away)}</span>` : ''}` : '';
+      `${ok(m.away) ? ` <span class="mba">${pcs(m.away)}${od ? ` <span class="pdo">${esc(day(od))}</span>` : ''}</span>` : ''}` : '';
 
 
 
@@ -511,7 +526,7 @@
       : (c.usd > 0 ? `<span class="mbm">${money(c.usd)} <span>opened</span></span>` : '<span class="mbm muted">no new money</span>') + part;
     const badges = badgesHTML(q);
     if (!l1 && !cm && !badges) return `<span class="muted">${DASH}</span>`;
-    const tip = mainTip(r);
+    const tip = mainTip(r, od);
     return `<div class="mb"${tip ? ` title="${esc(tip)}"` : ''}>` +
       `<div class="mb1">${l1 || `<span class="muted">${DASH}</span>`}</div>${cm || badges ? `<div class="mb2">${cm}${badges}</div>` : ''}</div>`;
   }
@@ -742,13 +757,14 @@
   }
   function flagCardHTML(fm, fl, put, sym) {
     fl = obj(fl);
-    const src = srcById(fl.src), link = boardLink(src, fl, sym, put), when = whenTxt(fl), rows = dRows(fl.d, fm.id, fl.src, put);
+    const src = srcById(fl.src), link = boardLink(src, fl, sym, put), when = whenTxt(fl), od = oldDay(nameOf(sym));
+    const rows = dRows(fl.d, fm.id, fl.src, put, od);
     const qs = qOf(fl).filter(q => QWORD[q] && !(put && q === 'sold'));
     const bname = src ? src.name || src.id : fl.src || '';
     const note = fl.stale ? 'board out of date: not scored' : put && isSold(fl) ? 'tagged sold (put writing): not counted' : '';
     const tail = link ? `<a class="ext" href="${esc(link)}" target="_blank" rel="noopener">Open ${esc(bname)} ↗</a>`
       : fl.gone ? `<span class="gone">no longer on ${esc(bname || 'its board')}</span>` : bname ? `<span class="muted">${esc(bname)}</span>` : '';
-    return `<div class="pf${put ? ' put' : ''}${fl.stale ? ' stale' : ''}"><div class="pf1">${chip(fm, fl, put)}<span class="pfl">${esc(fl.lab || '')}</span></div>` +
+    return `<div class="pf${put ? ' put' : ''}${fl.stale ? ' stale' : ''}"><div class="pf1">${chip(fm, fl, put, od)}<span class="pfl">${esc(fl.lab || '')}</span></div>` +
       (rows.length ? `<div class="kvs">${rows.map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div>` : '') +
       (qs.length ? `<div class="pfq">${qs.map(q => `<span class="qb ${q}">${esc(QWORD[q])}</span>`).join('')}</div>` : '') +
       `<div class="pf3"><span>${esc([when, note].filter(Boolean).join(' · '))}</span>${tail}</div></div>`;
