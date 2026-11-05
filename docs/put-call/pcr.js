@@ -71,9 +71,16 @@
     var s = S(k), f = s.sf_info || {};
     return nowIdx(k) === s.sf && !f.closed && f.date === etNow().date;
   }
+  function sfSrc(k) {
+    return (S(k).sf_info || {}).via === 'cboe'
+      ? { from: "Cboe's running count", tag: 'Cboe count', snap: "last reading from Cboe's running count",
+          zclose: 'at the Cboe count close', zsnap: 'at the last Cboe count reading', rclose: 'Cboe count close', rsnap: 'last Cboe count reading' }
+      : { from: 'the 15-minute chains', tag: 'chains', snap: 'last 15-minute chains snapshot',
+          zclose: 'at the chains close', zsnap: 'at the last chains snapshot', rclose: 'chains close', rsnap: 'last chains snapshot' };
+  }
   function sfTag(k) {
     if (nowIdx(k) !== S(k).sf) return '';
-    return '<span class="sf-tag">' + (sfLive(k) ? 'so far' : 'chains') + '</span>';
+    return '<span class="sf-tag">' + (sfLive(k) ? 'so far' : sfSrc(k).tag) + '</span>';
   }
   function lastIdx() { return DATA.dates.length - 1; }
   function serLast(k) { return S(k).last; }
@@ -294,12 +301,12 @@
   }
   function renderHero() {
     var k = curSer(), s = S(k), i = nowIdx(k), sfx = i === s.sf, live = sfx && sfLive(k), rl = at(k, 'rl', i), r1 = at(k, 'r1', i), p = at(k, 'pct', i), z = zoneOf(p);
-    var prev = at(k, 'rl', s.last === i ? i - 1 : s.last), sfInfo = s.sf_info || {};
+    var prev = at(k, 'rl', s.last === i ? i - 1 : s.last), sfInfo = s.sf_info || {}, W = sfSrc(k);
     document.querySelectorAll('[data-sername]').forEach(function (e) { e.textContent = s.short; });
     $('sub1').textContent = s.label + ' — ' + s.what;
     var h = '<div class="hero-num"><span class="hero-k">put/call' + (live ? ' so far' : '') + '</span> ' + f2(rl) + '</div>' +
-      '<div class="hero-date">' + fdate(DATA.dates[i], true) + (sfx ? (live ? ' so far, from the 15-minute chains' + (sfInfo.t ? ' · as of ' + sfInfo.t + ' ET' : '')
-        : sfInfo.closed ? ' close from the 15-minute chains (official numbers post later)' : ' last 15-minute chains snapshot' + (sfInfo.t ? ' (' + sfInfo.t + ' ET)' : '') + ' · official numbers post later') : ' close') + '</div>' +
+      '<div class="hero-date">' + fdate(DATA.dates[i], true) + (sfx ? (live ? ' so far, from ' + W.from + (sfInfo.t ? ' · as of ' + sfInfo.t + ' ET' : '')
+        : sfInfo.closed ? ' close from ' + W.from + ' (official numbers post later)' : ' ' + W.snap + (sfInfo.t ? ' (' + sfInfo.t + ' ET)' : '') + ' · official numbers post later') : ' close') + '</div>' +
       '<p class="hero-move">' + (live ? 'today so far' : 'that day alone') + ' <b>' + f2(r1) + '</b>' + (prev != null ? ' · put/call line ' + (sfx ? 'at the last official close ' : 'the session before ') + f2(prev) : '') + '</p>' +
       '<p class="hero-pct"><span class="hp-b">' + ord(p) + ' percentile</span> among ' + winWord(k) + '</p>' + gauge(p, k) +
       '<p class="hero-move">' + ctxLine(i) + '</p>';
@@ -308,7 +315,7 @@
       $('zoneLine').innerHTML = '<span class="zw">No reading</span> — a session is missing from ' + s.short + "'s recent days (" + fdate(DATA.dates[i], true) + ')';
       return;
     }
-    $('zoneLine').innerHTML = '<span class="zw ' + zc(k, z) + '">' + zw(k, z) + (live ? ' so far today' : sfx ? (sfInfo.closed ? ' at the chains close' : ' at the last chains snapshot') : '') + '</span> — ' + s.short + ' put/call ' + f2(rl) + ', ' +
+    $('zoneLine').innerHTML = '<span class="zw ' + zc(k, z) + '">' + zw(k, z) + (live ? ' so far today' : sfx ? ' ' + (sfInfo.closed ? W.zclose : W.zsnap) : '') + '</span> — ' + s.short + ' put/call ' + f2(rl) + ', ' +
       (p >= 50 ? 'more puts than on ' + Math.round(p) + '% of ' + winWord(k) : 'fewer puts than on ' + Math.round(100 - p) + '% of ' + winWord(k)) +
       ' <span class="zone-key">(usual range ' + f2(at(k, 'lo', i)) + ' to ' + f2(at(k, 'hi', i)) + ')</span>';
   }
@@ -416,7 +423,7 @@
       (KSRC === 'px' ? '<span class="lg-i"><span class="lg-tri g"></span>golden cross on a ' + DATA.zones[3] + ' or ' + DATA.zones[4] + ' day</span><span class="lg-i"><span class="lg-tri r"></span>golden cross on a ' + DATA.zones[1] + ' or ' + DATA.zones[0] + ' day</span><span class="lg-i"><span class="lg-tri n"></span>golden cross on a ' + DATA.zones[2] + ' day</span>'
         : '<span class="lg-i"><span class="lg-tri r"></span>K over D: puts rising</span><span class="lg-i"><span class="lg-tri g"></span>K under D: puts easing</span>') +
       '<span class="lg-i"><span class="lg-now"></span>now' + ((TF === '1D' ? V.sfLive : V.rOpen) || V.pxOpen ? ' (hollow + dotted = so far, as if it closed now)'
-        : (TF === '1D' && V.rOpen ? ' (hollow + dotted = from the 15-minute chains; official numbers post later)' : '')) + '</span>';
+        : (TF === '1D' && V.rOpen ? ' (hollow + dotted = from ' + sfSrc(k).from + '; official numbers post later)' : '')) + '</span>';
     document.querySelectorAll('#kdjSrc button').forEach(function (x) {
       x.setAttribute('aria-pressed', x.getAttribute('data-k') === KSRC ? 'true' : 'false');
       if (x.getAttribute('data-k') === 'px') x.textContent = SIDE + ' price';
@@ -446,7 +453,7 @@
     var kd = KJ && KJ.K[i] != null ? ' · KDJ ' + Math.round(KJ.K[i]) + ' / ' + Math.round(KJ.D[i]) + ' / ' + Math.round(KJ.J[i]) +
       (KJ.up.indexOf(i) >= 0 ? (KSRC === 'px' ? ' <span class="up">golden cross</span>' : ' K over D') : KJ.dn.indexOf(i) >= 0 ? ' K under D' : '') : '';
     var di = V.day(i);
-    var h = '<span class="d">' + periodWord(V, i, true) + (open ? ' (so far)' : chainsSnap ? ' (last chains snapshot)' : chainsClose ? ' (chains close)' : '') + '</span>' +
+    var h = '<span class="d">' + periodWord(V, i, true) + (open ? ' (so far)' : chainsSnap ? ' (' + sfSrc(k).rsnap + ')' : chainsClose ? ' (' + sfSrc(k).rclose + ')' : '') + '</span>' +
       (r != null ? ' · put/call <span class="vx">' + f2(r) + '</span> · <span class="pc">' + ord(p) + ' percentile</span> <span class="' + zc(k, z) + '">' + zw(k, z) + '</span>' +
         (V.r1 && V.r1[i] != null ? ' · that day ' + f2(V.r1[i]) : '') : ' · no ' + s0.short + ' reading') +
       ' · ' + SIDE + ' ' + f2(c) + (mv != null ? ' <span class="' + (mv >= 0 ? 'up' : 'down') + '">' + sgn(mv, 2) + '%</span>' : '') +
@@ -574,7 +581,7 @@
     Object.keys(DATA.series).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); });
     $('gTiles').innerHTML = keys.map(function (k) {
       var s = S(k), i = nowIdx(k), p = at(k, 'pct', i), z = zoneOf(p);
-      return '<button type="button" class="gtile" data-k="' + k + '" aria-pressed="' + (k === curSer()) + '"><span class="gk"><b>' + esc(s.short) + (sfTag(k) ? ' ' + sfTag(k) : '') + '</b><span>' + (i === s.sf ? 'chains' : 'Cboe') + ' · ' + fshort(DATA.dates[i]) + '</span></span>' +
+      return '<button type="button" class="gtile" data-k="' + k + '" aria-pressed="' + (k === curSer()) + '"><span class="gk"><b>' + esc(s.short) + (sfTag(k) ? ' ' + sfTag(k) : '') + '</b><span>' + (i === s.sf ? sfSrc(k).tag : 'Cboe') + ' · ' + fshort(DATA.dates[i]) + '</span></span>' +
         '<span class="gv">' + f2(at(k, 'rl', i)) + '<span class="tp">' + ord(p) + '</span></span> <span class="gz ' + (zc(k, z) || 'mid') + '">' + zw(k, z) + '</span>' +
         spark(k) + '<span class="gw">' + esc(s.what) + '</span></button>';
     }).join('');
