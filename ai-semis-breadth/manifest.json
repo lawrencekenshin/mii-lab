@@ -1,0 +1,15 @@
+{
+ "schema": 2,
+ "kind": "ai-semis-breadth",
+ "generated_utc": "2026-11-06T22:00:52+00:00",
+ "state": "CLOSED",
+ "as_of": "2026-11-06",
+ "as_of_utc": "2026-11-06T22:00:39+00:00",
+ "files": {
+  "breadth.json": {
+   "sha256": "d9e473240ed77e9583902b8dda6913242be27aa4abb602b0f32ce66ede957ba4",
+   "bytes": 2960084,
+   "as_of": "2026-11-06"
+  }
+ }
+}
