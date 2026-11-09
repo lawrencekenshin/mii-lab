@@ -177,6 +177,16 @@
   }
 
 
+  function redrawCharts() {
+    tip.style.display = 'none';
+    app.querySelectorAll('.chart[data-sym]').forEach(async (el) => {
+      try { drawChart(el, await nameData(el.dataset.sym), el.dataset.upto || S.day, { after: !!el.dataset.after }); } catch (e) {  }
+    });
+    const np = $('#ch-np');
+    if (np && S.tab === 'name') nameData(S.sym).then((n) => drawChart(np, n, S.day, { big: true })).catch(() => {});
+  }
+
+
   function drawChart(el, n, upto, o) {
     o = o || {};
     const W = Math.max(280, el.clientWidth), H = Math.max(120, el.clientHeight);
@@ -416,10 +426,12 @@
   }
 
 
+  let lastView = '';
   async function render() {
     route();
     chrome();
     tip.style.display = 'none';
+    const view = S.tab + '|' + (S.sym || '');
     try {
       if (S.tab === 'table') await renderTable();
       else if (S.tab === 'name') await renderName();
@@ -427,7 +439,8 @@
     } catch (e) {
       app.innerHTML = `<p class="lede">Could not load this view (${esc(e.message || e)}). Reload to try again.</p>`;
     }
-    if (S.tab !== 'name') window.scrollTo(0, 0);
+    if (S.tab !== 'name' || view !== lastView) window.scrollTo(0, 0);
+    lastView = view;
   }
 
   async function boot() {
@@ -437,8 +450,16 @@
     }
     $('#find').addEventListener('change', (e) => { const v = (e.target.value || '').trim().toUpperCase(); if (v) { location.hash = href('', S.day, v).slice(1); e.target.value = ''; } });
     window.addEventListener('hashchange', render);
-    let rz;
-    window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 220); });
+
+
+    let rz, lastW = document.documentElement.clientWidth;
+    window.addEventListener('resize', () => {
+      const w = document.documentElement.clientWidth;
+      if (w === lastW) return;
+      lastW = w;
+      clearTimeout(rz); rz = setTimeout(redrawCharts, 220);
+    });
+    window.addEventListener('scroll', () => { if (tip.style.display !== 'none') tip.style.display = 'none'; }, { passive: true });
     render();
   }
   boot();
