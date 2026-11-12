@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeMark Hunter · live</title>
+<meta name="description" content="Tom DeMark's TD Sequential on weekly and monthly bars across the S&amp;P 500, Nasdaq-100, Russell 1000, Russell 2000, ETFs and a watchlist: the 9 and 13 counts with each name's King GEX read, GEX pile and call / put skew. Rebuilt after each close.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/dmk.css?v=p25">
+</head>
+<body class="pubpage">
+<a class="skip" href="#app">Skip to the board</a>
+<header class="sitehdr">
+  <div class="wrap topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">DeMark Hunter</span><span class="t-short">DeMark</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<div class="rainbow"></div>
+<header class="topbar">
+  <a class="brand" href="#hunt"><span class="mark">9</span>DEMARK HUNTER</a>
+  <nav class="tabs">
+    <a class="tab" data-tab="hunt" href="#hunt">Hunt</a>
+    <a class="tab" data-tab="tops" href="#tops">Tops</a>
+    <a class="tab" data-tab="table" href="#table">Table</a>
+  </nav>
+  <input class="search" id="find" list="syms" placeholder="Find a ticker" autocomplete="off" spellcheck="false" aria-label="Find a ticker">
+  <datalist id="syms"></datalist>
+  <div class="vintage" id="vintage"></div>
+</header>
+<main class="wrap" id="app"><p class="lede">Loading the board…</p></main>
+<div class="tip" id="tip"></div>
+<script>window.DMK_PUBLIC = true;</script>
+<script src="js/dmk.js?v=p25"></script>
+</body>
+</html>
