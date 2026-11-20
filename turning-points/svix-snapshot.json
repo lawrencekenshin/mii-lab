@@ -1,0 +1,1 @@
+{"schema":2,"built_utc":"2026-11-20T23:01:16Z","kind":"tp-option","asof":"2026-11-19","est":{"premium":0.066204,"tau":0.087495,"expiry":"2026-12-21","timestamp":"2026-11-19 21:32:39","forward":7199.338113,"spot":7175.8301,"strikes":115,"minStrike":3000,"maxStrike":8400,"parityRMSE":0.182131,"convexityWarnings":2}}
