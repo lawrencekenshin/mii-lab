@@ -1,0 +1,20 @@
+{
+ "schema": 2,
+ "kind": "ai-semis-fear",
+ "generated_utc": "2026-11-21T10:18:46+00:00",
+ "state": "CLOSED",
+ "as_of": "2026-11-20",
+ "as_of_utc": "2026-11-21T10:18:46+00:00",
+ "files": {
+  "aisf.json": {
+   "sha256": "79d5bc0687e4e6fdc4cb1056030af29e48965cf8bd5b9f9dc214de6187961128",
+   "bytes": 2250820,
+   "as_of": "2026-11-20"
+  },
+  "vol.json": {
+   "sha256": "baf1a3b89b55aee147a073c7b31b9e9ad286462ec74404aaf06d1106c380e7a0",
+   "bytes": 2469874,
+   "as_of": "2026-11-20"
+  }
+ }
+}
