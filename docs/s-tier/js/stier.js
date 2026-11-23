@@ -105,9 +105,9 @@
     $('#next').onclick = () => i < days.length - 1 && go(days[i + 1]);
     if ($('#today')) $('#today').onclick = () => go(S.board.as_of);
     const v = S.board.vintage || {};
-    $('#vintage').innerHTML = S.day === S.board.as_of
+    $('#vintage').innerHTML = rebTag(S.day) + (S.day === S.board.as_of
       ? `<span class="dot${v.calls_lag || v.king !== v.kdj ? ' lag' : ''}"></span>${d2(v.kdj)} close · King ${d2(v.king)} · Calls ${d2(v.calls)} · updated ${esc(builtWords())}`
-      : `<span class="dot lag"></span>Replay: the board as of the ${d2(S.day)} close`;
+      : `<span class="dot lag"></span>Replay: the board as of the ${d2(S.day)} close`);
     const dl = $('#syms');
     if (!dl.childElementCount) dl.innerHTML = (S.board.history.rows || []).map((r) => `<option value="${esc(r.s)}">`).join('');
   }
@@ -370,8 +370,22 @@
       <span><i style="background:#1a1e29;border:1px solid #2A2E39"></i>no tier</span><span>Chart key: <b style="color:#E3B341">♛ gold line</b> = king strike (dashed when it isn't top grade) · red shading = deep KDJ washout · <b style="color:#26a69a">▲</b> = KDJ turn · <b style="color:#4fc3f7">●</b> = Stealth top tier (○ = other Stealth tiers) · top bar = tier · prices are % moves</span></div></section>`;
   }
 
+  function rebText() {
+    const r = S.board.rebuilt;
+    if (!r || !r.frm) return '';
+    const gap = (r.gap || []).map(d2).join(' and ');
+    return `Since the ${d2(r.frm)} close the king node and the Stealth calls come from rebuilt reads (OCC open interest and closing quotes), graded by the same rules as before.` + (gap ? ` ${gap} had no option read and show the last king node before them.` : '');
+  }
+  function rebTag(day) {
+    const r = S.board.rebuilt;
+    if (!r || !r.frm || (day && day < r.frm)) return '';
+    return `<span class="reb" title="${esc(rebText())}">REBUILT</span>`;
+  }
   function footHTML() {
-    return `<div class="foot">Updated ${esc(builtWords())} · ${esc(S.board.universe)} names (S&amp;P 500, Nasdaq-100, Russell 1000) · the KDJ lands after each US close; the king node and the calls fill in overnight (US Eastern). Prices are shown as % moves; king strikes are option strikes.</div>`;
+    const when = S.board.rebuilt
+      ? `the KDJ, the king node and the calls land after each US close (US Eastern evening). ${esc(rebText())}`
+      : 'the KDJ lands after each US close; the king node and the calls fill in overnight (US Eastern).';
+    return `<div class="foot">Updated ${esc(builtWords())} · ${esc(S.board.universe)} names (S&amp;P 500, Nasdaq-100, Russell 1000) · ${when} Prices are shown as % moves; king strikes are option strikes.</div>`;
   }
 
 
