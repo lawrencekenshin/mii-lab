@@ -41,6 +41,23 @@ const stackS = v => PUT() ? fm(-v) : fm(v);
 const otherS = v => !v ? '$0' : PUT() ? fm(v) : fm(-v);
 
 
+
+
+
+const SH = () => !!(D && D.rebuilt && D.rebuilt.shares);
+let REB_HREF = null, REB_REAL = () => '';
+const REB = () => {
+  const r = D && D.rebuilt;
+  if (!r) return REB_REAL();
+  const t = `Cboe closed its option-chain feed on Nov 19, 2026. Open interest here is OCC's (${day(r.oi)} settle); each contract keeps the last implied vol Cboe published (${day(r.iv)}). ${r.n} of ${r.of} names.`;
+  const lab = `REBUILT · OCC open interest · vols ${day(r.iv)}`;
+  return REB_HREF ? ` <a class="reb" href="${REB_HREF}" title="${t} Click for the last board made from real Cboe chains.">${lab}</a>` : ` <span class="reb" title="${t}">${lab}</span>`;
+};
+const REBD = n => n.syn ? `Rebuilt chain: open interest from OCC, ${day(n.syn.oi)} settle${n.syn.fetched ? ' (read ' + esc(n.syn.fetched) + ')' : ''} · implied vols from the Cboe chain of ${day(n.syn.iv)}${n.syn.own != null ? ' (' + Math.round(n.syn.own * 100) + '% of the open interest on its own contract\'s vol, the rest on a neighbour\'s)' : ''}` : null;
+const REBS = x => String(x.source || '').startsWith('occ') ? ' · rebuilt from OCC open interest' : '';
+const REBR = () => D && D.rebuilt ? `<div class="pastnote">The record counts real Cboe days only${D.rebuilt.record_to ? ', to <b>' + dayW(D.rebuilt.record_to) + '</b>' : ''}. Days rebuilt from OCC open interest open no new entries; entries already open keep being checked against the price.</div>` : '';
+
+
 const LIVE = location.hostname === 'lawrencekenshin.github.io';
 const BASE = LIVE ? 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/hunt-data/hunt/' : './data/';
 let BUST = '';
@@ -102,7 +119,7 @@ const hh = r => (r[K()] || {})[S.h];
 const binsOf = r => ((r.h || {})[S.h] || {}).b || (hh(r) || {}).b;
 const inList = r => S.l === 'all' || (r.l || []).includes(S.l);
 const fr = r => { const f = hh(r) && hh(r).fr; return f && f[1] ? [f[0] - f[1], (f[0] - f[1]) / f[1]] : null; };
-const isFresh = r => { const f = fr(r); return !!f && f[0] >= 1000 && f[1] >= 0.10; };
+const isFresh = r => { const f = fr(r); return !!f && (SH() ? !!hh(r).fr[2] : f[0] >= 1000 && f[1] >= 0.10); };
 
 const cpOf = (r, H = S.h) => { const c = r.cp && r.cp[H]; return c && c[0] + c[1] > 0 ? c : null; };
 const cpShare = c => c[0] / (c[0] + c[1]);
@@ -163,7 +180,7 @@ function chips(r, max = (WIDE() ? 4 : MID() ? 3 : 2)) {
 function freshCell(r) {
   const f = fr(r);
   if (!f) return '<span class="fresh n">n/a</span>';
-  return `<span class="fresh ${isFresh(r) ? 'g' : 'n'}">${f[0] >= 0 ? '+' : '−'}${kf(Math.abs(f[0]))} <small>(${pc(f[1])})</small></span>`;
+  return `<span class="fresh ${isFresh(r) ? 'g' : 'n'}">${SH() ? pc(f[1]) : `${f[0] >= 0 ? '+' : '−'}${kf(Math.abs(f[0]))} <small>(${pc(f[1])})</small>`}</span>`;
 }
 function daysCell(g) {
   if (!g || g.v !== 'match' || g.days == null) return '';
@@ -171,7 +188,7 @@ function daysCell(g) {
   return ` <span class="dys" title="on the list since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}">${g.days}d${g.since_start ? '+' : ''}</span>`;
 }
 function cpLab(c) {
-  const sh = cpShare(c), x = sh >= 0.5 ? c[0] / Math.max(c[1], 1) : c[1] / Math.max(c[0], 1);
+  const sh = cpShare(c), m = SH() ? 1e-4 : 1, x = sh >= 0.5 ? c[0] / Math.max(c[1], m) : c[1] / Math.max(c[0], m);
   const t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
   return sh >= 0.55 ? `<b class="up">${t}× calls</b>` : sh <= 0.45 ? `<b class="dn">${t}× puts</b>` : `<b class="cpe">${t}× even</b>`;
 }
@@ -188,6 +205,7 @@ function cpMove(c, pre = '1W ') {
 }
 function cpTip(c, H = S.h, then = 'a week ago (same expiries)') {
   const wk = cpWk(c);
+  if (SH()) return `${Math.round(cpShare(c) * 100)}% of open contracts are calls (${H} expiries)` + (wk == null ? '' : ` · ${then} ${Math.round(wk * 100)}% calls`);
   return `${kf(c[0])} calls vs ${kf(c[1])} puts open (${H} expiries), ${Math.round(cpShare(c) * 100)}% calls` +
     (wk == null ? '' : ` · ${then} ${Math.round(wk * 100)}% calls: calls ${c[0] - c[2] >= 0 ? '+' : '−'}${kf(Math.abs(c[0] - c[2]))}, puts ${c[1] - c[3] >= 0 ? '+' : '−'}${kf(Math.abs(c[1] - c[3]))}`);
 }
@@ -196,9 +214,9 @@ function cpCard(n) {
     return `<span class="${H === S.h ? 'wh' : 'muted'}">${H}</span>${cpBar(c, 'wide')}<span class="r">${cpLab(c)}</span>${cpMove(c)}`; }).join('');
   if (!rows) return '';
   const c = cpOf(n), wk = c && cpWk(c);
-  const adds = c && wk != null ? ` A week earlier (${day(n.wk_settle)}, same expiries) ${Math.round(wk * 100)}% calls: calls <b class="${c[0] >= c[2] ? 'up' : 'dn'}">${c[0] - c[2] >= 0 ? '+' : '−'}${kf(Math.abs(c[0] - c[2]))}</b>, puts <b class="${c[1] >= c[3] ? 'dn' : 'up'}">${c[1] - c[3] >= 0 ? '+' : '−'}${kf(Math.abs(c[1] - c[3]))}</b>.` : '';
-  return `<div class="card2"><h4><span>Calls : puts</span><span>open contracts</span></h4><div class="cpg">${rows}</div>
-    ${c ? `<div class="txt" style="margin-top:6px">${S.h}: <b>${kf(c[0])}</b> calls vs <b>${kf(c[1])}</b> puts open, ${Math.round(cpShare(c) * 100)}% calls.${adds}</div>` : ''}
+  const adds = c && wk != null && SH() ? ` A week earlier (${day(n.wk_settle)}, same expiries) ${Math.round(wk * 100)}% calls.` : c && wk != null ? ` A week earlier (${day(n.wk_settle)}, same expiries) ${Math.round(wk * 100)}% calls: calls <b class="${c[0] >= c[2] ? 'up' : 'dn'}">${c[0] - c[2] >= 0 ? '+' : '−'}${kf(Math.abs(c[0] - c[2]))}</b>, puts <b class="${c[1] >= c[3] ? 'dn' : 'up'}">${c[1] - c[3] >= 0 ? '+' : '−'}${kf(Math.abs(c[1] - c[3]))}</b>.` : '';
+  return `<div class="card2"><h4><span>Calls : puts</span><span>${SH() ? 'share of open contracts' : 'open contracts'}</span></h4><div class="cpg">${rows}</div>
+    ${c ? `<div class="txt" style="margin-top:6px">${S.h}: ${SH() ? `<b>${Math.round(cpShare(c) * 100)}%</b> of open contracts are calls.` : `<b>${kf(c[0])}</b> calls vs <b>${kf(c[1])}</b> puts open, ${Math.round(cpShare(c) * 100)}% calls.`}${adds}</div>` : ''}
     <div class="note" style="margin-top:4px">Green = calls' share, red = puts'. White tick = a week ago. Every strike counts (in the money too); one contract = 100 shares, whatever its price.</div></div>`;
 }
 function cpCell(r, per) {
@@ -267,7 +285,7 @@ function renderBar() {
     <span class="sep"></span>${HS.map((H, i) => `<button class="chip ${H === S.h ? 'on' : ''}" data-h="${H}" title="expiries counted">${H}<span class="c">${counts[i]}</span></button>`).join('')}
     <span class="sep"></span>${LISTS.map(([k, t]) => `<button class="chip ${k === S.l ? 'on' : ''}" data-l="${k}">${NARROW() && k === 'wl' ? 'WL1' : t}<span class="c">${lc[k] ?? ''}</span></button>`).join('')}
     <input id="q" placeholder="Find a ticker" spellcheck="false" autocomplete="off" value="${esc(S.q)}">
-    <span id="status" title="${esc(st.error || '')}"><b class="${dot}"></b>${day(D.day)} close · OI ${day(D.settle)} settle · built ${built}${st.ok === false ? ' · last build FAILED' : ''}</span>`;
+    <span id="status" title="${esc(st.error || '')}"><b class="${dot}"></b>${day(D.day)} close · OI ${day(D.settle)} settle · built ${built}${st.ok === false ? ' · last build FAILED' : ''}${REB()}</span>`;
   document.body.classList.toggle('neg', PUT());
   const q = $('#q');
   q.addEventListener('input', () => { S.q = q.value.trim().toUpperCase();
@@ -322,13 +340,13 @@ function tiles(G) {
       : `<div class="tile"><div class="k">Top put stack</div><div class="v"><small>none</small></div></div>`;
   }
   const big = m.slice().sort((a, b) => hh(b).up - hh(a).up)[0];
-  const frs = m.filter(r => fr(r)).sort((a, b) => fr(b)[0] - fr(a)[0])[0];
+  const frs = m.filter(r => fr(r) && (!SH() || isFresh(r))).sort((a, b) => fr(b)[0] - fr(a)[0])[0];
   const fl = D.counts[S.side][S.h].fails || {};
   return `<div class="tiles">
     <div class="tile"><div class="k">Matches · ${S.h}${past ? ' · ' + day(S.d) : ''}</div><div class="v num">${m.length} <small>of ${past ? 'saved' : G.all.length}</small></div><div class="s">${G.n.length} near misses${!past && D.history.days.length > 1 ? ` · <b>${newN}</b> new · <b>${left.length}</b> left` : ''}<br><b>${m.filter(r => (r.biz ?? 0) >= 70).length}</b> with business 70+${m.filter(r => (r.biz ?? 0) >= 70).length ? ': ' + m.filter(r => (r.biz ?? 0) >= 70).map(r => r.s).join(', ') : ''}</div></div>
     ${ref}
     <div class="tile ${big ? 'lnk' : ''}" ${big ? `data-s="${big.s}"` : ''}><div class="k">Biggest ${w.mine} stack</div><div class="v num">${big ? big.s + ` <small>${stackS(hh(big).up)}</small>` : '<small>–</small>'}</div><div class="s">${big ? (hh(big).rel * 100).toFixed(1) + "% of a day's $ volume" : ''}</div></div>
-    <div class="tile ${frs ? 'lnk' : ''}" ${frs ? `data-s="${frs.s}"` : ''}><div class="k">Most ${w.addedLong} · 1 week</div><div class="v num">${frs ? frs.s + ` <small>${fr(frs)[0] >= 0 ? '+' : ''}${kf(fr(frs)[0])}</small>` : '<small>–</small>'}</div><div class="s">${frs ? `contracts at its levels (${pc(fr(frs)[1])})` : 'no week-ago snapshot'}</div></div>
+    <div class="tile ${frs ? 'lnk' : ''}" ${frs ? `data-s="${frs.s}"` : ''}><div class="k">Most ${w.addedLong} · 1 week</div><div class="v num">${frs ? frs.s + ` <small>${SH() ? pc(fr(frs)[1]) : (fr(frs)[0] >= 0 ? '+' : '') + kf(fr(frs)[0])}</small>` : '<small>–</small>'}</div><div class="s">${frs ? (SH() ? 'more contracts at its levels than a week ago' : `contracts at its levels (${pc(fr(frs)[1])})`) : SH() && m.some(r => fr(r)) ? 'none added enough this week' : 'no week-ago snapshot'}</div></div>
     <div class="tile"><div class="k">Why names drop out · today</div><div class="s">${[['ratio', `${w.theirs}s ${w.there} too big`], ['rel', 'stack small for the stock'], ['negbar', `one big ${w.theirs} bar`], ['com', 'stack hugs the price']].map(([k, t]) => `<b class="num">${fl[k] || 0}</b> ${t}`).join('<br>')}</div></div>
   </div>` + (left.length ? `<div class="leftline">Left the list since ${day(D.history.days[D.history.days.length - 2])}: ${left.map(s => `<span class="lnk" data-s="${s}">${s}</span>`).join('')}</div>` : '');
 }
@@ -379,7 +397,7 @@ async function renderBoard() {
   const rank = r => G.m.indexOf(r);
   let h = viewBar();
   if (past) { const x = DAYB[S.d];
-    h += `<div class="pastnote">Saved board for <b>${dayW(S.d)}</b> · close ${day(S.d)} · OI ${day(x.settle)} settle${String(x.source || '').startsWith('oiarchive') ? ' · rebuilt from saved open-interest snapshots' : ''}. Rows are as they were that day. Click a name to see today's chart with that day's levels dashed. <span class="lnk" data-d="">Back to latest →</span></div>`; }
+    h += `<div class="pastnote">Saved board for <b>${dayW(S.d)}</b> · close ${day(S.d)} · OI ${day(x.settle)} settle${String(x.source || '').startsWith('oiarchive') ? ' · rebuilt from saved open-interest snapshots' : REBS(x)}. Rows are as they were that day. Click a name to see today's chart with that day's levels dashed. <span class="lnk" data-d="">Back to latest →</span></div>`; }
   h += ruleStrip() + tiles(G);
   if (NARROW()) {
     h += sortBar() + m.map(r => card(r, rank(r), 'match')).join('');
@@ -591,10 +609,10 @@ async function renderDetail() {
   drawChart(n);
   const ck = g.checks.map(([id, ok, t]) => `<span class="${ok ? 'y' : 'n'}">${ok ? '✓' : '✕'}</span><span>${esc(t)}</span>`).join('');
   const lt = (g.levels || []).map(d => { const dd = d.oi_wk != null && d.oi_all != null ? d.oi_all - d.oi_wk : null;
-    return `<tr><td class="${d.k === g.kt ? 'kg' : ''}"><b>${sk(d.k)}</b></td><td>${pc(d.k / n.spot - 1)}</td><td>${d.sigma != null ? d.sigma.toFixed(1) + 'σ' : '–'}</td><td>${fm(d.gex)}</td><td>${kf(PUT() ? d.put_oi || 0 : d.call_oi || 0)}</td><td>${expS(d.exp)}</td><td class="${dd != null && dd >= 1000 ? 'up' : ''}">${dd == null ? 'n/a' : (dd >= 0 ? '+' : '−') + kf(Math.abs(dd))}</td></tr>`; }).join('');
+    return `<tr><td class="${d.k === g.kt ? 'kg' : ''}"><b>${sk(d.k)}</b></td><td>${pc(d.k / n.spot - 1)}</td><td>${d.sigma != null ? d.sigma.toFixed(1) + 'σ' : '–'}</td><td>${fm(d.gex)}</td><td>${SH() ? '–' : kf(PUT() ? d.put_oi || 0 : d.call_oi || 0)}</td><td>${expS(d.exp)}</td><td class="${(SH() ? d.big1w : dd != null && dd >= 1000) ? 'up' : ''}">${dd == null ? (d.new1w ? 'new' : 'n/a') : SH() ? pc(dd) : (dd >= 0 ? '+' : '−') + kf(Math.abs(dd))}</td></tr>`; }).join('');
   const P = g.pct || {}, pb = (lab, v) => `<div class="pb"><span>${lab}</span><i><b style="width:${(v || 0) * 100}%"></b></i><span class="num" style="text-align:right">${Math.round((v || 0) * 100)}th</span></div>`;
-  const f = g.fr, dd = f && f[1] ? f[0] - f[1] : null, fresh = dd != null && dd >= 1000 && dd / f[1] >= 0.10;
-  const grew = (g.levels || []).filter(d => d.oi_wk > 0 && d.oi_all - d.oi_wk >= 200 && (d.oi_all - d.oi_wk) / d.oi_wk >= 0.10);
+  const f = g.fr, dd = f && f[1] ? f[0] - f[1] : null, fresh = dd != null && (SH() ? !!f[2] : dd >= 1000 && dd / f[1] >= 0.10);
+  const grew = (g.levels || []).filter(d => SH() ? d.grew : d.oi_wk > 0 && d.oi_all - d.oi_wk >= 200 && (d.oi_all - d.oi_wk) / d.oi_wk >= 0.10);
   const exps = [...new Set((g.levels || []).map(d => d.exp && expS(d.exp).replace(/ \d+ /, ' ')).filter(Boolean))].join(' / ');
   let recTxt = '';
   try { const R = await loadRecord(); const es = (((R.sides[S.side] || {})[S.h] || {}).entries || []).filter(e => e.sym === sym);
@@ -610,10 +628,10 @@ async function renderDetail() {
     ${lt ? `<div class="card2"><h4><span>${w.levels}</span><span>OI ${day(n.oi_settle)} settle</span></h4><table class="lvt"><tr><th>Strike</th><th>Away</th><th>Reach</th><th>GEX</th><th>${PUT() ? 'Puts' : 'Calls'}</th><th>Main expiry</th><th>1W</th></tr>${lt}</table><div class="note" style="margin-top:6px">Reach = distance in the main expiry's own implied moves. 1W = ${w.addedLong} since the ${day(n.wk_settle)} settle (all open expiries).</div></div>` : ''}
     ${NARROW() ? '' : cpCard(n)}
     <div class="card2"><h4><span>${sym} vs all ${D.universe} names</span><span>percentile</span></h4>${pb(`Stack ÷ ${w.theirs}s ${w.there}`, P.x)}${pb('Stack vs $ volume', P.rel)}${pb('Stack size ($)', P.up)}${pb(`How far ${w.where}`, P.com)}${pb(`Share 10%+ ${w.where}`, P.far)}</div>
-    ${(g.levels || []).length ? `<div class="card2"><h4><span>Is the stack new?</span><span class="${fresh ? 'up' : 'muted'}">${dd == null ? 'n/a' : fresh ? 'FRESH' : 'OLD'}</span></h4><div class="txt">${dd == null ? 'No snapshot from a week earlier.' : `${PUT() ? 'Puts' : 'Calls'} at the levels: <b>${kf(f[0])}</b> now vs ${kf(f[1])} on ${day(n.wk_settle)} (<b>${pc(dd / f[1])}</b>). `}<span class="muted">${dd == null ? '' : fresh ? `${PUT() ? 'Puts' : 'Calls'} are being added at the levels` : `Mostly ${exps} ${w.mine}s that were already there`}${grew.length ? '. Grew 10%+: ' + grew.map(d => sk(d.k) + ' (' + pc((d.oi_all - d.oi_wk) / d.oi_wk) + ')').join(', ') : ''}.</span></div></div>` : ''}
+    ${(g.levels || []).length ? `<div class="card2"><h4><span>Is the stack new?</span><span class="${fresh ? 'up' : 'muted'}">${dd == null ? 'n/a' : fresh ? 'FRESH' : 'OLD'}</span></h4><div class="txt">${dd == null ? 'No snapshot from a week earlier.' : `${PUT() ? 'Puts' : 'Calls'} at the levels: ${SH() ? `<b>${pc(dd / f[1])}</b> vs ${day(n.wk_settle)}. ` : `<b>${kf(f[0])}</b> now vs ${kf(f[1])} on ${day(n.wk_settle)} (<b>${pc(dd / f[1])}</b>). `}`}<span class="muted">${dd == null ? '' : fresh ? `${PUT() ? 'Puts' : 'Calls'} are being added at the levels` : `Mostly ${exps} ${w.mine}s that were already there`}${grew.length ? '. Grew 10%+: ' + grew.map(d => sk(d.k) + ' (' + pc((d.oi_all - d.oi_wk) / d.oi_wk) + ')').join(', ') : ''}.</span></div></div>` : ''}
     ${g.v === 'match' && g.days != null ? `<div class="card2"><h4><span>On the list</span><span></span></h4><div class="txt">${g.new ? '<b>New today.</b>' : `<b>${g.days}</b> session${g.days === 1 ? '' : 's'}, since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}.`}</div></div>` : ''}
     ${recTxt}
-    <div class="card2"><h4><span>Data</span><span></span></h4><div class="note">Option chain built ${new Date(n.build).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' })} ET · open interest ${day(n.oi_settle)} settle · price ${day(n.px_day)} close · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`;
+    <div class="card2"><h4><span>Data</span><span></span></h4><div class="note">${REBD(n) || `Option chain built ${new Date(n.build).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' })} ET · open interest ${day(n.oi_settle)} settle`} · price ${day(n.px_day)} close · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`;
 }
 
 
@@ -625,7 +643,7 @@ function gexDeltas(n) {
   a.forEach(x => { pa[x[0]] = x; }); b.forEach(x => { pb[x[0]] = x; });
   return b.map(x => x[0]).filter(k => pa[k]).sort((p, q) => p - q).map(k => {
     const x = pa[k], y = pb[k];
-    return { k, was: x[1], now: y[1], d: y[1] - x[1], dc: y[4] - x[2], dp: y[5] - x[3] };
+    return { k, was: x[1], now: y[1], d: y[1] - x[1], dc: SH() ? null : y[4] - x[2], dp: SH() ? null : y[5] - x[3] };
   });
 }
 function chgMini(n, D0, Wd, Hh) {
@@ -639,7 +657,7 @@ function chgMini(n, D0, Wd, Hh) {
   for (let t = Math.ceil(lo / st) * st; t <= hi; t += st) s += `<line x1="28" x2="${Wd}" y1="${y(t)}" y2="${y(t)}" stroke="#2a2e39"/><text x="0" y="${y(t) + 3.5}" fill="#787b86" font-size="10.5">${sk(t)}</text>`;
   s += `<line x1="${cx}" x2="${cx}" y1="${top}" y2="${bot}" stroke="#4a4f5c"/><line x1="28" x2="${Wd}" y1="${y(S0)}" y2="${y(S0)}" stroke="#2962ff" stroke-dasharray="2,3"/><text x="${Wd - 2}" y="${y(S0) - 3}" fill="#8ec0fa" font-size="10.5" text-anchor="end">price ${S0.toFixed(2)}</text>`;
   X.forEach(x => { const len = Math.max(1, Math.abs(x.d) / mx * half);
-    s += `<rect x="${x.d >= 0 ? cx : cx - len}" y="${y(x.k) - bh / 2}" width="${len}" height="${bh}" fill="${x.d >= 0 ? '#26a69a' : '#ef5350'}" opacity=".9"><title>${sk(x.k)}: ${SU(x.d)} · calls ${SKf(x.dc)} · puts ${SKf(x.dp)}</title></rect>`; });
+    s += `<rect x="${x.d >= 0 ? cx : cx - len}" y="${y(x.k) - bh / 2}" width="${len}" height="${bh}" fill="${x.d >= 0 ? '#26a69a' : '#ef5350'}" opacity=".9"><title>${sk(x.k)}: ${SU(x.d)}${SH() ? '' : ` · calls ${SKf(x.dc)} · puts ${SKf(x.dp)}`}</title></rect>`; });
   return s + `<text x="${cx - 6}" y="${Hh - 4}" fill="#787b86" font-size="10.5" text-anchor="end">← GEX lost</text><text x="${cx + 6}" y="${Hh - 4}" fill="#787b86" font-size="10.5">GEX added →</text></svg>`;
 }
 function chgCard(n) {
@@ -655,7 +673,7 @@ function chgCard(n) {
   const eng = `Net GEX ${dn >= 0 ? 'rose' : 'fell'} ${fm(Math.abs(dn))} (${fm(al.net)} → ${fm(lv.net)}). `
     + (cUp.length ? `Calls were added above the price: <b>${SKf(cUp[0].dc)}</b> at ${sk(cUp[0].k)}${cUp[1] ? `, <b>${SKf(cUp[1].dc)}</b> at ${sk(cUp[1].k)}` : ''} (${SKf(cUp.reduce((t, x) => t + x.dc, 0))} in all). ` : '')
     + (pDn.length ? `Puts were added below: <b>${SKf(pDn[0].dp)}</b> at ${sk(pDn[0].k)}${pDn[1] ? `, <b>${SKf(pDn[1].dp)}</b> at ${sk(pDn[1].k)}` : ''} (${SKf(pDn.reduce((t, x) => t + x.dp, 0))} in all). ` : '')
-    + (a.oi_settle === n.oi_settle ? `Same open interest (${day(n.oi_settle)} settle): the change comes from the price. ` : !cUp.length && !pDn.length ? 'Little new open interest at any strike. ' : '')
+    + (a.oi_settle === n.oi_settle ? `Same open interest (${day(n.oi_settle)} settle): the change comes from the price. ` : !SH() && !cUp.length && !pDn.length ? 'Little new open interest at any strike. ' : '')
     + (same ? `Same close (${day(n.px_day)}): only the open interest changed. ` : `The price went ${a.spot.toFixed(2)} → ${S0.toFixed(2)} (${pc(S0 / a.spot - 1, 1)}). `)
     + moved.map(k => `<b>The ${nm[k]} moved ${lv[k] > al[k] ? 'up' : 'down'} from ${sk(al[k])} to ${sk(lv[k])}.</b> `).join('')
     + (kept.length ? `The ${kept.map(k => `${nm[k]} (${sk(lv[k])})`).join(', ')} didn't move. ` : '')
@@ -674,7 +692,7 @@ function chgCard(n) {
     <div class="gxc-l">King ${mv('king')} · call wall ${mv('call_wall')} · put wall ${mv('put_wall')}</div>
     <div class="gxc-l">${w.levels}: ${add.length ? `<span class="up">+ ${add.map(sk).join(', ')}</span> ` : ''}${drop.length ? `<span class="dn">− ${drop.map(sk).join(', ')}</span>` : ''}${!add.length && !drop.length ? '<span class="muted">same</span>' : ''}${ag.sc != null && g.sc != null && Math.round(ag.sc) !== Math.round(g.sc) ? ` · score ${ag.sc.toFixed(0)} → <b>${g.sc.toFixed(0)}</b>` : ''}</div>
     <div class="gxc-h">Change by strike</div>${chgMini(n, D0, NARROW() ? Math.max(260, window.innerWidth - 60) : 346, 220)}
-    ${big.length ? `<div class="gxc-h">Biggest changes</div><table class="gxc-t"><tr><th>Strike</th><th class="r">GEX change</th><th class="r">Calls</th><th class="r">Puts</th></tr>${big.map(x => `<tr><td><b>${sk(x.k)}</b> <span class="muted">${pc(x.k / S0 - 1)}</span></td><td class="r ${x.d >= 0 ? 'up' : 'dn'}">${SU(x.d)}</td><td class="r ${x.dc > 0 ? 'up' : x.dc < 0 ? 'dn' : 'muted'}">${SKf(x.dc) || '0'}</td><td class="r ${x.dp > 0 ? 'dn' : x.dp < 0 ? 'up' : 'muted'}">${SKf(x.dp) || '0'}</td></tr>`).join('')}</table>` : ''}
+    ${big.length ? `<div class="gxc-h">Biggest changes</div><table class="gxc-t"><tr><th>Strike</th><th class="r">GEX change</th>${SH() ? '' : '<th class="r">Calls</th><th class="r">Puts</th>'}</tr>${big.map(x => `<tr><td><b>${sk(x.k)}</b> <span class="muted">${pc(x.k / S0 - 1)}</span></td><td class="r ${x.d >= 0 ? 'up' : 'dn'}">${SU(x.d)}</td>${SH() ? '' : `<td class="r ${x.dc > 0 ? 'up' : x.dc < 0 ? 'dn' : 'muted'}">${SKf(x.dc) || '0'}</td><td class="r ${x.dp > 0 ? 'dn' : x.dp < 0 ? 'up' : 'muted'}">${SKf(x.dp) || '0'}</td>`}</tr>`).join('')}</table>` : ''}
     <div class="note">On the chart: ${GKEY}, against the previous map (${day(a.px_day)} close · open interest ${day(a.oi_settle)} settle). Open interest changes once a day; GEX also moves with the price.</div></div>`;
 }
 async function renderChanges() {
@@ -794,7 +812,7 @@ async function renderRecord() {
     <td class="num">${e.odds['60'].kt != null ? Math.round(e.odds['60'].kt * 100) + '%' : '–'}</td><td>${cell(e, '60', 'kt')}</td><td class="num">${ctrl(e, '60', 'kt')}</td>
     <td>${e.fresh ? '<span class="up">fresh</span>' : e.fresh_known ? '<span class="muted">old</span>' : '<span class="muted">n/a</span>'}</td><td class="num">${e.res['20'].ret != null ? pc(e.res['20'].ret, 1) : '<span class="open">–</span>'}</td></tr>`;
   const head = `<tr><th>Joined</th><th>Stock</th><th>Price</th><th>First level</th><th>Biggest level</th><th>Odds 20s</th><th>First level · 20s</th><th>Matched · 20s</th><th>Odds 60s</th><th>Biggest · 60s</th><th>Matched · 60s</th><th>${PUT() ? 'Puts' : 'Calls'}</th><th>Return 20s</th></tr>`;
-  $('#main').innerHTML = `<div class="rec-wrap"><h2>Track record · ${w.pat} · ${S.h}</h2>
+  $('#main').innerHTML = `<div class="rec-wrap"><h2>Track record · ${w.pat} · ${S.h}</h2>${REBR()}
     <div class="note" style="max-width:1100px">Pre-registered on Oct 7, before any result existed. Each name is logged on the first day it matches. Its targets are fixed that day: the first level ${w.where} and the biggest level ${w.where}. A touch is a daily ${PUT() ? 'low at or below' : 'high at or above'} the target, counted from the NEXT session, because open interest posts before the open. Each entry is compared with the options' own odds and with 3 stocks from the same day that did not match, picked for similar 60-day beta and 20-day return, using targets at the same % distances. Names already on the list on ${day(R.first_day)}, the first day of history, are not scored because their join date is unknown.</div>
     <div class="rec-tiles">${tile('Entries scored', `${sm.entries || 0} <small>+${sm.censored || 0} not scored</small>`, `${sm.open || 0} still inside their first 20 sessions`)}${line('20', 'k1', 'First level · 20 sessions')}${line('20', 'kt', 'Biggest level · 20 sessions')}${line('60', 'kt', 'Biggest level · 60 sessions')}</div>
     <table class="rec"><thead>${head}</thead><tbody>${scored.map(row).join('') || `<tr><td colspan="13" class="muted" style="padding:14px 6px">No new entries since history began.</td></tr>`}
