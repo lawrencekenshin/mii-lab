@@ -85,7 +85,7 @@ function rowHtml(sym, i, mx) {
   const stay = a.t20n ? `top 20 on ${a.t20 || 0} of ${a.t20n}` : "";
   const run = a.str ? `${a.str}${a.strp ? "+" : ""} ${a.str === 1 ? "day" : "days"} running` : "";
   const hc = r.hc != null ? `<span class="v">${Math.round(r.hc * 100)}% calls</span>${split(r.hc)}` : `<span class="muted">–</span>`;
-  const wh = a.mc ? `<span class="v">${esc(whereText(a))}</span><span class="s">${Math.round(a.mc[3] * 100)}% of it${a.tk ? " · " + TEN[["m1", "m6", "y1", "y1p"].indexOf(a.tk)] : ""}</span>` : `<span class="muted">–</span>`;
+  const wh = a.mc ? `<span class="v">${esc(whereText(a))}</span><span class="s">${Math.round(a.mc[3] * 100)}% of it${a.tk ? " · most " + TEN[["m1", "m6", "y1", "y1p"].indexOf(a.tk)] : ""}</span>` : `<span class="muted">–</span>`;
   let h = `<div role="button" tabindex="0" class="rw${S.n === sym ? " open" : ""}" data-sym="${esc(sym)}" aria-expanded="${S.n === sym}">
     <span class="rk"><b>${i + 1}</b>${moveTag(a)}</span>
     <span class="nmc"><b>${esc(sym)}${tags(r)}</b><span>${esc(r.nm || "")}</span></span>
