@@ -265,6 +265,24 @@ body.neg .dots i.on { background:var(--dn); }
 .chg-sec td.chg-s { white-space:nowrap; min-width:110px; }
 
 
+.lsw { display:inline-flex; margin-left:6px; border:1px solid var(--line2); border-radius:14px; overflow:hidden; white-space:nowrap; }
+.lsw button { padding:4px 10px; color:var(--sub); font-size:12.5px; }
+.lsw button.on { background:#2a2e39; color:#fff; }
+.lsw button[data-live="1"].on { background:#10302b; color:#9fe0d6; font-weight:600; }
+.lsw i { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--up); margin-right:6px; vertical-align:1px; }
+.lsw button[data-live="1"]:not(.on) i { background:#3a3e4a; }
+#status.lst { color:#9fb5c9; }
+.lvd { display:inline-block; margin-left:6px; padding:0 5px; border:1px dashed #5d606b; border-radius:3px; color:var(--sub);
+       font-size:10.5px; font-weight:500; line-height:15px; vertical-align:1px; }
+.tvc .r, .tvc th.r { text-align:right; }
+.tvc .lvt td, .tvc .lvt th { padding-right:6px; }
+@media (max-width: 760px) {
+  #status.lst { white-space:normal; line-height:1.45; }
+  .lsw { margin:4px 0 0; }
+  .lsw button { padding:5px 10px; }
+}
+
+
 .top{border-bottom:1px solid #2A2E39;position:sticky;top:env(safe-area-inset-top,0px);background:rgba(19,23,34,.94);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:40}
 .topbar{display:flex;align-items:center;gap:14px;height:48px;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,"Roboto","Segoe UI","Helvetica Neue",Arial,sans-serif}
 .brand{color:#8A8E99;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap;display:inline-flex;align-items:center;min-height:44px}

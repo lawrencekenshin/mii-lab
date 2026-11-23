@@ -2,6 +2,8 @@
 
 
 
+
+
 const HS = ['1M', '3M', '6M', '1Y+'];
 const LISTS = [['all', 'All'], ['spx', 'SPY'], ['ndx', 'QQQ'], ['wl', 'Watchlist 1'], ['ai', 'AI']];
 const PERS = [['today', 'Today'], ['chg', 'Changes'], ['1W', '1W'], ['1M', '1M'], ['ALL', 'Total']];
@@ -10,10 +12,12 @@ const store = {
   set(k, v) { try { localStorage.setItem('hunt.' + k, JSON.stringify(v)); } catch (e) {  } },
 };
 const S = { v: 'board', h: store.get('h', '1Y+'), l: store.get('l', 'all'), near: store.get('near', true),
-  sort: store.get('sort', ['sc', -1]), psort: store.get('psort', ['days', -1]), q: '', s: null, side: store.get('side', 'call'), per: 'today', d: null };
+  sort: store.get('sort', ['sc', -1]), psort: store.get('psort', ['days', -1]), q: '', s: null, side: store.get('side', 'call'), per: 'today', d: null,
+  live: false, liveSet: false };
 if (!HS.includes(S.h)) S.h = '1Y+';
 if (S.side !== 'put') S.side = 'call';
 let D = null, REC = null, PER = null, BUILD = null, STATUS = null;
+let EOD = null, LV = null, LVST = null;
 const NAMES = {}, DAYB = {};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -49,8 +53,10 @@ let REB_HREF = null, REB_REAL = () => '';
 const REB = () => {
   const r = D && D.rebuilt;
   if (!r) return REB_REAL();
-  const t = `Cboe closed its option-chain feed on Nov 19, 2026. Open interest here is OCC's (${day(r.oi)} settle); each contract keeps the last implied vol Cboe published (${day(r.iv)}). ${r.n} of ${r.of} names.`;
-  const lab = `REBUILT · OCC open interest · vols ${day(r.iv)}`;
+  const lv = r.live != null;
+  const t = lv ? `Cboe closed its option-chain feed on Nov 19, 2026. Open interest here is OCC's (${day(r.oi)} settle). ${r.live} of ${r.of} names use today's implied vols from Alpaca's delayed option feed; the others keep the last vol Cboe published.`
+    : `Cboe closed its option-chain feed on Nov 19, 2026. Open interest here is OCC's (${day(r.oi)} settle); each contract keeps the last implied vol Cboe published (${day(r.iv)}). ${r.n} of ${r.of} names.`;
+  const lab = lv ? `REBUILT · OCC open interest · today's vols (delayed feed)` : `REBUILT · OCC open interest · vols ${day(r.iv)}`;
   return REB_HREF ? ` <a class="reb" href="${REB_HREF}" title="${t} Click for the last board made from real Cboe chains.">${lab}</a>` : ` <span class="reb" title="${t}">${lab}</span>`;
 };
 const REBD = n => n.syn ? `Rebuilt chain: open interest from OCC, ${day(n.syn.oi)} settle${n.syn.fetched ? ' (read ' + esc(n.syn.fetched) + ')' : ''} · implied vols from the Cboe chain of ${day(n.syn.iv)}${n.syn.own != null ? ' (' + Math.round(n.syn.own * 100) + '% of the open interest on its own contract\'s vol, the rest on a neighbour\'s)' : ''}` : null;
@@ -60,26 +66,81 @@ const REBR = () => D && D.rebuilt ? `<div class="pastnote">The record counts rea
 
 const LIVE = location.hostname === 'lawrencekenshin.github.io';
 const BASE = LIVE ? 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/hunt-data/hunt/' : './data/';
-let BUST = '';
+const LBASE = LIVE ? 'https://raw.githubusercontent.com/lawrencekenshin/mii-lab/hunt-live-data/hunt-live/' : './data/live/';
+let BUST = '', LBUST = '';
 async function getJSON(url) {
-  const path = url === 'api/status' ? 'status.json' : url.replace(/^data\//, '');
-  const q = path === 'status.json' ? '?t=' + Math.floor(Date.now() / 60000) : BUST;
-  const r = await fetch(BASE + path + q, { cache: 'no-cache' });
+  const lv = url === 'api/live' || url.startsWith('data/live/');
+  const path = url === 'api/status' || url === 'api/live' ? 'status.json' : url.replace(/^data\/(live\/)?/, '');
+  const q = path === 'status.json' ? '?t=' + Math.floor(Date.now() / 60000) : lv ? LBUST : BUST;
+  const r = await fetch((lv ? LBASE : BASE) + path + q, { cache: 'no-cache' });
   if (!r.ok) throw new Error(url + ' ' + r.status);
   return r.json();
 }
 async function loadBoard() {
   if (STATUS && STATUS.build) BUST = '?b=' + STATUS.build;
   D = await getJSON('data/hunt.json');
+  EOD = D;
   BUILD = D.build;
   for (const k in NAMES) delete NAMES[k];
   REC = null; PER = null;
 }
-async function loadName(sym) { if (!NAMES[sym]) NAMES[sym] = await getJSON('data/names/' + encodeURIComponent(sym) + '.json'); return NAMES[sym]; }
+const nameKey = sym => (inLive() ? 'L|' : '') + sym;
+async function loadName(sym) {
+  const k = nameKey(sym), url = 'data/names/' + encodeURIComponent(sym) + '.json';
+  if (!NAMES[k]) NAMES[k] = inLive() ? await getJSON('data/live/names/' + encodeURIComponent(sym) + '.json').catch(() => getJSON(url)) : await getJSON(url);
+  return NAMES[k];
+}
 async function loadRecord() { if (!REC) REC = await getJSON('data/record.json'); return REC; }
 async function loadPeriods() { if (!PER) PER = await getJSON('data/periods.json'); return PER; }
 async function loadDay(d) { if (!DAYB[d]) DAYB[d] = await getJSON('data/days/' + d + '.json'); return DAYB[d]; }
 const pastDay = () => S.per === 'today' && S.d && S.d !== D.day;
+
+
+
+
+
+
+
+const etDay = t => new Date(t * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const etHM = t => t ? new Date(t).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }) : '–';
+const etWhen = t => !t ? '–' : (LV && LV.live && String(t).slice(0, 10) !== LV.live.today ? day(String(t).slice(0, 10)) + ' ' : '') + etHM(t) + ' ET';
+function liveUsable() {
+  if (!LVST || !LVST.build || !LVST.day || !EOD || !['open', 'final'].includes(LVST.phase)) return false;
+  return LVST.day === etDay(LVST.server_time || Date.now() / 1000) && LVST.day > EOD.day;
+}
+const liveFresh = () => liveUsable() && (LVST.server_time || Date.now() / 1000) * 1000 - new Date(LVST.built).getTime() < 20 * 60000;
+const liveView = () => S.v !== 'record' && S.per === 'today' && !(S.d && EOD && S.d !== EOD.day);
+const wantLive = () => S.live && liveUsable() && liveView();
+const lvToday = () => !!LV && !!LV.live && LV.live.today === LVST.day;
+const inLive = () => !!LV && D === LV;
+function pick() { D = wantLive() && lvToday() ? LV : EOD; }
+async function loadLive() {
+  try { LVST = await getJSON('api/live'); } catch (e) { return false; }
+  if (LVST.build) LBUST = '?b=' + LVST.build;
+  if (!LVST.build) LV = null;
+  return true;
+}
+async function loadLiveBoard() {
+  if (!LVST || !LVST.build || (LV && LV.build === LVST.build)) return;
+  try { LV = await getJSON('data/live/hunt.json'); } catch (e) { return; }
+  for (const k in NAMES) if (k.startsWith('L|')) delete NAMES[k];
+}
+function show(top) {
+  if (wantLive()) return loadLiveBoard().then(() => render(top));
+  render(top);
+}
+const VTXT = { match: 'match', near: 'near miss' };
+function liveMark(r) {
+  const g = hh(r);
+  if (!inLive() || !g || (g.ev || null) === (g.v || null)) return '';
+  return ` <span class="lvd" title="On the ${day(EOD.day)} close board: ${VTXT[g.ev] || 'off the list'}. At the ${etHM(D.live.asof)} ET price: ${VTXT[g.v] || 'off the list'}.">close: ${g.ev === 'match' ? 'match' : g.ev === 'near' ? 'near' : 'off'}</span>`;
+}
+const SRCTXT = k => k === 'seeker' ? 'Price Seeker, about 15 min delayed' : k === 'chain' ? "the option feed's own delayed stock price" : k === 'close' ? 'no live price' : (k || '');
+function pxCell(r) {
+  if (!inLive()) return `${r.px.toFixed(2)}<br><span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}" style="font-size:12px">${pc(r.r20, 1)}</span>`;
+  if (r.px_src === 'close') return `<span title="no live price: the ${day(EOD.day)} close">${r.px.toFixed(2)}</span><br><span class="muted" style="font-size:12px">no live price</span>`;
+  return `<span title="${etHM(r.px_t)} ET · ${SRCTXT(r.px_src)} · ${day(EOD.day)} close ${r.close.toFixed(2)} · 20d ${pc(r.r20, 1)}">${r.px.toFixed(2)}</span><br><span class="${(r.chg || 0) >= 0 ? 'up' : 'dn'}" style="font-size:12px">${pc(r.chg, 1)}</span>`;
+}
 
 
 function readHash() {
@@ -110,9 +171,9 @@ function go(changes, push = true) {
   Object.assign(S, changes);
   store.set('h', S.h); store.set('l', S.l); store.set('near', S.near); store.set('sort', S.sort); store.set('psort', S.psort); store.set('side', S.side);
   writeHash(push);
-  render(prevV !== S.v);
+  show(prevV !== S.v);
 }
-window.addEventListener('popstate', () => { readHash(); render(true); });
+window.addEventListener('popstate', () => { readHash(); show(true); });
 
 
 const hh = r => (r[K()] || {})[S.h];
@@ -125,7 +186,7 @@ const cpOf = (r, H = S.h) => { const c = r.cp && r.cp[H]; return c && c[0] + c[1
 const cpShare = c => c[0] / (c[0] + c[1]);
 const cpWk = c => c[2] != null && c[2] + c[3] > 0 ? c[2] / (c[2] + c[3]) : null;
 const SORTS = {
-  sc: r => hh(r).sc, s: r => r.s, px: r => r.r20 ?? -9, up: r => hh(r).up, dn: r => hh(r).dn, x: r => hh(r).x,
+  sc: r => hh(r).sc, s: r => r.s, px: r => (inLive() ? r.chg : r.r20) ?? -9, up: r => hh(r).up, dn: r => hh(r).dn, x: r => hh(r).x,
   lv: r => hh(r).lv.length, com: r => hh(r).com, fr: r => (fr(r) || [-1e12])[0], biz: r => r.biz ?? -1,
   cp: r => { const c = cpOf(r); return c ? cpShare(c) : -1; },
   days: r => r.days ?? (hh(r).days || 0), ret: r => r.ret ?? -9, best: r => r.touched ? 1 : -Math.abs(r.best ?? 9),
@@ -271,7 +332,19 @@ function sortBar() {
 }
 
 
+function liveSwitch() {
+  if (!liveUsable() || !liveView()) return '';
+  const on = inLive();
+  return `<span class="lsw" role="group" aria-label="Live or close board"><button class="${on ? 'on' : ''}" data-live="1" title="This board repriced at the newest delayed price with today's implied vols, every 5 min in US hours"><i></i>Live ${etHM(LVST.asof || LVST.built)}</button><button class="${on ? '' : 'on'}" data-live="0" title="The board at the ${day(EOD.day)} close (the record and the history use this one)">${day(EOD.day)} close</button></span>`;
+}
+function liveStatus() {
+  const L = D.live, fresh = liveFresh();
+  const dot = LVST && LVST.ok === false ? 'err' : fresh ? '' : 'stale';
+  const np = (L.no_price || []).length;
+  return `<span id="status" class="lst" title="${esc((LVST && LVST.error) || `live board built ${etHM(D.built)} ET · close board ${day(EOD.day)}`)}"><b class="${dot}"></b>Live · prices ${etHM(L.asof)} ET${L.fresh ? ' (about 15 min delayed)' : ' (Price Seeker is behind)'}${np ? ` · ${np} without a live price` : ''} · today's vols: ${L.feed ?? L.iv_today} of ${L.names} names${L.iv_last ? ', to ' + L.iv_last + ' ET' : ''} · OI ${day(D.settle)} settle${LVST && LVST.ok === false ? ' · last live pass FAILED' : ''}${REB()}</span>`;
+}
 function renderBar() {
+  pick();
   const rows = D.rows;
   const counts = HS.map(H => rows.filter(r => inList(r) && (r[K()] || {})[H] && r[K()][H].v === 'match').length);
   const lc = { all: rows.length, ...D.lists };
@@ -285,7 +358,7 @@ function renderBar() {
     <span class="sep"></span>${HS.map((H, i) => `<button class="chip ${H === S.h ? 'on' : ''}" data-h="${H}" title="expiries counted">${H}<span class="c">${counts[i]}</span></button>`).join('')}
     <span class="sep"></span>${LISTS.map(([k, t]) => `<button class="chip ${k === S.l ? 'on' : ''}" data-l="${k}">${NARROW() && k === 'wl' ? 'WL1' : t}<span class="c">${lc[k] ?? ''}</span></button>`).join('')}
     <input id="q" placeholder="Find a ticker" spellcheck="false" autocomplete="off" value="${esc(S.q)}">
-    <span id="status" title="${esc(st.error || '')}"><b class="${dot}"></b>${day(D.day)} close · OI ${day(D.settle)} settle · built ${built}${st.ok === false ? ' · last build FAILED' : ''}${REB()}</span>`;
+    ${liveSwitch()}${inLive() ? liveStatus() : `<span id="status" title="${esc(st.error || '')}"><b class="${dot}"></b>${day(D.day)} close · OI ${day(D.settle)} settle · built ${built}${st.ok === false ? ' · last build FAILED' : ''}${REB()}</span>`}`;
   document.body.classList.toggle('neg', PUT());
   const q = $('#q');
   q.addEventListener('input', () => { S.q = q.value.trim().toUpperCase();
@@ -325,9 +398,11 @@ function ruleStrip() {
     ${PUT() ? `<span class="note" style="flex-basis:100%">The negative side is judged less strictly on lopsidedness than the call side: calls sit above the price almost everywhere, so an exact mirror finds almost nothing.</span>` : ''}</div>`;
 }
 function tiles(G) {
-  const m = G.m, w = W(), past = pastDay();
+  const m = G.m, w = W(), past = pastDay(), lv = inLive();
   const newN = m.filter(r => hh(r).new).length;
-  const left = past ? [] : (((D.history.left || {})[S.side] || {})[S.h] || []).filter(s => { const r = D.rows.find(x => x.s === s); return r && inList(r); });
+  const left = past ? [] : lv ? D.rows.filter(r => inList(r) && hh(r) && hh(r).ev === 'match' && hh(r).v !== 'match').map(r => r.s)
+    : (((D.history.left || {})[S.side] || {})[S.h] || []).filter(s => { const r = D.rows.find(x => x.s === s); return r && inList(r); });
+  const joined = lv ? m.filter(r => hh(r).ev !== 'match').length : 0;
   let ref;
   if (!PUT()) {
     const nx = srcRows().find(r => r.s === 'NXPI');
@@ -343,16 +418,16 @@ function tiles(G) {
   const frs = m.filter(r => fr(r) && (!SH() || isFresh(r))).sort((a, b) => fr(b)[0] - fr(a)[0])[0];
   const fl = D.counts[S.side][S.h].fails || {};
   return `<div class="tiles">
-    <div class="tile"><div class="k">Matches · ${S.h}${past ? ' · ' + day(S.d) : ''}</div><div class="v num">${m.length} <small>of ${past ? 'saved' : G.all.length}</small></div><div class="s">${G.n.length} near misses${!past && D.history.days.length > 1 ? ` · <b>${newN}</b> new · <b>${left.length}</b> left` : ''}<br><b>${m.filter(r => (r.biz ?? 0) >= 70).length}</b> with business 70+${m.filter(r => (r.biz ?? 0) >= 70).length ? ': ' + m.filter(r => (r.biz ?? 0) >= 70).map(r => r.s).join(', ') : ''}</div></div>
+    <div class="tile"><div class="k">Matches · ${S.h}${past ? ' · ' + day(S.d) : lv ? ' · live ' + etHM(D.live.asof) : ''}</div><div class="v num">${m.length} <small>of ${past ? 'saved' : G.all.length}</small></div><div class="s">${G.n.length} near misses${lv ? ` · <b>${joined}</b> joined · <b>${left.length}</b> off since the ${day(EOD.day)} close` : !past && D.history.days.length > 1 ? ` · <b>${newN}</b> new · <b>${left.length}</b> left` : ''}<br><b>${m.filter(r => (r.biz ?? 0) >= 70).length}</b> with business 70+${m.filter(r => (r.biz ?? 0) >= 70).length ? ': ' + m.filter(r => (r.biz ?? 0) >= 70).map(r => r.s).join(', ') : ''}</div></div>
     ${ref}
     <div class="tile ${big ? 'lnk' : ''}" ${big ? `data-s="${big.s}"` : ''}><div class="k">Biggest ${w.mine} stack</div><div class="v num">${big ? big.s + ` <small>${stackS(hh(big).up)}</small>` : '<small>–</small>'}</div><div class="s">${big ? (hh(big).rel * 100).toFixed(1) + "% of a day's $ volume" : ''}</div></div>
     <div class="tile ${frs ? 'lnk' : ''}" ${frs ? `data-s="${frs.s}"` : ''}><div class="k">Most ${w.addedLong} · 1 week</div><div class="v num">${frs ? frs.s + ` <small>${SH() ? pc(fr(frs)[1]) : (fr(frs)[0] >= 0 ? '+' : '') + kf(fr(frs)[0])}</small>` : '<small>–</small>'}</div><div class="s">${frs ? (SH() ? 'more contracts at its levels than a week ago' : `contracts at its levels (${pc(fr(frs)[1])})`) : SH() && m.some(r => fr(r)) ? 'none added enough this week' : 'no week-ago snapshot'}</div></div>
     <div class="tile"><div class="k">Why names drop out · today</div><div class="s">${[['ratio', `${w.theirs}s ${w.there} too big`], ['rel', 'stack small for the stock'], ['negbar', `one big ${w.theirs} bar`], ['com', 'stack hugs the price']].map(([k, t]) => `<b class="num">${fl[k] || 0}</b> ${t}`).join('<br>')}</div></div>
-  </div>` + (left.length ? `<div class="leftline">Left the list since ${day(D.history.days[D.history.days.length - 2])}: ${left.map(s => `<span class="lnk" data-s="${s}">${s}</span>`).join('')}</div>` : '');
+  </div>` + (left.length ? `<div class="leftline">${lv ? `Off the list at the ${etHM(D.live.asof)} ET price (on the ${day(EOD.day)} close board)` : `Left the list since ${day(D.history.days[D.history.days.length - 2])}`}: ${left.map(s => `<span class="lnk" data-s="${s}">${s}</span>`).join('')}</div>` : '');
 }
 function cols() {
   const w = W();
-  return [['rk', '#', 0], ['s', 'Stock', 1], ['px', 'Price · 20d', 1, 'r'], ['b', `GEX by strike<br><span class="thsub">below ← price → above</span>`, 0],
+  return [['rk', '#', 0], ['s', 'Stock', 1], ['px', inLive() ? 'Live · since close' : 'Price · 20d', 1, 'r'], ['b', `GEX by strike<br><span class="thsub">below ← price → above</span>`, 0],
     ['up', w.stack, 1, 'r'], ['dn', w.other, 1, 'r'], ['x', '×', 1, 'r'], ['lv', w.levels, 1], ['com', 'Centre', 1, 'r'],
     ['fr', w.added, 1, 'r'], ['cp', 'Calls : Puts', 1], ['tf', `KDJ 1W · 2W · 1M<br><span class="thsub">1H · 4H · 1D</span>`, 0], ['biz', 'Business', 1], ['sc', 'Score', 1]];
 }
@@ -367,8 +442,8 @@ function tableRow(r, i, kind) {
     ? `<td>${chips(r)}</td><td class="r num">${comS(g.com)}</td><td class="r num">${freshCell(r)}</td>`
     : `<td class="why" colspan="3">${kind === 'near' ? '✕ ' : ''}${esc((g.why || []).join(' · ') || '—')}</td>`;
   return `<tr class="row ${kind}" data-s="${r.s}"><td class="rk">${kind === 'match' ? i + 1 : ''}</td>
-    <td><div class="tk">${r.s}${kind === 'match' ? daysCell(g) : ''}</div><div class="nm">${esc(r.n || '')}</div></td>
-    <td class="r num">${r.px.toFixed(2)}<br><span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}" style="font-size:12px">${pc(r.r20, 1)}</span></td>
+    <td><div class="tk">${r.s}${kind === 'match' ? daysCell(g) : ''}${liveMark(r)}</div><div class="nm">${esc(r.n || '')}</div></td>
+    <td class="r num">${pxCell(r)}</td>
     <td>${glyph(r)}</td>
     <td class="r num"><span class="${PUT() ? 'dn' : 'wh'}">${stackS(g.up)}</span><br><span class="muted" style="font-size:11.5px">${((g.rel || 0) * 100).toFixed(1)}% of $vol</span></td>
     <td class="r num ${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</td><td class="r num wh">${xS(g.x)}</td>
@@ -376,7 +451,7 @@ function tableRow(r, i, kind) {
 }
 function card(r, i, kind) {
   const g = hh(r), w = W();
-  return `<div class="pcard ${kind}" data-s="${r.s}"><div class="r1"><span>${kind === 'match' ? `<span class="muted">${i + 1}</span> ` : ''}<b class="wh" style="font-size:15px">${r.s}</b> <span class="muted num" style="font-size:12px">${r.px.toFixed(2)} <span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}">${pc(r.r20, 1)}</span></span>${kind === 'match' ? daysCell(g) : ''}</span>${scoreCell(g.sc)}</div>
+  return `<div class="pcard ${kind}" data-s="${r.s}"><div class="r1"><span>${kind === 'match' ? `<span class="muted">${i + 1}</span> ` : ''}<b class="wh" style="font-size:15px">${r.s}</b> <span class="muted num" style="font-size:12px">${r.px.toFixed(2)} ${inLive() ? (r.px_src === 'close' ? 'no live price' : `<span class="${(r.chg || 0) >= 0 ? 'up' : 'dn'}">${pc(r.chg, 1)}</span>`) : `<span class="${(r.r20 || 0) >= 0 ? 'up' : 'dn'}">${pc(r.r20, 1)}</span>`}</span>${kind === 'match' ? daysCell(g) : ''}${liveMark(r)}</span>${scoreCell(g.sc)}</div>
     <div style="margin-top:5px">${glyph(r, cardW(), 40)}</div>
     <div class="r3 num"><span>stack <b class="${PUT() ? 'dn' : ''}">${stackS(g.up)}</b></span><span>${w.theirs}s <b class="${PUT() ? 'up' : 'dn'}">${otherS(g.dn)}</b></span><span><b>${xS(g.x)}</b></span><span>centre <b>${comS(g.com)}</b></span><span>${w.added} <b>${fr(r) ? pc(fr(r)[1]) : 'n/a'}</b></span></div>
     ${duo(r)}
@@ -416,7 +491,12 @@ async function renderBoard() {
   $('#main').innerHTML = h;
   wireViewBar();
 }
+function liveFoot() {
+  const L = D.live, st = Object.entries(L.settles || {}).sort().reverse().map(([k, n]) => `${n} names on ${day(k)}`).join(', ');
+  return `<div class="foot">Live: every name's GEX map repriced at the newest delayed price (Price Seeker, about 15 minutes behind the market) with the clock set to now, every 5 minutes in US hours; the bars, king, walls, score and match / near move with the price. Open interest changes once a day (OCC posts it in the evening): each row uses the settle its chain carries (${st}). Implied vols: ${L.feed ?? L.iv_today} names use today's, from Alpaca's delayed option feed, refreshed about every 15 minutes (a contract with no vol of its own takes the other side's at its strike, else a neighbouring strike's); the others keep the last vol Cboe published. Contracts expiring today are left out, as on tonight's close board, and each window counts the same expiries as the close board. The ${day(EOD.day)} close board is priced on stored vols, so a small part of the gap between the two boards is the vols, not the price. "close: match / near / off" = the close board's verdict, shown where the live one differs. Days on the list, the record, 1W / 1M / Total and Changes use the close board. "Calls : Puts" = open contracts in the window's expiries, as on the close board. Live board built ${etHM(D.built)} ET.</div>`;
+}
 function foot() {
+  if (inLive()) return liveFoot();
   return `<div class="foot">Bars are GEX by strike: net calls − puts per strike, $ per 1% move, priced at the close, every expiry in the ${S.h} window. Green = mostly call open interest, red = mostly puts. "${W().added}" = ${W().mine} open interest at the stack's levels vs the settle a week earlier, same expiries still open. "Calls : Puts" = all open call vs put contracts in the window's expiries (every strike); the white tick and ▲/▼ = the call share a week earlier, same expiries. KDJ = 9,3,3 on each timeframe's last closed candle at the close (1H / 4H from that session's hourly bars, 4H = the 09:30 and 13:30 ET blocks): GC = golden cross in the last few candles, coil = K closing in on D from below, up / dn = K above / below D. Rebuilt once a day from end-of-day options open interest. ${D.canonical ? '' : `<span class="am">This build already carries the ${day(D.settle)} settle (next-morning data) with the ${day(D.day)} close; saved days and the record use the evening build.</span>`} History starts ${day(D.history.first_day)}; days before the live build were rebuilt from saved open-interest snapshots.</div>`;
 }
 
@@ -536,6 +616,10 @@ function chartSVG(n, Wd, Hh, asof) {
     const pb = bars.find(b => b[0] === wall), px = Math.min(cw - 98, bx0 + (pb ? blen(pb[1]) : 0) + 6), col = put ? '#26a69a' : '#ef5350';
     s += `<line x1="0" x2="${cw}" y1="${y(wall)}" y2="${y(wall)}" stroke="${col}" stroke-width="1.3"/><rect x="${px}" y="${y(wall) - 9}" width="92" height="18" rx="3" fill="${col}"/><text x="${px + 46}" y="${y(wall) + 4}" font-size="11" fill="#fff" text-anchor="middle" font-weight="600">${put ? 'CALL' : 'PUT'} WALL ${sk(wall)}</text>`;
   }
+  if (n.px_src && n.px_src !== 'close' && n.close > lo && n.close < hi) {
+    const yc = y(n.close);
+    s += `<line x1="0" x2="${cw}" y1="${yc}" y2="${yc}" stroke="#9598a1" stroke-dasharray="6,4"/><rect x="${cw + 2}" y="${yc - 9}" width="${padR - 4}" height="18" fill="#363a45" rx="2"/><text x="${cw + 7}" y="${yc + 4}" font-size="11" fill="#d1d4dc">${n.close.toFixed(2)}</text><text x="4" y="${yc + (n.close > S0 ? -4 : 13)}" fill="#9598a1" font-size="10.5">${day(n.close_day)} close</text>`;
+  }
   s += `<line x1="0" x2="${cw}" y1="${y(S0)}" y2="${y(S0)}" stroke="#2962ff" stroke-dasharray="2,3"/><rect x="${cw + 2}" y="${y(S0) - 9}" width="${padR - 4}" height="18" fill="#2962ff" rx="2"/><text x="${cw + 7}" y="${y(S0) + 4}" font-size="11" fill="#fff">${S0.toFixed(2)}</text>`;
   if (BIG.length) {
     const side = put ? 'put' : 'call', on = k => k > lo && k < hi, lvY = L.map(l => y(l.k));
@@ -563,6 +647,33 @@ function chartSVG(n, Wd, Hh, asof) {
   s += `<text x="8" y="${top + 16}" fill="#7fd3c9" font-size="12.5" font-weight="600">${capA}</text>`;
   s += `<text x="8" y="${bot - 10}" fill="#e88a88" font-size="12.5" font-weight="600">${capB}</text>`;
   return s + '</svg>';
+}
+function liveHead(n) {
+  if (n.px_src === 'close') return `no live price · ${day(n.close_day)} close ${n.spot.toFixed(2)}`;
+  return `live ${n.spot.toFixed(2)} <span class="muted">${etHM(n.px_t)} ET</span> · <span class="${(n.chg || 0) >= 0 ? 'up' : 'dn'}">${pc(n.chg, 1)}</span> since the ${day(n.close_day)} close ${n.close.toFixed(2)}`;
+}
+function tvCard(n) {
+  if (!n.px_src || SH()) return '';
+  const t = n.tv;
+  if (!t) return `<div class="card2"><h4><span>Traded today</span><span class="muted">no file from today yet</span></h4><div class="note">${esc(n.sym)} is priced on its saved chain (vols of ${etWhen(n.iv_asof)}). Today's volume shows once the 15-minute option feed has a usable file for it (first pass about 09:50 ET; a few names never have one).</div></div>`;
+  const c = (t.cp || {})[S.h], L = ((t.lv || {})[S.h] || {})[K()] || [], x = t.p ? t.c / t.p : null, kt = (n[K()][S.h] || {}).kt;
+  const kc = v => Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : kf(v);
+  const share = (v, oi) => oi ? (v / oi >= 0.095 ? Math.round(v / oi * 100) : (v / oi * 100).toFixed(1)) + '%' : '–';
+  const lt = L.map(([k, v, oi]) => `<tr><td class="${k === kt ? 'kg' : ''}"><b>${sk(k)}</b></td><td>${pc(k / n.spot - 1)}</td><td class="r">${kc(v)}</td><td class="r">${kc(oi)}</td><td class="r ${oi && v / oi >= 0.2 ? 'up' : ''}">${share(v, oi)}</td></tr>`).join('');
+  const top = (t.top || []).slice(0, 6).map(([e, k, cp, v, oi]) => `<tr><td>${expS(e)}</td><td><b>${sk(k)}</b> <span class="${cp === 'C' ? 'up' : 'dn'}">${cp === 'C' ? 'call' : 'put'}</span></td><td class="r">${kc(v)}</td><td class="r">${kc(oi)}</td></tr>`).join('');
+  return `<div class="card2 tvc"><h4><span>Traded today</span><span>to ${t.t} ET</span></h4>
+    <div class="txt"><b>${kc(t.c)}</b> calls vs <b>${kc(t.p)}</b> puts traded so far${x ? ` (${x >= 1 ? x.toFixed(1) + '× calls' : (1 / x).toFixed(1) + '× puts'})` : ''}, on expiries 2+ sessions out. Open on those expiries (OI ${day(n.oi_settle)} settle): ${kc(t.coi)} calls, ${kc(t.poi)} puts.${c ? ` ${S.h} window: ${kc(c[0])} calls, ${kc(c[1])} puts traded.` : ''}</div>
+    ${lt ? `<table class="lvt" style="margin-top:6px"><tr><th>Level</th><th>Away</th><th class="r">${PUT() ? 'Puts' : 'Calls'} traded</th><th class="r">Open</th><th class="r">Traded ÷ open</th></tr>${lt}</table>` : ''}
+    ${top ? `<div class="gxc-h">Most traded contracts</div><table class="lvt"><tr><th>Expiry</th><th>Contract</th><th class="r">Traded</th><th class="r">Open</th></tr>${top}</table>` : ''}
+    <div class="note" style="margin-top:6px">Contracts traded today up to ${t.t} ET (the feed's trades run about 15 min behind), expiries at least 2 sessions out. "Open" = open interest at the ${day(n.oi_settle)} settle, before today's trades. Volume alone does not say whether positions were opened or closed, or bought or sold.</div></div>`;
+}
+function liveData(n, lv) {
+  const px = n.px_src === 'close' ? `No live price: the ${day(n.close_day)} close` : `Price live ${etHM(n.px_t)} ET (${SRCTXT(n.px_src)})`;
+  const own = n.syn && n.syn.own != null ? Math.round(n.syn.own * 100) : null;
+  const opt = n.src === 'alp' ? `Options: OCC open interest (${day(n.oi_settle)} settle) with today's implied vols${SH() ? '' : ' and volume'} from Alpaca's delayed option feed, read ${etWhen(n.build)}${SH() ? '' : `, trades to ${etWhen(n.iv_asof)}`}${own != null ? `; ${own}% of the open interest has a vol at its own strike, the rest takes a neighbour's` : ''}. Contracts expiring today are left out`
+    : n.src === 'snap' ? `IV / volume ${etWhen(n.iv_asof)} · OI ${day(n.oi_settle)} settle · option chain built ${etWhen(n.build)} (Index Flow snapshot)`
+    : (REBD(n) || `IV ${etWhen(n.iv_asof)} · OI ${day(n.oi_settle)} settle · option chain built ${etWhen(n.build)}`) + (n.syn ? ' (the feed has too few vols for this name today)' : '');
+  return `<div class="card2"><h4><span>Data</span><span></span></h4><div class="note">${px} · ${opt} · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`;
 }
 function verdictHead(r, g) {
   const G = groups(), rk = G.byScore.indexOf(r) + 1;
@@ -602,7 +713,7 @@ async function renderDetail() {
   const g = n[K()][S.h], lv = n.lv[S.h];
   if (!g) { $('#cmain').innerHTML = `<div class="empty">No ${S.h} data for ${esc(sym)}.</div>`; return; }
   $('#cmain').innerHTML = `<div id="chead"><span class="t"><b>${sym}</b> · ${esc(n.name || '')} · D</span>
-    <span class="muted num">close ${n.spot.toFixed(2)} · <span class="${(n.ret20 || 0) >= 0 ? 'up' : 'dn'}">${pc(n.ret20, 1)} 20d</span> · GEX ${S.h} · King ${sk(lv.king)} · Flip ${lv.flip ? lv.flip.toFixed(1) : '—'} · Net ${fm(lv.net)}</span>
+    <span class="muted num">${n.px_src ? liveHead(n) : `close ${n.spot.toFixed(2)} · <span class="${(n.ret20 || 0) >= 0 ? 'up' : 'dn'}">${pc(n.ret20, 1)} 20d</span>`}${inLive() && !n.px_src ? ' · <span class="am">close map: no live map for this name</span>' : ''} · GEX ${S.h} · King ${sk(lv.king)} · Flip ${lv.flip ? lv.flip.toFixed(1) : '—'} · Net ${fm(lv.net)}</span>
     <span style="margin-left:auto;display:flex;gap:6px"><button class="btn g" data-v="board">← Board</button></span></div>
     <div class="note" style="padding:0 4px 4px">${ASOF ? `<span class="asof">Dashed lines = the levels on ${dayW(ASOF.day)} (${ASOF.v === 'match' ? 'on the list' : 'near miss'}, price ${ASOF.px.toFixed(2)}). </span>` : ''}${n.prev && !ASOF ? `<span class="gkey">vs ${day(n.prev.px_day)} close · OI ${day(n.prev.oi_settle)}: ${GKEY}</span> · ` : ''}Price axis stretched to the whole stack${n.big ? ' and to the 5 biggest strikes within 2× the price; dashed tag = one of them outside the stack zone, ▲▼ tag = beyond the chart' : ''}. ${n.sector ? esc(n.sector) + ' · ' : ''}${(n.lists || []).map(l => ({ spx: 'S&P 500', ndx: 'Nasdaq-100', wl: 'Watchlist 1', ai: 'AI list' })[l]).filter(Boolean).join(' · ')}</div>
     <div id="chart"></div>`;
@@ -622,7 +733,8 @@ async function renderDetail() {
   $('#side').innerHTML = `
     ${ASOF ? '' : chgCard(n)}
     ${ASOF ? `<div class="card2 asofcard"><h4><span class="asof">On ${dayW(ASOF.day)}</span><span>${ASOF.v === 'match' ? 'on the list' : 'near miss'} · score ${(ASOF.sc || 0).toFixed(0)}</span></h4><div class="txt">Price ${ASOF.px.toFixed(2)} → ${n.spot.toFixed(2)} now (<b class="${n.spot >= ASOF.px ? 'up' : 'dn'}">${pc(n.spot / ASOF.px - 1, 1)}</b>). Stack ${stackS(ASOF.up)} vs ${otherS(ASOF.dn)} (${xS(ASOF.x)}). Levels then: ${ASOF.lv.map(l => sk(l[0])).join(', ')} · now: ${(g.levels || []).map(d => sk(d.k)).join(', ') || 'none'}. <span class="lnk" data-d="">Clear</span></div></div>` : ''}
-    <div class="card2"><h4><span>${g.v === 'match' ? 'Why ' + sym + ' is here' : 'Rules'}${PUT() ? ' · negative' : ''}</span>${verdictHead(r, g)}</h4><div class="ck">${ck}</div></div>
+    <div class="card2"><h4><span>${g.v === 'match' ? 'Why ' + sym + ' is here' : 'Rules'}${PUT() ? ' · negative' : ''}</span>${verdictHead(r, g)}</h4><div class="ck">${ck}</div>${n.px_src && (g.ev || null) !== (g.v || null) ? `<div class="note" style="margin-top:6px">On the ${day(EOD.day)} close board: ${VTXT[g.ev] || 'off the list'}.</div>` : ''}</div>
+    ${tvCard(n)}
     ${bizCard(sym, n)}
     ${NARROW() ? cpCard(n) : ''}
     ${lt ? `<div class="card2"><h4><span>${w.levels}</span><span>OI ${day(n.oi_settle)} settle</span></h4><table class="lvt"><tr><th>Strike</th><th>Away</th><th>Reach</th><th>GEX</th><th>${PUT() ? 'Puts' : 'Calls'}</th><th>Main expiry</th><th>1W</th></tr>${lt}</table><div class="note" style="margin-top:6px">Reach = distance in the main expiry's own implied moves. 1W = ${w.addedLong} since the ${day(n.wk_settle)} settle (all open expiries).</div></div>` : ''}
@@ -631,7 +743,7 @@ async function renderDetail() {
     ${(g.levels || []).length ? `<div class="card2"><h4><span>Is the stack new?</span><span class="${fresh ? 'up' : 'muted'}">${dd == null ? 'n/a' : fresh ? 'FRESH' : 'OLD'}</span></h4><div class="txt">${dd == null ? 'No snapshot from a week earlier.' : `${PUT() ? 'Puts' : 'Calls'} at the levels: ${SH() ? `<b>${pc(dd / f[1])}</b> vs ${day(n.wk_settle)}. ` : `<b>${kf(f[0])}</b> now vs ${kf(f[1])} on ${day(n.wk_settle)} (<b>${pc(dd / f[1])}</b>). `}`}<span class="muted">${dd == null ? '' : fresh ? `${PUT() ? 'Puts' : 'Calls'} are being added at the levels` : `Mostly ${exps} ${w.mine}s that were already there`}${grew.length ? '. Grew 10%+: ' + grew.map(d => sk(d.k) + ' (' + pc((d.oi_all - d.oi_wk) / d.oi_wk) + ')').join(', ') : ''}.</span></div></div>` : ''}
     ${g.v === 'match' && g.days != null ? `<div class="card2"><h4><span>On the list</span><span></span></h4><div class="txt">${g.new ? '<b>New today.</b>' : `<b>${g.days}</b> session${g.days === 1 ? '' : 's'}, since ${day(g.since)}${g.since_start ? ' (when history starts)' : ''}.`}</div></div>` : ''}
     ${recTxt}
-    <div class="card2"><h4><span>Data</span><span></span></h4><div class="note">${REBD(n) || `Option chain built ${new Date(n.build).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' })} ET · open interest ${day(n.oi_settle)} settle`} · price ${day(n.px_day)} close · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`;
+    ${n.px_src ? liveData(n, lv) : `<div class="card2"><h4><span>Data</span><span></span></h4><div class="note">${REBD(n) || `Option chain built ${new Date(n.build).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' })} ET · open interest ${day(n.oi_settle)} settle`} · price ${day(n.px_day)} close · ${lv.expiries} expiries to ${esc(lv.last_expiry || '')}.</div></div>`}`;
 }
 
 
@@ -673,7 +785,7 @@ function chgCard(n) {
   const eng = `Net GEX ${dn >= 0 ? 'rose' : 'fell'} ${fm(Math.abs(dn))} (${fm(al.net)} → ${fm(lv.net)}). `
     + (cUp.length ? `Calls were added above the price: <b>${SKf(cUp[0].dc)}</b> at ${sk(cUp[0].k)}${cUp[1] ? `, <b>${SKf(cUp[1].dc)}</b> at ${sk(cUp[1].k)}` : ''} (${SKf(cUp.reduce((t, x) => t + x.dc, 0))} in all). ` : '')
     + (pDn.length ? `Puts were added below: <b>${SKf(pDn[0].dp)}</b> at ${sk(pDn[0].k)}${pDn[1] ? `, <b>${SKf(pDn[1].dp)}</b> at ${sk(pDn[1].k)}` : ''} (${SKf(pDn.reduce((t, x) => t + x.dp, 0))} in all). ` : '')
-    + (a.oi_settle === n.oi_settle ? `Same open interest (${day(n.oi_settle)} settle): the change comes from the price. ` : !SH() && !cUp.length && !pDn.length ? 'Little new open interest at any strike. ' : '')
+    + (a.oi_settle === n.oi_settle ? `Same open interest (${day(n.oi_settle)} settle): the change comes from the price${n.src === 'alp' ? ", the clock and today's vols (the close map uses stored vols)" : ''}. ` : !SH() && !cUp.length && !pDn.length ? 'Little new open interest at any strike. ' : '')
     + (same ? `Same close (${day(n.px_day)}): only the open interest changed. ` : `The price went ${a.spot.toFixed(2)} → ${S0.toFixed(2)} (${pc(S0 / a.spot - 1, 1)}). `)
     + moved.map(k => `<b>The ${nm[k]} moved ${lv[k] > al[k] ? 'up' : 'down'} from ${sk(al[k])} to ${sk(lv[k])}.</b> `).join('')
     + (kept.length ? `The ${kept.map(k => `${nm[k]} (${sk(lv[k])})`).join(', ')} didn't move. ` : '')
@@ -681,7 +793,7 @@ function chgCard(n) {
   const mag = v => fm(Math.abs(v || 0)), mv = k => al[k] !== lv[k] ? `<b class="up">${sk(al[k])} → ${sk(lv[k])}</b>` : `${lv[k] != null ? sk(lv[k]) : '–'} <span class="muted">same</span>`;
   const lk = (ag.lv || []), nk = (g.levels || []).map(x => x.k), add = nk.filter(k => !lk.includes(k)), drop = lk.filter(k => !nk.includes(k));
   const big = D0.slice().sort((p, q) => Math.abs(q.d) - Math.abs(p.d)).slice(0, 6).filter(x => x.d);
-  return `<div class="card2 gxc"><h4><span class="gxc-k">GEX changes</span><span>since the last map · ${S.h}</span></h4>
+  return `<div class="card2 gxc"><h4><span class="gxc-k">GEX changes</span><span>${n.px_src ? 'since the ' + day(a.px_day) + ' close' : 'since the last map'} · ${S.h}</span></h4>
     <p class="eng">${eng}</p>
     <table class="gxc-t"><tr><th></th><th class="r">${ld(a)}</th><th class="r">${ld(n)}</th><th class="r">change</th></tr>
       <tr><td>Net GEX</td><td class="r">${fm(al.net)}</td><td class="r"><b>${fm(lv.net)}</b></td><td class="r ${dn > 0 ? 'up' : dn < 0 ? 'dn' : 'muted'}">${dn ? SU(dn) : '–'}</td></tr>
@@ -821,6 +933,7 @@ async function renderRecord() {
 
 
 function renderMain() {
+  pick();
   if (S.v === 'detail' && S.s) return renderDetail();
   if (S.v === 'record') return renderRecord().catch(e => { $('#main').innerHTML = `<div class="empty">Record unavailable: ${esc(e.message)}</div>`; });
   if (S.per === 'chg') return renderChanges().catch(e => { $('#main').innerHTML = `<div class="empty">Changes unavailable: ${esc(e.message)}</div>`; });
@@ -834,8 +947,9 @@ function render(top) {
   if (top) window.scrollTo(0, 0);
 }
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-h],[data-l],[data-v],[data-near],[data-sort],[data-dir],[data-s],[data-side],[data-per],[data-d]');
+  const t = e.target.closest('[data-h],[data-l],[data-v],[data-near],[data-sort],[data-dir],[data-s],[data-side],[data-per],[data-d],[data-live]');
   if (!t || t.tagName === 'A') return;
+  if (t.dataset.live !== undefined) return go({ live: t.dataset.live === '1', liveSet: true }, false);
   if (t.dataset.side) return go({ side: PUT() ? 'call' : 'put' }, false);
   if (t.dataset.h) return go({ h: t.dataset.h }, false);
   if (t.dataset.l) return go({ l: t.dataset.l }, false);
@@ -860,8 +974,9 @@ document.addEventListener('keydown', e => {
 });
 let rz = null, lastNarrow = NARROW();
 window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
+  if (!D) return;
   if (NARROW() !== lastNarrow) { lastNarrow = NARROW(); return render(); }
-  if (S.v === 'detail' && NAMES[S.s]) drawChart(NAMES[S.s]); else if (S.v === 'board') renderMain(); }, 150); });
+  if (S.v === 'detail' && NAMES[nameKey(S.s)]) drawChart(NAMES[nameKey(S.s)]); else if (S.v === 'board') renderMain(); }, 150); });
 
 async function poll() {
   try {
@@ -870,12 +985,26 @@ async function poll() {
     else if (D) renderBar();
   } catch (e) {  }
 }
+async function pollLive() {
+  const was = LV && LV.build, wasLive = inLive();
+  if (!await loadLive()) return;
+  if (!S.liveSet) S.live = liveFresh();
+  if (wantLive()) await loadLiveBoard();
+  pick();
+  if (!D) return;
+  if (inLive() !== wasLive || (inLive() && LV.build !== was)) { const y = window.scrollY; render(); window.scrollTo(0, y); }
+  else renderBar();
+}
 (async function init() {
   readHash();
   try { STATUS = await getJSON('api/status'); } catch (e) { STATUS = null; }
   try { await loadBoard(); } catch (e) { $('#main').innerHTML = `<div class="empty">Could not load the data (${esc(e.message)}). Try again in a minute.</div>`; return; }
   if (S.d === D.day) S.d = null;
+  const lvOn = await loadLive();
+  S.live = liveFresh();
+  if (wantLive()) await loadLiveBoard();
   writeHash(false);
   render();
   setInterval(poll, 300000);
+  setInterval(pollLive, 120000);
 })();
