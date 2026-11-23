@@ -217,6 +217,14 @@
   function px(v) { return num(v) ? NF2.format(v) : '–'; }
   function strike(v) { return num(v) ? NFS.format(v) : '–'; }
   function int(v) { return num(v) ? NFI.format(v) : '–'; }
+
+
+
+  var SHARES = false;
+  function isSh(c, p) { return SHARES && num(c) && num(p) && c >= 0 && p >= 0 && c + p <= 1.0001; }
+  function shp(v) { return num(v) ? Math.round(v * 100) + '%' : '–'; }
+  function cpWhat(c, p) { return isSh(c, p) ? shp(c) + ' calls and ' + shp(p) + ' puts' : int(c) + ' calls and ' + int(p) + ' puts'; }
+  function cpSlash(c, p) { return isSh(c, p) ? shp(c) + ' calls / ' + shp(p) + ' puts' : int(c) + ' calls / ' + int(p) + ' puts'; }
   function sgnInt(v) { return num(v) ? (v > 0 ? '+' : v < 0 ? '−' : '') + NFI.format(Math.abs(v)) : '–'; }
 
   function r0(f) { return (f < 0 ? -1 : 1) * Math.round(Math.abs(f) * 100 + 1e-7); }
@@ -264,7 +272,7 @@
   function cpBar(n, wide) {
     var win = cpWin();
     if (win === 'all') return num(n.chain_call_oi) && num(n.chain_put_oi) ?
-      cpBarOf(n.chain_call_oi, n.chain_put_oi, wide, int(n.chain_call_oi) + ' calls and ' + int(n.chain_put_oi) + ' puts held across all of ' + n.sym + '’s options') : null;
+      cpBarOf(n.chain_call_oi, n.chain_put_oi, wide, cpWhat(n.chain_call_oi, n.chain_put_oi) + ' held across all of ' + n.sym + '’s options') : null;
     if (win === 'wk') return hasWeek(n) ?
       cpBarOf(n.wk_c, n.wk_p, wide, int(n.wk_c) + ' calls and ' + int(n.wk_p) + ' puts traded, ' + weekTxt(n) + ', all of ' + n.sym + '’s options') : null;
     if (!hasVol(n)) return null;
@@ -276,7 +284,7 @@
   }
   function pileBar(n, wide) {
     if (!num(n.call_oi) || !num(n.put_oi)) return null;
-    return cpBarOf(n.call_oi, n.put_oi, wide, int(n.call_oi) + ' calls and ' + int(n.put_oi) + ' puts held at the ' + strike(n.node) + ' pile');
+    return cpBarOf(n.call_oi, n.put_oi, wide, cpWhat(n.call_oi, n.put_oi) + ' held at the ' + strike(n.node) + ' pile');
   }
   function cpBarOf(c, p, wide, what) {
     var t = c + p;
@@ -400,13 +408,17 @@
     n._spk = withToday(normSeries(n.spark), n.price_day || pricesDay, n.price);
     n._trip = n.trip === 'above' ? { above: true } : num(n.trip) ? { t: n.trip } : null;
     var x = Array.isArray(n.nc) ? n.nc : null, ch = n.oi_chg && x ? n.oi_chg[x[0]] : null;
-    n._nc = x && Array.isArray(ch) && num(ch[0]) && num(ch[1]) ? { w: String(x[0]), kind: x[1], chg: ch[0], pct: ch[1] } : null;
+    n._nc = x && Array.isArray(ch) && (num(ch[0]) || SHARES) && num(ch[1]) ? { w: String(x[0]), kind: x[1], chg: ch[0], pct: ch[1] } : null;
     return n;
   }
   var CP_MIN = { all: 5000, wk: 3000, day: 1000 };
-  function skewOf(c, p, min) { return num(c) && num(p) && c + p >= min ? c / Math.max(p, 1) : null; }
+  function skewOf(c, p, min) {
+    if (isSh(c, p)) return c + p > 0 ? c / Math.max(p, 1e-4) : null;
+    return num(c) && num(p) && c + p >= min ? c / Math.max(p, 1) : null;
+  }
   function prep(d, listKey, side) {
     var sideKey = 'calls', full = d;
+    SHARES = !!(d && d.rebuilt && d.rebuilt.shares);
     if (side === 'puts' && d.puts && Array.isArray(d.puts.names)) {
       sideKey = 'puts';
       var dp = Object.create(d);
@@ -572,6 +584,12 @@
     if (P.nOlder) older = ' (' + P.nOlder + (P.nOlder === 1 ? ' name' : ' names') + ' still on ' + (P.olderDates.length === 1 ? dS(P.olderDates[0]) : 'older chains') + ')';
     segText(pl, ['Option piles: ' + (P.newest ? dS(P.newest) : '–') + ' settle' + older, 'open interest changes once a day',
       (P.universeAll != null ? int(P.universeAll) : '–') + ' names checked']);
+    if (RAW && RAW.rebuilt) {
+      var rbt = span('reb-tag', 'REBUILT · OCC open interest');
+      rbt.title = 'Open interest comes from the clearing house (OCC), on chains rebuilt with stored implied vols. ' +
+        (SHARES ? 'Sizes are shown as shares, not contract counts. ' : '') + 'The $ in a pile are priced from those vols, and there is no traded volume.';
+      pl.insertBefore(rbt, pl.firstChild);
+    }
     savedStatus();
   }
   function banner(kind, title, text, button, inline) {
@@ -1236,7 +1254,7 @@
       ['AI company', 'on the AI companies list'],
       ['Pile above the price', strike(n.node) + ' is ' + p0(n.dist) + ' above the price'],
       ['Big pile', p0(n.share) + ' of all the upside gamma on ' + n.sym + (num(n.gex_usd) ? ' (' + usd(n.gex_usd) + ' of gamma)' : '')],
-      ['Fresh calls', '+' + int(f.added) + ' open calls at ' + strike(n.node) + ' (' + chgTxt(f.growth) + ')' +
+      ['Fresh calls', (SHARES && !num(f.to_oi) ? 'Open calls at ' + strike(n.node) + ' ' + chgTxt(f.growth) : '+' + int(f.added) + ' open calls at ' + strike(n.node) + ' (' + chgTxt(f.growth) + ')') +
         (f.from_day && f.to_day ? ' from ' + dS(f.from_day) + ' to ' + dS(f.to_day) : '') + (num(f.to_oi) ? ', ' + int(f.to_oi) + ' open now' : '')]
     ].forEach(function (x) {
       var li = document.createElement('li');
@@ -1264,8 +1282,8 @@
     var e = n.ewz, k = strike(n.node), ul = document.createElement('ul'); ul.className = 'why';
     var items = [
       ['Big pile far above', k + ' is ' + p0(n.dist) + ' above the price; ' + p0(n.share) + ' of all the upside gamma on ' + n.sym + (num(n.gex_usd) ? ' (' + usd(n.gex_usd) + ' of gamma)' : '')],
-      ['Calls, not puts', int(n.call_oi) + ' calls against ' + int(n.put_oi) + ' puts at ' + k],
-      ['Fresh calls', '+' + int(e.added) + ' open calls at ' + k + ' (' + chgTxt(e.growth) + ')' +
+      ['Calls, not puts', (isSh(n.call_oi, n.put_oi) ? shp(n.call_oi) + ' calls against ' + shp(n.put_oi) : int(n.call_oi) + ' calls against ' + int(n.put_oi)) + ' puts at ' + k],
+      ['Fresh calls', (SHARES && !num(e.to_oi) ? 'Open calls at ' + k + ' ' + chgTxt(e.growth) : '+' + int(e.added) + ' open calls at ' + k + ' (' + chgTxt(e.growth) + ')') +
         (e.from_day && e.to_day ? ' from ' + dS(e.from_day) + ' to ' + dS(e.to_day) : '') + (num(e.to_oi) ? ', ' + int(e.to_oi) + ' open now' : '')]
     ];
     if (e.roll && num(e.roll.from_k) && num(e.roll.from_chg)) items.push(['Rolled in', 'the top strike moved from ' + strike(e.roll.from_k) + ' to ' + k +
@@ -1748,7 +1766,7 @@
     var ft = function (v, k, cls) { var f = div('ft' + (cls ? ' ' + cls : '')); f.appendChild(span('ft-v', v)); f.appendChild(span('ft-k', k)); tally.appendChild(f); };
     ft('+' + K.joined.length, 'joined the list', 'ft-worked'); ft('−' + K.left.length, 'left the list', 'ft-wrong_way'); ft(String(K.tiers.length), 'changed tier');
     ft(String(K.n_closer || 0), 'moved 1+ pt closer to the pile');
-    if (K.added && K.added[0]) ft(K.added[0].sym + ' ' + gxSK(K.added[0].n), 'most ' + w.opts + ' added at a pile'); else ft('–', 'most ' + w.opts + ' added at a pile');
+    if (K.added && K.added[0]) ft(K.added[0].sym + ' ' + (num(K.added[0].n) ? gxSK(K.added[0].n) : num(K.added[0].pc) ? sp1(K.added[0].pc) : ''), 'most ' + w.opts + ' added at a pile'); else ft('–', 'most ' + w.opts + ' added at a pile');
     c.appendChild(tally);
     var sec = function (t, n) { var hh = document.createElement('h3'); hh.className = 'chg-h'; hh.textContent = t + (n != null ? ' · ' + n : ''); c.appendChild(hh); };
     if (K.joined.length) {
@@ -1780,8 +1798,8 @@
     col('Moved away', K.farther.map(function (m) { return chgRow(m.sym, [a1(m.d0) + ' → ' + a1(m.d1) + ' from ' + strike(m.node), span('chg-m down', (Math.abs(m.d1 - m.d0) * 100).toFixed(1) + ' pts farther')]); }));
     c.appendChild(two);
     var two2 = div('chg-2'), col2 = function (t, rows) { var d = div(''); var hh = document.createElement('h3'); hh.className = 'chg-h'; hh.textContent = t; d.appendChild(hh); rows.forEach(function (r) { d.appendChild(r); }); two2.appendChild(d); };
-    col2(w.Opts + ' added at the pile · 1 session', K.added.map(function (o) { return chgRow(o.sym, [span('chg-m up', gxSK(o.n) + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.pc) ? ' (' + sp1(o.pc) + ')' : '')]); })
-      .concat((K.cut || []).slice(0, 1).map(function (o) { return chgRow(o.sym, [span('chg-m down', gxSK(o.n) + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.pc) ? ' (' + sp1(o.pc) + ')' : '') + ' · biggest cut']); })));
+    col2(w.Opts + ' added at the pile · 1 session', K.added.map(function (o) { return chgRow(o.sym, [span('chg-m up', (num(o.n) ? gxSK(o.n) : num(o.pc) ? sp1(o.pc) : 'more') + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.n) && num(o.pc) ? ' (' + sp1(o.pc) + ')' : '')]); })
+      .concat((K.cut || []).slice(0, 1).map(function (o) { return chgRow(o.sym, [span('chg-m down', (num(o.n) ? gxSK(o.n) : num(o.pc) ? sp1(o.pc) : 'fewer') + ' ' + w.opts), 'at ' + strike(o.node) + (num(o.n) && num(o.pc) ? ' (' + sp1(o.pc) + ')' : '') + ' · biggest cut']); })));
     col2('Odds that moved', (K.odds || []).map(function (o) { return chgRow(o.sym, [p0(o.o0) + ' → ' + p0(o.o1), o.e0 !== o.e1 ? span('chg-m amber', 'main expiry rolled ' + dS(o.e0) + ' → ' + dS(o.e1)) : span('chg-m', 'the price moved')]); }));
     c.appendChild(two2);
     c.appendChild(para('src', 'Compared with the saved list of ' + wS(CHG.data.vs) + '. A name leaves when one of the five checks stops passing; the price coming close to its pile moves it to Closing in.'));
@@ -1920,7 +1938,7 @@
     if (!x) { c.appendChild(span('mut', '–')); c.removeAttribute('title'); return; }
     var pt = sp0(x.pct), w = ' · ' + x.w + 's';
     c.className += x.kind === 'strong' ? ' strong' : x.kind === 'down' ? ' dnc' : ' mutc';
-    c.appendChild(span('nc-long', x.kind === 'strong' ? compactSigned(x.chg) + ' ' + pt + w : (x.kind === 'flat' ? 'flat' : pt) + w));
+    c.appendChild(span('nc-long', x.kind === 'strong' ? (num(x.chg) ? compactSigned(x.chg) + ' ' : '') + pt + w : (x.kind === 'flat' ? 'flat' : pt) + w));
     c.appendChild(span('nc-short', SW().opts + ' ' + (x.kind === 'flat' ? 'flat' : pt)));
     c.title = SW().Opts + ' added at this strike over the last ' + x.w + ' sessions. Changes once a day.';
   }
@@ -2484,7 +2502,8 @@
       (n.first_seen ? ' (first seen ' + dS(n.first_seen) + ').' : '.'));
     var x = n._nc;
     if (x) {
-      if (x.kind === 'strong' || x.kind === 'up') parts.push(int(x.chg) + ' ' + w.opts + ' were added at ' + k + ' over the last ' + x.w + ' sessions (' + sp0(x.pct) + ').');
+      if ((x.kind === 'strong' || x.kind === 'up') && !num(x.chg)) parts.push(w.Opts + ' at ' + k + ' rose ' + p0(Math.abs(x.pct)) + ' over the last ' + x.w + ' sessions.');
+      else if (x.kind === 'strong' || x.kind === 'up') parts.push(int(x.chg) + ' ' + w.opts + ' were added at ' + k + ' over the last ' + x.w + ' sessions (' + sp0(x.pct) + ').');
       else if (x.kind === 'flat') parts.push('Hardly any ' + w.opts + ' were added lately.');
       else parts.push(w.Opts + ' at ' + k + ' fell ' + p0(Math.abs(x.pct)) + ' over the last ' + x.w + ' sessions.');
     }
@@ -2547,16 +2566,16 @@
         var wb = cpBarOf(n.wk_c, n.wk_p, true, int(n.wk_c) + ' calls and ' + int(n.wk_p) + ' puts traded, ' + weekTxt(n)); if (wb && wd) wd.appendChild(wb);
       }
     }
-    var cpd = row(w.Opts + ' / ' + w.other + ' held at the pile', int(ownOi(n)) + ' / ' + int(othOi(n)) + (cp == null ? '' : cp === Infinity ? ' (no ' + w.other + ')' : ' (' + ratioTxt(cp) + ' to 1)'));
+    var cpd = row(w.Opts + ' / ' + w.other + ' held at the pile', (isSh(ownOi(n), othOi(n)) ? shp(ownOi(n)) + ' / ' + shp(othOi(n)) : int(ownOi(n)) + ' / ' + int(othOi(n))) + (cp == null ? '' : cp === Infinity ? ' (no ' + w.other + ')' : ' (' + ratioTxt(cp) + ' to 1)'));
     var cbw = pileBar(n, true); if (cbw && cpd) cpd.appendChild(cbw);
     if (num(n.chain_call_oi) && num(n.chain_put_oi) && (n.chain_call_oi + n.chain_put_oi) > 0) {
       var cc = n.chain_call_oi, cq = n.chain_put_oi;
-      var chd = row('Held across all of ' + n.sym + '’s options', int(cc) + ' calls / ' + int(cq) + ' puts (' + cpRatioTxt(cc, cq) + ' calls : puts)');
-      var chb = cpBarOf(cc, cq, true, int(cc) + ' calls and ' + int(cq) + ' puts across all of ' + n.sym + '’s options');
+      var chd = row('Held across all of ' + n.sym + '’s options', cpSlash(cc, cq) + ' (' + cpRatioTxt(cc, cq) + ' calls : puts)');
+      var chb = cpBarOf(cc, cq, true, cpWhat(cc, cq) + ' across all of ' + n.sym + '’s options');
       if (chb && chd) chd.appendChild(chb);
     }
     var ch = n.oi_chg || {}, miss = false;
-    var nc = ['1', '3', '5'].map(function (w) { var v = ch[w]; if (!Array.isArray(v) || !num(v[0])) { miss = true; return '–'; } return sgnInt(v[0]) + ' (' + sp0(v[1]) + ')'; }).join(' / ');
+    var nc = ['1', '3', '5'].map(function (w) { var v = ch[w]; if (!Array.isArray(v) || !(num(v[0]) || (SHARES && num(v[1])))) { miss = true; return '–'; } return num(v[0]) ? sgnInt(v[0]) + ' (' + sp0(v[1]) + ')' : sp0(v[1]); }).join(' / ');
     var ncv = span('', nc);
     if (miss && typeof n.oi0 === 'string') ncv.appendChild(span('mut', 'collecting since ' + dS(n.oi0)));
     row('New ' + SW().opts + ' · 1 / 3 / 5 sessions', ncv);
@@ -3312,8 +3331,8 @@
     ['Share %', function (n) { return num(n.share) ? n.share * 100 : null; }, 1, function (v) { return num(v) ? Math.round(v) + '' : '–'; }],
     ['Held', function (n) { return n._persist; }, 1, function (v, n) { return v == null ? '–' : v + ' of ' + n._win; }],
     ['First seen', function (n) { return n.first_seen || ''; }, 1, function (v) { return dS(v); }],
-    ['Calls', function (n) { return n.call_oi; }, 1, int],
-    ['Puts', function (n) { return n.put_oi; }, 1, int],
+    [function () { return SHARES ? 'Calls share at the pile' : 'Calls'; }, function (n) { return n.call_oi; }, 1, function (v, n) { return isSh(n.call_oi, n.put_oi) ? shp(v) : int(v); }],
+    [function () { return SHARES ? 'Puts share at the pile' : 'Puts'; }, function (n) { return n.put_oi; }, 1, function (v, n) { return isSh(n.call_oi, n.put_oi) ? shp(v) : int(v); }],
     [function () { return 'New ' + SW().opts + ' % (window)'; }, function (n) { return n._nc ? n._nc.pct * 100 : null; }, 1, function (v, n) { return n._nc ? sp0(n._nc.pct) + ' (' + n._nc.w + 's)' : '–'; }],
     ['20d %', function (n) { return num(n.ret20) ? n.ret20 * 100 : null; }, 1, function (v) { return num(v) ? (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) : '–'; }],
     ['From 52w high %', function (n) { return num(n.off_high) ? n.off_high * 100 : null; }, 1, function (v) { return num(v) ? (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) : '–'; }],

@@ -700,3 +700,5 @@ html.ps-embed,.ps-embed body{overflow:hidden;scrollbar-gutter:auto;background:tr
 
 @media (max-width:420px){.topbar{gap:8px}.tabs{gap:0}.tab{padding:13px 4px;font-size:13px;letter-spacing:-.015em}}
 @media (max-width:359px){.topbar{gap:6px}.brand{font-size:11.5px}.tab{padding:13px 2.5px;font-size:12px}}
+
+.reb-tag { display:inline-block; margin-right:8px; padding:1px 7px; border:1px solid rgba(245,214,61,.55); border-radius:4px; color:#f5d63d; font-size:10.5px; font-weight:700; letter-spacing:.04em; white-space:nowrap; }
