@@ -17,6 +17,23 @@ const S = { idx: [], byS: {}, st: null, sym: null, doc: null, H: [], sel: -1, ma
   show: load("kt.show", { king: 1, flip: 1, res: 1, sup: 1, air: 1 }), gex: load("kt.gex", 1), lay: null,
   z: { t: null, p: null } };
 
+
+
+const REB = () => (S.st && S.st.rebuilt) || null;
+const SH = () => !!(REB() && REB().shares);
+let REB_HREF = null;
+function srcLab(r) { return r.src === "reb" ? "rebuilt map" : r.src === "bot" ? "the daily map" : "evening build"; }
+function rebTag() {
+  const reb = REB(), old = $("#rebtag");
+  if (old) old.remove();
+  let html = "";
+  if (reb) {
+    const v = reb.vols ? fday(reb.vols, false) : "", el = REB_HREF ? "a" : "span";
+    const t = `Sessions from ${fday(reb.frm, false)} on are rebuilt: each session's open interest from OCC, each contract's last stored implied vol${v ? " (" + v + ")" : ""}. The last map from the live chain feed is ${fday(reb.last_real, false)}.`;
+    html = `<${el}${REB_HREF ? ` href="${REB_HREF}"` : ""} id="rebtag" class="rebtag" title="${esc(t)}">REBUILT · OCC open interest${v ? " · vols " + v : ""}</${el}>`;
+  }
+  if (html) $("#brand").insertAdjacentHTML("afterend", html);
+}
 function load(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {  } }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -196,7 +213,9 @@ function status() {
   const age = st.built_ts ? (Date.now() / 1000 - st.built_ts) / 3600 : null;
   $("#status b").className = !st.ok ? "err" : age != null && age > 36 ? "stale" : "";
   const prov = st.provisional ? ` · ${fday(st.provisional.slice(0, 10), false)} evening build` : "";
-  $("#status span").textContent = st.ok ? `map ${st.last_snapshot ? fday(st.last_snapshot, false) : "–"}${prov} · built ${st.built || ""}` : "build failed";
+  const what = REB() ? "rebuilt map" : "map";
+  $("#status span").textContent = st.ok ? `${what} ${st.last_snapshot ? fday(st.last_snapshot, false) : "–"}${prov} · built ${st.built || ""}` : "build failed";
+  rebTag();
 }
 async function refreshStatus() {
   try {
@@ -249,7 +268,7 @@ const COLS = [
   ["next", "× next", "", r => r.dom, -1, "how many times bigger than the next + cell"],
   ["move", "King vs price · 12 sessions", "l", r => r._mv, -1, "the price move over these 12 sessions"],
   ["held", "Held", "", r => r.held, -1, "sessions in a row on the same strike"],
-  ["oi", "OI added 5d", "", r => r.add, -1, "contracts added at the king over the last 5 settles"],
+  ["oi", "OI added 5d", "", r => SH() ? r.fresh : r.add, -1, "open interest added at the king over the last 5 settles"],
   ["cp", "Calls : puts", "l", r => r.cp && r.cp[0] + r.cp[1] > 0 ? cpShare(r.cp) : null, -1, "calls' share of all open contracts (shown, not used for ranking)"],
   ["biz", "Business", "l", r => r.biz, -1, "the business score, 0–100 (shown, not used for ranking)"],
   ["setup", "Setup", "l", r => r.setup ? SETUP_ORD[r.setup] : 9, 1, "PINNED → AT FLIP → SUPPORTED → CAPPED → UNSTABLE"],
@@ -260,7 +279,7 @@ const kf = n => { const a = Math.abs(n); return (n < 0 ? "−" : "") + (a >= 1e6
 const cpShare = c => c[0] / (c[0] + c[1]);
 const cpWk = c => c[2] != null && c[2] + c[3] > 0 ? c[2] / (c[2] + c[3]) : null;
 function cpLab(c) {
-  const sh = cpShare(c), x = sh >= 0.5 ? c[0] / Math.max(c[1], 1) : c[1] / Math.max(c[0], 1), t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
+  const sh = cpShare(c), lo = SH() ? 1e-4 : 1, x = sh >= 0.5 ? c[0] / Math.max(c[1], lo) : c[1] / Math.max(c[0], lo), t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
   return sh >= 0.55 ? `<b class="up">${t}× calls</b>` : sh <= 0.45 ? `<b class="dn">${t}× puts</b>` : `<b class="cpe">${t}× even</b>`;
 }
 function cpBar(c, cls = "") {
@@ -276,6 +295,8 @@ function cpMove(c, pre = "1W ") {
 }
 function cpTip(c, r) {
   const wk = cpWk(c);
+  if (SH()) return `${Math.round(cpShare(c) * 100)}% of the open contracts are calls (every strike and expiry)` +
+    (wk == null ? "" : ` · ${r.settle5 ? fday(r.settle5, false) : "a week ago"} (same expiries) ${Math.round(wk * 100)}% calls`);
   return `${kf(c[0])} calls vs ${kf(c[1])} puts open (every strike and expiry), ${Math.round(cpShare(c) * 100)}% calls` +
     (wk == null ? "" : ` · ${r.settle5 ? fday(r.settle5, false) : "a week ago"} (same expiries) ${Math.round(wk * 100)}% calls: calls ${c[0] - c[2] >= 0 ? "+" : "−"}${kf(Math.abs(c[0] - c[2]))}, puts ${c[1] - c[3] >= 0 ? "+" : "−"}${kf(Math.abs(c[1] - c[3]))}`);
 }
@@ -306,12 +327,13 @@ function cpHistCard(doc) {
   const line = (lab, b) => {
     if (!b) return `<span class="muted">${lab}</span><span class="muted">no data that far back</span><span></span><span></span>`;
     const c = [h.c, h.p, b[1], b[2]], wk = cpWk(c), d = wk == null ? null : (sh - wk) * 100;
-    const tip = `${fday(b[0], false)} settle (expiries still open now): ${kf(b[1])} calls vs ${kf(b[2])} puts, ${wk == null ? "–" : Math.round(wk * 100) + "% calls"} · since then calls ${h.c - b[1] >= 0 ? "+" : "−"}${kf(Math.abs(h.c - b[1]))}, puts ${h.p - b[2] >= 0 ? "+" : "−"}${kf(Math.abs(h.p - b[2]))}`;
+    const tip = SH() ? `${fday(b[0], false)} settle (expiries still open now): ${wk == null ? "–" : Math.round(wk * 100) + "% calls"}`
+      : `${fday(b[0], false)} settle (expiries still open now): ${kf(b[1])} calls vs ${kf(b[2])} puts, ${wk == null ? "–" : Math.round(wk * 100) + "% calls"} · since then calls ${h.c - b[1] >= 0 ? "+" : "−"}${kf(Math.abs(h.c - b[1]))}, puts ${h.p - b[2] >= 0 ? "+" : "−"}${kf(Math.abs(h.p - b[2]))}`;
     return `<span title="${esc(tip)}">${lab} <span class="muted">${fday(b[0], false)}</span></span>${cpBar(c, "wide")}<span class="r">${wk == null ? "–" : Math.round(wk * 100) + "%"}</span>` +
       `<span class="r ${d == null || Math.abs(d) < 1 ? "muted" : d > 0 ? "up" : "dn"}">${d == null ? "" : Math.abs(d) < 1 ? "=" : (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(0) + "pt"}</span>`;
   };
   return `<div class="card2"><h4><span>Calls : puts</span><span class="muted">open contracts · every strike and expiry · ${fday(h.settle, false)} settle</span></h4>
-    <div class="cpnow">${cpBar(now.concat([null, null]), "wide big")}<div class="cpnl">${cpLab(now)}<span class="muted">${kf(h.c)} calls vs ${kf(h.p)} puts · ${Math.round(sh * 100)}% calls</span></div></div>
+    <div class="cpnow">${cpBar(now.concat([null, null]), "wide big")}<div class="cpnl">${cpLab(now)}<span class="muted">${SH() ? "" : `${kf(h.c)} calls vs ${kf(h.p)} puts · `}${Math.round(sh * 100)}% calls</span></div></div>
     <div class="cpg"><span class="muted h">vs</span><span class="muted h">calls' share now · white tick = then</span><span class="muted h r">then</span><span class="muted h r">change</span>
       ${line("1 day", h.back["1"])}${line("5 days", h.back["5"])}${line("10 days", h.back["10"])}</div>
     <div class="cnote">Green = calls' share, red = puts'. A look-back counts only the expiries still open today. One contract = 100 shares, whatever its price.</div></div>`;
@@ -384,7 +406,7 @@ async function renderTop(a) {
   const hl = c => c === lens.col ? " hl" : "";
   const ds = {}; rows.forEach(r => { ds[r.d + "|" + r.src] = (ds[r.d + "|" + r.src] || 0) + 1; });
   const [dd, src] = Object.entries(ds).sort((x, y) => y[1] - x[1])[0][0].split("|");
-  const when = `${fday(dd)} close` + (src !== "bot" ? ` · evening build (open interest from the ${fday(S.top.settles[S.top.settles.length - 1], false)} settle)` : " · the daily map");
+  const when = `${fday(dd)} close` + (src === "reb" ? ` · rebuilt map (${fday(dd, false)} open interest)` : src !== "bot" ? ` · evening build (open interest from the ${fday(S.top.settles[S.top.settles.length - 1], false)} settle)` : " · the daily map");
   const trs = shown.map((r, i) => `<tr data-s="${esc(r.s)}">
       <td class="rk">${r._rk}</td><td class="l"><b class="tk">${esc(r.s)}</b><div class="nm">${esc(r.n || "")}</div></td>
       <td>${fp(r.px)}</td>
@@ -393,14 +415,14 @@ async function renderTop(a) {
       <td>${fm(r.v)}</td><td class="${hl("share")}">${((r.share || 0) * 100).toFixed(0)}%</td><td>${(r.dom || 0) >= 99 ? (neg ? "only −" : "only +") : (r.dom || 0).toFixed(1) + "×"}</td>
       <td class="l sp"><div class="spw">${spark(r.spark, 120, 28, neg ? C.dn : C.king)}<span class="sm ${r._mv > 0 ? "up" : r._mv < 0 ? "dn" : ""}">${r._mv == null ? "" : pc(r._mv)}</span></div></td>
       <td class="${hl("held")}">${r.held}<div class="sm">since ${fday(r.since, false)}</div></td>
-      <td class="${hl("oi")}">${r.add == null ? "<span class='muted'>–</span>" : (r.add >= 0 ? "+" : "−") + Math.abs(r.add).toLocaleString()}<div class="sm">${r.fresh != null && r.add > 0 ? Math.round(r.fresh * 100) + "% new" : ""}</div></td>
+      <td class="${hl("oi")}">${oiCell(r)}</td>
       <td class="l">${cpCell(r)}</td><td class="l">${bizCell(r)}</td>
       <td class="l">${r.setup ? `<span class="tag ${r.setup.replace(" ", "")}">${r.setup}</span>` : ""}</td>
       <td class="${hl("score")}">${r.score != null ? r.score.toFixed(0) : ""}</td></tr>`).join("");
   const cards = shown.map((r, i) => `<div class="kc" data-s="${esc(r.s)}"><div class="r1"><span class="rk">${r._rk}</span><b class="tk">${esc(r.s)}</b><span class="muted">${fp(r.px)}</span>
       <span class="kgv"><b class="${kc}">${fk(r.k)}</b> ${fexp(r.exp)}</span></div>
       <div class="r2"><span>${pc(r.dist)}${r.sig != null ? " · " + r.sig.toFixed(1) + "σ" : ""}</span><span>${fm(r.v)} · ${((r.share || 0) * 100).toFixed(0)}% of map</span>
-      <span>held ${r.held}</span>${r.add != null && r.add > 0 ? `<span>+${r.add.toLocaleString()} OI</span>` : ""}${r.setup ? `<span class="tag ${r.setup.replace(" ", "")}">${r.setup}</span>` : ""}</div>
+      <span>held ${r.held}</span>${oiChip(r)}${r.setup ? `<span class="tag ${r.setup.replace(" ", "")}">${r.setup}</span>` : ""}</div>
       <div class="r3">${spark(r.spark, 300, 30, neg ? C.dn : C.king)}<span class="lm ${neg ? "dn" : ""}">${lensVal(lens, r)}</span></div>${duo(r)}</div>`).join("");
   $("#app").innerHTML = `<div class="tophead"><span class="t">${neg ? "Top negative king nodes" : "Top king nodes"}</span>${sideSw}<span class="muted">${when} · ${list.length} of ${rows.length} names · click a name to open its tracker</span></div>
     <div class="lenses">${tabs}</div><div class="ldef">${esc(ldef(lens))}</div>
@@ -425,10 +447,22 @@ async function renderTop(a) {
   $("#tsort").onchange = e => { const c = COLS.find(x => x[0] === e.target.value); sortBy(c[0], c[4]); };
   if ($("#tflip")) $("#tflip").onclick = () => sortBy(col[0], -dir);
 }
+
+function oiCell(r) {
+  if (SH()) return r.fresh == null ? "<span class='muted'>–</span>"
+    : `${r.fresh > 0 ? "+" : r.fresh < 0 ? "−" : ""}${Math.round(Math.abs(r.fresh) * 100)}%<div class="sm">${r.fresh > 0 ? "of it new" : r.fresh < 0 ? "fewer than now" : ""}</div>`;
+  return (r.add == null ? "<span class='muted'>–</span>" : (r.add >= 0 ? "+" : "−") + Math.abs(r.add).toLocaleString()) +
+    `<div class="sm">${r.fresh != null && r.add > 0 ? Math.round(r.fresh * 100) + "% new" : ""}</div>`;
+}
+function oiChip(r) {
+  if (SH()) return r.fresh > 0 ? `<span>${Math.round(r.fresh * 100)}% new OI</span>` : "";
+  return r.add != null && r.add > 0 ? `<span>+${r.add.toLocaleString()} OI</span>` : "";
+}
 function lensVal(l, r) {
   if (l.k === "strong") return `score ${r.score.toFixed(0)}`;
   if (l.k === "sticky") return `${r.held} sessions on ${fk(r.k)}`;
-  if (l.k === "build") return `+${(r.add || 0).toLocaleString()} contracts · ${Math.round((r.fresh || 0) * 100)}% new`;
+  if (l.k === "build") return SH() ? `${Math.round((r.fresh || 0) * 100)}% of its open interest new`
+    : `+${(r.add || 0).toLocaleString()} contracts · ${Math.round((r.fresh || 0) * 100)}% new`;
   if (l.k === "far") return `${pc(r.dist)} · ${r.sig.toFixed(1)}σ`;
   return `${((r.share || 0) * 100).toFixed(0)}% of map · ${r.dte}d`;
 }
@@ -573,7 +607,7 @@ async function renderSkew(a, mode = "king") {
     (col ? `<button id="tflip" class="chip" title="Flip the order">${dir < 0 ? "▼" : "▲"}</button>` : "") + `</span>`;
   const ds = {}; (list.length ? list : krows).forEach(r => { ds[r.d + "|" + r.src] = (ds[r.d + "|" + r.src] || 0) + 1; });
   const [dd, src] = (Object.entries(ds).sort((x, y) => y[1] - x[1])[0] || ["|"])[0].split("|");
-  const kWhen = dd ? `${pile ? "piles" : "kings"} ${fday(dd)} close${src !== "bot" ? " (evening build)" : ""}` : "";
+  const kWhen = dd ? `${pile ? "piles" : "kings"} ${fday(dd)} close${src === "reb" ? " (rebuilt map)" : src !== "bot" ? " (evening build)" : ""}` : "";
   const kc = neg ? "kn" : "kg", all = (sk.orders[(pile ? "pile" : neg ? "neg" : "pos") + "|" + w + "|" + c] || []).length;
   const ali = r => skAligned(r, c) ? `<div class="sm al">${c === "C" ? "above ✓" : "below ✓"}</div>` : `<div class="sm">${!pile && r.sig != null ? r.sig.toFixed(1) + "σ" : ""}</div>`;
   const kingTds = r => `<td class="l"><b class="${kc}">${fk(r.k)}</b> <span class="muted">${fexp(r.exp)}</span><div class="sm">${r.dte} days</div></td>
@@ -700,7 +734,7 @@ function render() {
       ${zoomBar()}<span class="seg" id="profSeg"><button data-m="net" class="${S.prof === "net" ? "on" : ""}">Net</button><button data-m="cp" class="${S.prof === "cp" ? "on" : ""}">Calls · Puts</button></span></div>
       <div id="svgwrap"><div id="tip"></div></div>
       <div class="daybar"><button class="nav" id="prevD" ${S.sel === 0 ? "disabled" : ""}>◀</button><button class="nav" id="nextD" ${last ? "disabled" : ""}>▶</button>
-      <span class="lbl">${fday(r.d)} · <b>${r.src === "bot" ? "the daily map" : "evening build"}</b></span><span class="note" id="mapNote"></span>
+      <span class="lbl">${fday(r.d)} · <b>${srcLab(r)}</b></span><span class="note" id="mapNote"></span>
       <span class="zhint">scroll = zoom price · shift+scroll = zoom sessions · drag = move · double-click = reset</span>
       ${last ? "" : `<button class="nav" id="lastD">Latest ▶▶</button>`}</div></div>` +
     table() + how();
@@ -728,7 +762,10 @@ function render() {
 
 function whenLine(r) {
   const parts = [];
-  if (r.src === "ext") {
+  if (r.src === "reb") {
+    const v = REB() && REB().vols;
+    parts.push(`<b>Rebuilt map</b> for the ${fday(r.d, false)} session: official close + ${fday(r.d, false)} open interest from OCC, with each contract's last stored implied vol${v ? " (" + fday(v, false) + ")" : ""}.`);
+  } else if (r.src === "ext") {
     parts.push(`<b>Evening build</b>: priced at the ${fday(r.d, false)} close with open interest from the previous settle. ${esc(S.doc.sym)} is outside the daily scan, so this is rebuilt from saved end-of-day chains (Russell 1000 / 2000 members), the same maths, from Sep 25.`);
   } else if (r.src === "eve") {
     const pv = S.H.length > 1 ? S.H[S.H.length - 2].d : null;
@@ -793,6 +830,7 @@ function table() {
     const chg = p && p.c ? r.c / p.c - 1 : null;
     const notes = [];
     if (r.src === "eve") notes.push(`<span class="tag eve">evening build</span>`);
+    if (r.src === "reb") notes.push(`<span class="tag reb">rebuilt</span>`);
     if (r.stale) notes.push("stale chain");
     if (p && p.k && r.k && !r.stale) {
       if (p.k[0] !== r.k[0]) notes.push(`<span class="moved">king ${fk(p.k[0])} → ${fk(r.k[0])}</span>`);
@@ -817,6 +855,11 @@ function table() {
     <tbody>${rows.join("")}</tbody></table></div>`;
 }
 
+function rebHow() {
+  const reb = REB();
+  if (!reb) return "";
+  return `<p><b>Rebuilt sessions</b> (from ${fday(reb.frm, false)}): the live chain feed closed, so each of these maps is built from that session's open interest (OCC), the official close and each contract's last stored implied vol${reb.vols ? " (" + fday(reb.vols, false) + ")" : ""}. Same maths.</p>`;
+}
 function how() {
   return `<div class="how">
     <p><b>King node</b> = the single biggest + cell on the map (one strike, one expiry, leaving out contracts about to expire), exactly as the daily GEX scan reports it. The gold line steps from session to session; the dot size is how big the king was that day.</p>
@@ -824,7 +867,7 @@ function how() {
     <b>Call wall</b> / <b>support</b> = the biggest + strike above / at or below the price, with every expiry added up. <b>Air pocket</b> = the most − strike below the price.</p>
     <p><b>The map</b> shows GEX per 1% move for every strike × expiry (green +, red −; brighter = bigger). The gold box is the king. The right-hand bars add each strike up across expiries.
     The newest ${S.doc && S.doc.maps.length > 1 ? S.doc.maps.length + " sessions have" : "session has"} the full map; earlier sessions show the 12 biggest strikes, added up across expiries.</p>
-    <p>Built from end-of-day option chains: open interest updated once a day, Black-Scholes gamma at the official close. Calls count +, puts −.</p></div>`;
+    <p>Built from end-of-day option chains: open interest updated once a day, Black-Scholes gamma at the official close. Calls count +, puts −.</p>${rebHow()}</div>`;
 }
 
 
@@ -1005,6 +1048,8 @@ function histPane(row, ri, y) {
     const i = at.get(S.H[S.H.length - 1].d);
     o.push(`<text x="${xc(i).toFixed(1)}" y="${row.y0 - 6}" fill="#ff9800" text-anchor="middle" font-size="10">eve</text>`);
   }
+  const fr = S.H.find(q => q.src === "reb");
+  if (fr && at.get(fr.d) != null) o.push(`<text x="${xc(at.get(fr.d)).toFixed(1)}" y="${row.y0 - 6}" fill="${C.king}" text-anchor="middle" font-size="10">rebuilt →</text>`);
   o.push(`<text x="${xa + 2}" y="${row.y0 - 10}" fill="${C.sub}" font-size="11">Levels on each saved session</text>`);
   return o.join("");
 }
@@ -1266,7 +1311,7 @@ function tipText(w, x, yy, price) {
     const r = S.H.find(q => q.d === d);
     if (!r) return d ? `<b>${fday(d)}</b><br><span class="muted">no snapshot saved for this session</span>` : "";
     const px = r.sp || r.c;
-    return `<b>${fday(r.d)}</b>${r.src === "eve" ? ' <span class="am">evening build</span>' : ""}${r.stale ? ' <span class="muted">stale chain</span>' : ""}<br>
+    return `<b>${fday(r.d)}</b>${r.src === "eve" ? ' <span class="am">evening build</span>' : r.src === "reb" ? ' <span class="am">rebuilt map</span>' : ""}${r.stale ? ' <span class="muted">stale chain</span>' : ""}<br>
       Close <b>${fp(r.c)}</b>${r.hi ? ` <span class="muted">(${fp(r.lo)}–${fp(r.hi)})</span>` : ""}<br>
       <span class="kg">King ${r.k ? `<b class="kg">${fk(r.k[0])}</b> ${fexp(r.k[1])} · ${fm(r.k[2])} · ${pc(r.k[0] / px - 1)}` : "–"}</span><br>
       Flip ${fk(r.fl)} · ${(r.nas || 0) > 0 ? '<span class="up">long gamma</span>' : '<span class="dn">short gamma</span>'}<br>
@@ -1288,7 +1333,7 @@ function tipText(w, x, yy, price) {
   }
   if (w.k === "prof") {
     return `<b>${fk(k)}</b> · all expiries<br>Net <b class="${(net || 0) >= 0 ? "up" : "dn"}">${fm(net)}</b>` +
-      (map.ca ? `<br><span class="up">Calls ${fm(map.ca[ki])}</span> · <span class="dn">Puts ${fm(map.pu[ki])}</span><br><span class="muted">OI ${(map.oc[ki] || 0).toLocaleString()} calls · ${(map.op[ki] || 0).toLocaleString()} puts</span>` : "") +
+      (map.ca ? `<br><span class="up">Calls ${fm(map.ca[ki])}</span> · <span class="dn">Puts ${fm(map.pu[ki])}</span>` + (map.oc && map.op ? `<br><span class="muted">OI ${(map.oc[ki] || 0).toLocaleString()} calls · ${(map.op[ki] || 0).toLocaleString()} puts</span>` : "") : "") +
       `<br><span class="muted">${pc(k / map.spot - 1)} from price</span>`;
   }
   return "";

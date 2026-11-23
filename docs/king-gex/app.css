@@ -142,6 +142,11 @@ table.hist { width:100%; border-collapse:collapse; font-variant-numeric:tabular-
 .tag.CAPPED { background:#2a2440; color:#b9a5ff; } .tag.UNSTABLE { background:#3a1d22; color:#ff8a87; }
 .tag.ATFLIP { background:#2d3038; color:#fff; }
 .tag.eve { background:#2a2e39; color:var(--amber); }
+.tag.reb { background:rgba(245,214,61,.12); color:#f5d63d; }
+
+.rebtag { font-size:10.5px; font-weight:700; letter-spacing:.04em; color:#f5d63d; border:1px solid rgba(245,214,61,.55); border-radius:4px; padding:2px 7px; white-space:nowrap; text-decoration:none; }
+a.rebtag:hover { background:rgba(245,214,61,.12); }
+.rebtag.real { color:#b2b5be; border-color:#434651; }
 
 
 .tophead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; padding:12px 14px 2px; }
