@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Which sectors and themes fill GEX Hunt's call list and which its put list, day by day, with the names behind each move and a forward record.">
+<title>GEX Rotation · live</title>
+<link rel="stylesheet" href="app.css?v=20261123a">
+</head>
+<body>
+<header class="top">
+  <div class="topbar">
+    <a class="brand" href="../">MII Lab</a>
+    <nav class="tabs" aria-label="Live dashboards">
+      <a class="tab" href="../live/"><span class="t-long">Fear meter</span><span class="t-short">Fear</span></a>
+      <a class="tab" href="../breadth/"><span class="t-long">Breadth</span><span class="t-short">Breadth</span></a>
+      <a class="tab" href="../eagle-eye/"><span class="t-long">Eagle Eye Technicals</span><span class="t-short">Eagle</span></a>
+      <a class="tab" href="../flow/"><span class="t-long">Flow Dashboard</span><span class="t-short">Flow</span></a>
+      <a class="tab" href="../gex-hunt/"><span class="t-long">GEX Hunt</span><span class="t-short">Hunt</span></a>
+      <a class="tab" href="../index-flow/"><span class="t-long">Index Flow</span><span class="t-short">Index</span></a>
+      <a class="tab" href="../sector-rotation/"><span class="t-long">Sector Rotation</span><span class="t-short">Rotation</span></a>
+      <a class="tab" href="./" aria-current="page"><span class="t-long">GEX Rotation</span><span class="t-short">GEX Rot.</span></a>
+      <a class="tab" href="../"><span class="t-long">All dashboards</span><span class="t-short">All</span></a>
+    </nav>
+  </div>
+</header>
+<header id="bar">
+  <span id="brand">GEX ROTATION</span>
+  <span class="vtabs" id="vtabs"><button data-v="board" class="on">Board</button><button data-v="rec">Record</button></span>
+  <span class="wsw" id="wsw" role="group" aria-label="Expiry window"></span>
+  <span id="liveb"></span>
+  <span class="xl" id="xl"></span>
+  <span id="status"><b></b><span id="stxt">loading…</span></span>
+</header>
+<div id="replay">
+  <button id="play" aria-label="Play the replay">&#9654;</button>
+  <div class="rtrack"><input type="range" id="slider" min="0" max="0" step="1" aria-label="Replay day"><div class="rticks" id="rticks"></div></div>
+  <div id="dayLbl"><b id="dayB"></b><span id="dayS"></span></div>
+  <button id="latest">Latest</button>
+</div>
+<main>
+  <div class="board">
+    <div class="q">Which themes are option traders stacking calls on, and which puts?</div>
+    <div class="tiles" id="tiles"></div>
+
+    <div class="sec">
+      <div class="h2"><b id="tideH">The tide</b>
+        <span><span class="lg"><span class="chip c m">SYM</span><span class="chip p m">SYM</span>match</span><span class="lg"><span class="chip c n">SYM</span>near miss</span><span class="lg"><span class="rg"></span>tilt 5 sessions ago</span><span class="lg">click a group for its names</span></span>
+      </div>
+      <div class="tide" id="tide"></div>
+    </div>
+
+    <div class="sec">
+      <div class="h2"><b>How each rotation unfolded</b>
+        <span><span class="lg"><span class="ln" style="background:var(--px)"></span>price vs board</span><span class="lg"><span class="sw" style="background:var(--call)"></span>calls stacked</span><span class="lg"><span class="sw" style="background:var(--put)"></span>puts stacked</span><span class="lg"><span class="ln" style="background:var(--gold)"></span>price turn → GEX turn</span></span>
+      </div>
+      <div class="ugrid" id="ugrid"></div>
+    </div>
+
+    <div class="sec">
+      <div class="h2"><b>Names on the move</b><span id="movesSub"></span></div>
+      <div class="mgrid" id="moves"></div>
+    </div>
+
+    <div class="sec">
+      <div class="h2"><b>Top of the lists</b><span id="topSub"></span></div>
+      <div class="lgrid" id="tops"></div>
+    </div>
+  </div>
+
+  <section id="gview">
+    <div class="gv-head" id="gvHead"></div>
+    <div class="gv-fact" id="gvFact"></div>
+    <div class="gv-card" id="gvChart"></div>
+    <div class="sec">
+      <div class="h2"><b>Who is on the lists</b><span id="gvSub"></span></div>
+      <div class="mt-wrap" id="gvTable"></div>
+      <div class="mt-foot" id="gvFoot"></div>
+    </div>
+  </section>
+
+  <section id="rview"></section>
+
+  <div class="foot" id="foot"></div>
+</main>
+<div id="tip"></div>
+<script src="app.js?v=20261123a"></script>
+<script src="reb-tag.js?v=20261123a" data-live="https://raw.githubusercontent.com/lawrencekenshin/mii-lab/gex-rotation-data/gex-rotation/"></script>
+</body>
+</html>
