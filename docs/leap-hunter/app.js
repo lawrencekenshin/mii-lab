@@ -5,6 +5,18 @@ const app = document.getElementById('app'), tt = document.getElementById('tt');
 const MON = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
 const fmtD = s => { const [, m, d] = s.split('-'); return MON[+m - 1] + ' ' + (+d); };
 const n0 = x => Math.round(x).toLocaleString('en-US');
+
+
+
+let SH = false;
+const shp = x => { const a = Math.abs(x) * 100; return (a >= 9.95 ? a.toFixed(0) : a >= 0.995 ? a.toFixed(1) : a >= 0.0995 ? a.toFixed(2) : a ? a.toFixed(3) : '0') + '%'; };
+const cn = x => SH ? shp(x) : n0(x);
+const pSz = p => SH ? (p.sh == null ? '–' : shp(p.sh)) : n0(p.oi);
+const ctw = () => SH ? ' of the pile' : ' contracts';
+const sameKind = j => !!(j && j.rebuilt && j.rebuilt.shares) === SH;
+const heatW = v => v >= 11 ? 'the biggest cell on the map' : v >= 8 ? 'heavy' : v >= 5 ? 'medium' : v >= 3 ? 'light' : 'very light';
+const rebTip = () => `From the ${D.rebuilt && D.rebuilt.frm ? fmtD(D.rebuilt.frm) : 'latest'} session on, this board is rebuilt each day from OCC open interest. Sizes show as shares, never contract counts: a pile’s share of the name’s long-dated calls above the price, its adds as a share of the pile today, calls and puts as shares of the name’s open interest. $ are model estimates from the last stored volatilities. Option volume is not rebuilt, so the roll check and the traded part of OLD PILE read nothing on those sessions.`;
+const rebTag = () => SH ? ` <span class="reb-tag" data-tip="${esc(rebTip())}">REBUILT · OCC open interest</span>` : '';
 const pct = x => { const v = Math.round(x * 100); return (v > 0 ? '+' : v < 0 ? '−' : x >= 0 ? '+' : '') + Math.abs(v) + '%'; };
 const usd = x => {
   if (x == null) return '–';
@@ -15,7 +27,7 @@ const usd = x => {
   return '$' + Math.round(x);
 };
 const sgn = x => !x ? '<span class="dim">0</span>'
-  : x > 0 ? `<span class="up">▲${n0(x)}</span>` : `<span class="down">▼${n0(-x)}</span>`;
+  : x > 0 ? `<span class="up">▲${cn(x)}</span>` : `<span class="down">▼${cn(-x)}</span>`;
 const px = s => s >= 1000 ? n0(s) : s.toFixed(2);
 const expLong = e => `${MON[+e.slice(2, 4) - 1]} ${+e.slice(4, 6)}, 20${e.slice(0, 2)}`;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -37,7 +49,7 @@ const perTitle = () => PER === 't' ? 'today' : PER === 'w' ? 'this week' : `sinc
 const sinceOf = r => r && r.since ? fmtD(r.since) : since();
 const sgn5 = x => x == null ? '<span class="dim">–</span>' : sgn(x);
 const compact = () => innerWidth <= 720;
-const spk = x => '×' + (x >= 100 ? n0(x) : x.toFixed(x >= 10 ? 0 : 1));
+const spk = x => '×' + (SH && x >= 99 ? '99+' : x >= 100 ? n0(x) : x.toFixed(x >= 10 ? 0 : 1));
 
 
 
@@ -53,7 +65,7 @@ const PEND = {};
 function nameFile(sym) {
   if (NAMES[sym]) return Promise.resolve(NAMES[sym]);
   return PEND[sym] || (PEND[sym] = nameRes(sym)
-    .then(res => res.ok ? res.json() : null).then(j => { if (j) NAMES[sym] = j; return j; }).catch(() => null)
+    .then(res => res.ok ? res.json() : null).then(j => { if (j && !sameKind(j)) j = null; if (j) NAMES[sym] = j; return j; }).catch(() => null)
     .finally(() => { delete PEND[sym]; }));
 }
 const pmc = x => x == null ? '<span class="dim">–</span>' : !x ? '<span class="dim">0</span>' : `<span class="${x > 0 ? 'up' : 'down'}">${pm(x)}</span>`;
@@ -62,9 +74,9 @@ const bxWhen = (r, k) => k === 't' ? (PD().t ? `on ${fmtD(PD().t.day)}` : '') : 
 function bxTable(r, p, cls = 'bxt') {
   const j = BXW.find(w => w[0] === PER)[2], top = Math.max(0, ...p.bx.map(x => x[j] || 0));
   return `<table class="${cls} num"><thead><tr><th class="l">Expiry</th><th>Held</th>${BXW.map(w => `<th class="${w[0] === PER ? 'on' : ''}">${w[1]}</th>`).join('')}</tr></thead><tbody>
-    ${p.bx.map((x, i) => `<tr><td class="l">${x[1]}${i === 0 && p.bx.length > 1 ? ' <span class="dim">biggest</span>' : ''}</td><td>${n0(x[2])}</td>
+    ${p.bx.map((x, i) => `<tr><td class="l">${x[1]}${i === 0 && p.bx.length > 1 ? ' <span class="dim">biggest</span>' : ''}</td><td>${cn(x[2])}</td>
       ${BXW.map(w => `<td class="${w[0] === PER ? 'on' : ''}${w[2] === j && top > 0 && x[j] === top ? ' top' : ''}">${pmc(x[w[2]])}</td>`).join('')}</tr>`).join('')}
-    <tr class="sum"><td class="l">Pile</td><td>${n0(p.oi)}</td>${BXW.map(w => `<td class="${w[0] === PER ? 'on' : ''}">${pmc([p.add1, p.add5, p.add][['t', 'w', 'a'].indexOf(w[0])])}</td>`).join('')}</tr></tbody></table>`;
+    <tr class="sum"><td class="l">Pile</td><td>${cn(p.oi)}</td>${BXW.map(w => `<td class="${w[0] === PER ? 'on' : ''}">${pmc([p.add1, p.add5, p.add][['t', 'w', 'a'].indexOf(w[0])])}</td>`).join('')}</tr></tbody></table>`;
 }
 function bxTip(r, p) {
   const n = p.bx.length;
@@ -90,14 +102,14 @@ const DIS = [['15', '15%+', .15], ['30', '30%+', .30], ['50', '50%+', .50], ['10
 const KEYS = { v: 'board', l: 'unusual', u: 'all', t: '6m', d: '15', p: 'a', q: '', s: '', k: '', o: '', oa: '', g: '1y', r: '6m' };
 
 
-const pm = x => (x > 0 ? '+' : x < 0 ? '−' : '') + n0(Math.abs(x));
+const pm = x => (x > 0 ? '+' : x < 0 ? '−' : '') + cn(Math.abs(x));
 const cpR = (c, p) => !p ? (c ? Infinity : null) : c / p;
 const r1 = (x, dp = 1) => x >= 100 || (x >= 10 && dp < 2) ? n0(x) : x.toFixed(x >= 10 ? 1 : dp);
 const rTxt = (r, dp = 1) => r >= 1 ? `${r1(r, dp)} : 1` : `1 : ${r1(1 / r, dp)}`;
 const cpTxt = (c, p, dp = 1) => { const r = cpR(c, p); return r == null ? '–' : r === Infinity ? 'calls only' : rTxt(r, dp); };
 const cpCls = (c, p) => { const r = cpR(c, p); return r == null ? 'dim' : r >= 2 ? 'cpc' : r < 1 ? 'cpp' : ''; };
 
-const cpAdd = (r, k) => { const s = r.cpf0 && r.cpf0[k]; return s && r.cp ? r.cp.map((v, i) => v - s[i]) : null; };
+const cpAdd = (r, k) => { if (r.cpa) return r.cpa[k] || null; const s = r.cpf0 && r.cpf0[k]; return s && r.cp ? r.cp.map((v, i) => v - s[i]) : null; };
 const flowTxt = (c, p, dp = 1) => c > 0 && p > 0 ? rTxt(c / p, dp) : c > 0 ? 'calls only' : p > 0 ? 'puts only' : c || p ? 'both down' : 'no change';
 const flowCls = (c, p) => c > 0 && p > 0 ? cpCls(c, p) : c > 0 ? 'cpc' : p > 0 ? 'cpp' : 'dim';
 const addWords = a => `${pm(a[0])} calls · ${pm(a[1])} puts`;
@@ -111,8 +123,8 @@ function splitBar(c, p, cls = 'mbar') {
 function cpCell(r) {
   if (!r.cp) return '<span class="dim">–</span>';
   const [c, p, cl, pl] = r.cp, a = cpAdd(r, PER), w = perWord(r);
-  const tip = `Open on ${r.sym}, ${fmtD(r.csettle || D.settle)} settle: ${n0(c)} calls · ${n0(p)} puts (${cpTxt(c, p)}), all expiries`
-    + ` · 180+ days: ${n0(cl)} calls · ${n0(pl)} puts (${cpTxt(cl, pl)})${a ? ` · Added ${w}: ${addWords(a)} (${flowTxt(a[0], a[1])}; bar: green = calls added, red = puts added)` : ''}`;
+  const tip = `Open on ${r.sym}, ${fmtD(r.csettle || D.settle)} settle: ${cn(c)} calls · ${cn(p)} puts (${cpTxt(c, p)}), all expiries${SH ? ' (shares of the name’s open interest)' : ''}`
+    + ` · 180+ days: ${cn(cl)} calls · ${cn(pl)} puts (${cpTxt(cl, pl)})${a ? ` · Added ${w}: ${addWords(a)} (${flowTxt(a[0], a[1])}; bar: green = calls added, red = puts added)` : ''}`;
   return `<span class="${cpCls(c, p)}" data-tip="${esc(tip)}">${cpTxt(c, p)}</span>`
     + (a ? `<span class="cpadd" data-tip="${esc(tip)}">${splitBar(a[0], a[1])}<span class="sub2">added <span class="${flowCls(a[0], a[1])}">${flowTxt(a[0], a[1])}</span></span></span>` : '');
 }
@@ -177,7 +189,7 @@ function go(patch) {
   location.hash = h.toString();
 }
 
-const rollWords = p => (p.roll || []).map(x => `${fmtD(x.day)}: ${x.frm} lost ${n0(x.n)} the same session (a possible roll)`).join(' · ');
+const rollWords = p => (p.roll || []).map(x => `${fmtD(x.day)}: ${x.frm} lost ${SH ? `about ${shp(x.n)} of this pile’s size` : n0(x.n)} the same session (a possible roll)`).join(' · ');
 function tagsHtml(p) {
   const cls = { 'NEW LINE': 'new', 'BUILDING': 'bld', 'OLD PILE': 'old', 'UNWINDING': 'unw', '2X+': 'x2', 'NO BID': 'old', 'ROLL?': 'roll' };
   return p.tags.map(t => `<span class="tag ${cls[t] || ''}"${t === 'ROLL?' ? ` data-tip="${esc(rollWords(p))}"` : ''}>${t === '2X+' ? 'NEEDS 2×+' : t}</span>`).join('');
@@ -218,8 +230,8 @@ function allPiles(st) {
 
 function spark(v, w = 72, h = 22) {
   if (!v || v.length < 2) return '';
-  const mx = Math.max(...v, 1), mn = Math.min(...v), lo = Math.max(0, mn - (mx - mn) * 0.15);
-  const X = i => 1 + i * (w - 4) / (v.length - 1), Y = y => h - 2 - (y - lo) / Math.max(mx - lo, 1) * (h - 5);
+  const mx = Math.max(...v, SH ? 1e-9 : 1), mn = Math.min(...v), lo = Math.max(0, mn - (mx - mn) * 0.15);
+  const X = i => 1 + i * (w - 4) / (v.length - 1), Y = y => h - 2 - (y - lo) / Math.max(mx - lo, SH ? 1e-9 : 1) * (h - 5);
   const pts = v.map((y, i) => `${X(i).toFixed(1)},${Y(y).toFixed(1)}`).join(' ');
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-label="open contracts by session">
     <polygon points="${X(0)},${h - 1} ${pts} ${X(v.length - 1)},${h - 1}" fill="#3987e5" fill-opacity=".18"/>
@@ -248,7 +260,7 @@ function renderBoard(st) {
   const head = `<header class="top"><div><h1>LEAP <span>Hunter</span></h1>
       <div class="sub">Far call piles on 6-month-plus options, 15%+ above the price</div></div>
       <div class="vint num">${n0(D.n_scanned)} names scanned · ${n0(D.n_names)} with far piles · ${n0(D.n_piles)} piles<br>
-      Open interest from the ${fmtD(D.settle)} settle · prices at the ${fmtD(D.asof)} close · “added” = ${PER === 't' ? `contracts added by ${PD().t ? fmtD(PD().t.day) : 'the latest session'}’s trading` : PER === 'w' ? `since the ${PD().w ? fmtD(PD().w.since) : ''} settle (5 sessions)` : `since the ${since()} settle`}</div></header>`;
+      Open interest from the ${fmtD(D.settle)} settle${rebTag()} · prices at the ${fmtD(D.asof)} close · “added” = ${PER === 't' ? `contracts added by ${PD().t ? fmtD(PD().t.day) : 'the latest session'}’s trading` : PER === 'w' ? `since the ${PD().w ? fmtD(PD().w.since) : ''} settle (5 sessions)` : `since the ${since()} settle`}</div></header>`;
   const pers = `<div class="pers">${PERS.map(x => `<button class="per ${x[0] === PER ? 'on' : ''}" data-p="${x[0]}">${x[1]}</button>`).join('')}</div>`;
   const lenses = `<div class="lenses">${LENSES.map(l => `<button class="lens ${l.id === L.id ? 'on' : ''}" data-lens="${l.id}"><b>${l.name}</b></button>`).join('')}</div>
       <div class="def">${L.def()}</div>`;
@@ -258,8 +270,8 @@ function renderBoard(st) {
       <input class="search" id="q" placeholder="Find a ticker…" value="${esc(st.q)}" autocapitalize="characters" autocomplete="off"></div>`;
   const tiles = `<div class="tiles">
       ${tile(`Most unusual ${PER === 'a' ? 'now' : perTitle()}`, tU, x => `${pct(x.p.away)} away · ${sgn5(pAdd(x.p))} ${perWord(x.r)} · ${usd(x.p.prem)}`)}
-      ${tile(`Biggest new money ${perTitle()}`, tF, x => `${sgn5(pAdd(x.p))} contracts ${perWord(x.r)} · ≈${usd(pFresh(x.p))} added`)}
-      ${tile('Farthest big fresh bet', tFar, x => `needs ${pct(x.p.away)} · ${sgn5(pAdd(x.p))} contracts · ${usd(x.p.prem)}`)}
+      ${tile(`Biggest new money ${perTitle()}`, tF, x => `${sgn5(pAdd(x.p))}${ctw()} ${perWord(x.r)} · ≈${usd(pFresh(x.p))} added`)}
+      ${tile('Farthest big fresh bet', tFar, x => `needs ${pct(x.p.away)} · ${sgn5(pAdd(x.p))}${ctw()} · ${usd(x.p.prem)}`)}
       ${newTile}</div>`;
 
   rows.forEach((x, i) => x.i = i + 1);
@@ -272,7 +284,7 @@ function renderBoard(st) {
       <td class="num">${px(r.S)}</td>
       <td class="l">${pileChip(r, p)}${pileSub(p)}</td>
       <td class="num">${pct(p.away)}<span class="sub2 w2">${p.sig.toFixed(2)}σ&nbsp;· <span class="b2">${Math.round(p.pt * 100)}% odds</span></span></td>
-      <td class="num">${n0(p.oi)}<span class="sub2 w2">${sgn5(pAdd(p))} <span class="b2">${perWord(r)}</span></span>${gxHtml(r, p)}${rolledSub(p)}</td>
+      <td class="num">${pSz(p)}<span class="sub2 w2">${sgn5(pAdd(p))} <span class="b2">${perWord(r)}</span></span>${gxHtml(r, p)}${rolledSub(p)}</td>
       <td class="num hide-n">${sgn5(p.add5)}</td>
       <td class="hide-m">${spark(p.h)}</td>
       <td class="num">${usd(p.prem)}<span class="sub2 w2">${p.padv != null ? (p.padv * 100).toFixed(1) + '% <span class="b2">of day $vol</span>' : ''}</span></td>
@@ -297,7 +309,7 @@ function renderBoard(st) {
         <span class="num"><span class="bar"><i style="width:${Math.min(100, pScore(p))}%"></i></span>${Math.round(pScore(p))}${r.biz != null ? ` <span class="bzk num">Biz ${r.biz}</span>` : ''}</span></div>
       <div class="r2 num">${pileChip(r, p)} needs ${pct(p.away)} · ${p.sig.toFixed(2)}σ · odds ${Math.round(p.pt * 100)}%</div>
       ${nxOf(p) > 1 && p.bs != null ? `<div class="r3 num">${p.nx} expiries summed · biggest ${p.expl} ${Math.round(p.bs * 100)}%</div>` : ''}
-      <div class="r3 num">${n0(p.oi)} contracts · ${sgn5(pAdd(p))} ${perWord(r)}${gxOf(p) ? ` · <span class="gx">${gxTxt(gxOf(p))}</span>` : ''} · ${usd(p.prem)}</div>
+      <div class="r3 num">${pSz(p)}${SH ? ' of far calls' : ' contracts'} · ${sgn5(pAdd(p))}${SH ? ' of the pile' : ''} ${perWord(r)}${gxOf(p) ? ` · <span class="gx">${gxTxt(gxOf(p))}</span>` : ''} · ${usd(p.prem)}</div>
       ${r.cp ? `<div class="r3 num">Calls : puts <span class="nw ${cpCls(r.cp[0], r.cp[1])}">${cpTxt(r.cp[0], r.cp[1])}</span>${cpAdd(r, PER) ? ` · added ${perWord(r)} <span class="nw">${splitBar(cpAdd(r, PER)[0], cpAdd(r, PER)[1], 'mbar il')} <span class="${flowCls(cpAdd(r, PER)[0], cpAdd(r, PER)[1])}">${flowTxt(cpAdd(r, PER)[0], cpAdd(r, PER)[1])}</span></span>` : ''}</div>` : ''}
       <div class="r3">${tagsHtml(p)}</div></div>`;
   }).join('')}</div>`;
@@ -306,6 +318,7 @@ function renderBoard(st) {
       Stands out = how many times bigger the pile is than the strikes next to it on the same expiry.
       Calls : puts = every call vs every put open on the name, all expiries; “added” = calls added ÷ puts added in the Today / 1 week / Total window, counting only series still open (expired weeklies are not closes); its bar is green for calls added, red for puts added (a side that fell shows as none).
       ROLL? = on the day the pile jumped, another call line on the same name traded and lost a similar number of contracts; shown for information, it doesn’t change new money or the score.
+      ${SH ? esc(rebTip()) + ' Pile share = the pile’s share of the name’s long-dated calls above the price; the ▲ / ▼ under it is the change in the window as a share of the pile today.' : ''}
       Click a column header to sort (again to flip it); # keeps the rank on the lens. Built ${esc(builtTxt())}.</footer>`;
   app.innerHTML = head + pers + lenses + filters + tiles + table + cards + foot;
 
@@ -342,14 +355,14 @@ function heatSVG(r, p) {
   const cmp = compact(), hw = left + cw * m, gap = cmp ? 0 : 22, pw = cmp ? 0 : 190, W = hw + gap + pw + (cmp ? 10 : 112), H = top + n * rowH + 26;
   const Y = i => top + (n - 1 - i) * rowH;
   let mx = 1; z.forEach(col => col.forEach(v => { if (v > mx) mx = v; }));
-  const col = v => v <= 0 ? '#141a24' : RAMP[Math.min(RAMP.length - 1, Math.floor(Math.sqrt(v / mx) * (RAMP.length - 1) + 0.5))];
-  const sum = ks.map((_, i) => z.reduce((a, c) => a + (c[i] || 0), 0)), smax = Math.max(...sum, 1);
+  const col = v => v <= 0 ? '#141a24' : RAMP[Math.min(RAMP.length - 1, SH ? v - 1 : Math.floor(Math.sqrt(v / mx) * (RAMP.length - 1) + 0.5))];
+  const sum = SH ? (r.heat.s || ks.map(() => 0)) : ks.map((_, i) => z.reduce((a, c) => a + (c[i] || 0), 0)), smax = Math.max(...sum, SH ? 1e-9 : 1);
   const pileI = ks.indexOf(p.K), kingI = ks.indexOf(r.king), mainJ = r.exps.indexOf(p.exp);
   let s = `<svg width="${W}" viewBox="0 0 ${W} ${H}" style="${cmp ? '' : 'max-width:100%;height:auto;'}display:block" role="img" aria-label="long-dated call open interest by strike and expiry">`;
   ex.forEach((e, j) => s += `<text x="${left + j * cw + cw / 2}" y="${top - 10}" fill="${j === mainJ ? '#ffd77a' : '#a9b0bc'}" font-size="11.5" text-anchor="middle" font-weight="${j === mainJ ? 650 : 400}">${e}</text>`);
   for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
     const v = z[j][i] || 0;
-    s += `<rect x="${left + j * cw + 1}" y="${Y(i) + 0.5}" width="${cw - 2}" height="${rowH - 1}" rx="1.5" fill="${col(v)}" data-tip="${ks[i]}C ${ex[j]} · ${n0(v)} contracts"/>`;
+    s += `<rect x="${left + j * cw + 1}" y="${Y(i) + 0.5}" width="${cw - 2}" height="${rowH - 1}" rx="1.5" fill="${col(v)}" data-tip="${ks[i]}C ${ex[j]} · ${SH ? (v ? heatW(v) : 'none open') : `${n0(v)} contracts`}"/>`;
   }
   if (pileI >= 0) for (let j = 0; j < m; j++) {
     if (!(z[j][pileI] > 0)) continue;
@@ -373,9 +386,9 @@ function heatSVG(r, p) {
   if (!cmp) sum.forEach((v, i) => {
     if (!v) return;
     const w = Math.max(2, v / smax * pw), isP = i === pileI;
-    s += `<rect x="${px0}" y="${Y(i) + 1}" width="${w}" height="${Math.max(2, rowH - 2)}" rx="2" fill="${isP ? '#f0b429' : '#3987e5'}" fill-opacity="${isP ? 1 : .75}" data-tip="${ks[i]}C · ${n0(v)} contracts, all long-dated expiries"/>`;
+    s += `<rect x="${px0}" y="${Y(i) + 1}" width="${w}" height="${Math.max(2, rowH - 2)}" rx="2" fill="${isP ? '#f0b429' : '#3987e5'}" fill-opacity="${isP ? 1 : .75}" data-tip="${ks[i]}C · ${SH ? `${shp(v)} of the long-dated calls on this map` : `${n0(v)} contracts, all long-dated expiries`}"/>`;
     if (isP || topIdx.includes(i) || i === kingI)
-      s += `<text x="${px0 + w + 5}" y="${Y(i) + rowH / 2 + 4}" fill="${isP ? '#ffd77a' : '#a9b0bc'}" font-size="11">${n0(v)}${i === kingI ? ' · king' : ''}</text>`;
+      s += `<text x="${px0 + w + 5}" y="${Y(i) + rowH / 2 + 4}" fill="${isP ? '#ffd77a' : '#a9b0bc'}" font-size="11">${cn(v)}${i === kingI ? ' · king' : ''}</text>`;
   });
   s += `<text x="${left}" y="${H - 6}" fill="#6f7787" font-size="11">${cmp ? `Dashed = price ${px(r.S)} · gold = the pile · tap a cell` : `Dashed line = price ${px(r.S)} · gold outline = the pile (thick = its biggest expiry) · king = biggest call gamma strike`}</text>`;
   return s + '</svg>';
@@ -391,14 +404,14 @@ function buildSVG(p) {
   let s = `<svg width="${W}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto;display:block" role="img" aria-label="pile open contracts by session">`;
   for (let g = 0; g <= 2; g++) {
     const v = mx * g / 2, y = Y(v);
-    s += `<line x1="${l}" x2="${W - rt}" y1="${y}" y2="${y}" stroke="#232a38"/><text x="${l - 6}" y="${y + 4}" fill="#6f7787" font-size="10.5" text-anchor="end">${n0(v)}</text>`;
+    s += `<line x1="${l}" x2="${W - rt}" y1="${y}" y2="${y}" stroke="#232a38"/><text x="${l - 6}" y="${y + 4}" fill="#6f7787" font-size="10.5" text-anchor="end">${cn(v)}</text>`;
   }
   const jumps = h.map((x, i) => [i ? x[1] - h[i - 1][1] : 0, i]).sort((a, c) => c[0] - a[0]).slice(0, 2).filter(x => x[0] > 0.05 * mx).map(x => x[1]);
   const placed = [];
   h.forEach((x, i) => {
     const y = Y(x[1]), d = i ? x[1] - h[i - 1][1] : 0, sp = split(i), x0 = l + i * bw + 1, w = Math.max(1, bw - 2);
     const where = sp.length ? ` (${sp.slice(0, 3).map(z => `${lab[z[1]]} ${pm(z[0])}`).join(', ')}${sp.length > 3 ? ', …' : ''})` : '';
-    const tip = `${fmtD(x[0])} · ${n0(x[1])} open${bh ? ` (${lab[0]} ${n0(bh[i][0])})` : ''} · ${d >= 0 ? '+' : ''}${n0(d)} vs prior${where} · ${n0(x[2])} traded`;
+    const tip = `${fmtD(x[0])} · ${cn(x[1])}${SH ? ' of today’s pile' : ''} open${bh ? ` (${lab[0]} ${cn(bh[i][0])})` : ''} · ${d >= 0 ? '+' : SH ? '−' : ''}${cn(d)} vs prior${where}${x[2] == null ? ' · option volume is not rebuilt' : ` · ${cn(x[2])} traded`}`;
     if (bh) {
       const yb = Y(bh[i][0]);
       s += `<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(0, H - b - y)}" rx="2" fill="#6da7ec" data-tip="${esc(tip)}"/>`
@@ -407,7 +420,7 @@ function buildSVG(p) {
     const rl = (p.roll || []).find(z => z.shows === x[0]);
     if (jumps.includes(i) || rl) {
       const el = sp.length && sp[0][1] !== 0 && sp[0][0] >= 0.5 * d ? ` ${lab[sp[0][1]]}` : '';
-      const txt = `+${n0(d)}${el}${rl ? ' roll?' : ''}`, tw = txt.length * 5.9, cx = l + i * bw + bw / 2;
+      const txt = `+${cn(d)}${el}${rl ? ' roll?' : ''}`, tw = txt.length * 5.9, cx = l + i * bw + bw / 2;
       const anc = cx + tw / 2 > W - rt ? 'end' : cx - tw / 2 < l ? 'start' : 'middle', tx = anc === 'end' ? x0 + w : anc === 'start' ? x0 : cx;
       const x1 = anc === 'end' ? tx - tw : anc === 'start' ? tx : tx - tw / 2;
       let ty = y - 5;
@@ -423,8 +436,8 @@ function bxPanel(r, p) {
   if (!p.bx) return '';
   const n = p.bx.length, w = BXW.find(x => x[0] === PER), a = [p.add1, p.add5, p.add][['t', 'w', 'a'].indexOf(PER)], g = gxOf(p);
   const line = n < 2 ? `One expiry: this pile is the ${p.expl} ${p.K}C contract line.`
-    : `The pile sums ${n} expiries at ${p.K}. ${w[1]} (${bxWhen(r, PER)}): ${a == null ? 'no session on file that far back' : `${pm(a)} contracts`}${g && a != null
-      ? `; ${g.map((x, i) => `${x[1]}%${i ? '' : ' of the contracts added went'} into ${x[2]}`).join(' and ')}, while the biggest expiry, ${p.expl}, ${(v => v > 0 ? `got ${pm(v)}` : v < 0 ? `lost ${n0(-v)}` : 'was flat')(p.bx[0][w[2]])}` : ''}.`;
+    : `The pile sums ${n} expiries at ${p.K}. ${w[1]} (${bxWhen(r, PER)}): ${a == null ? 'no session on file that far back' : `${pm(a)}${ctw()}`}${g && a != null
+      ? `; ${g.map((x, i) => `${x[1]}%${i ? '' : ' of the contracts added went'} into ${x[2]}`).join(' and ')}, while the biggest expiry, ${p.expl}, ${(v => v > 0 ? `got ${pm(v)}` : v < 0 ? `lost ${cn(-v)}` : 'was flat')(p.bx[0][w[2]])}` : ''}.`;
   return `<div class="bxsec"><div class="ph" style="margin:12px 0 4px"><b class="bxti">${p.K}C by expiry</b> ${line}</div>${bxTable(r, p, 'bxt wide')}</div>`;
 }
 
@@ -476,13 +489,13 @@ function gexSVG(r, p, st) {
   const pileAt = lvOf(p && p.K);
 
 
-  const pileW = sh => !p ? '' : sh > 1 ? ' = PILE' : sh ? ` = PILE ${p.K}C` : ` = PILE ${p.K}C · ${n0(p.oi)}`;
+  const pileW = sh => !p ? '' : sh > 1 ? ' = PILE' : sh || SH ? ` = PILE ${p.K}C` : ` = PILE ${p.K}C · ${n0(p.oi)}`;
   const wallW = (k, sh) => !lv ? '' : sh > 1 ? (k === lv.cw && k === lv.pw ? ' CW+PW' : k === lv.cw ? ' CW' : k === lv.pw ? ' PW' : '')
     : (k === lv.cw && k === lv.pw ? ' · CALL + PUT WALL' : k === lv.cw ? ' · CALL WALL' : k === lv.pw ? ' · PUT WALL' : '');
   const kTxt = sh => sh > 1 ? `K ${kS(lv.k)}` : sh ? `KING ${kS(lv.k)}` : `KING ${kS(lv.k)} ${pct(lv.k / S0 - 1)} · ${gUsd(lv.kg)}`;
   const cwTxt = sh => `${sh > 1 ? 'CW' : 'CALL WALL'} ${kS(lv.cw)}${lv.cw === lv.pw ? (sh > 1 ? '+PW' : ' + PUT') : ''}`;
   const pwTxt = sh => `${sh > 1 ? 'PW' : 'PUT WALL'} ${kS(lv.pw)}`;
-  const pileTxt = sh => sh > 1 ? `PILE ${p.K}C` : sh ? `PILE ${p.K}C ${pct(p.away)}` : `PILE ${p.K}C ${pct(p.away)} · ${nxOf(p) > 1 ? `${p.nx} expiries` : p.expl} · ${n0(p.oi)}`;
+  const pileTxt = sh => sh > 1 ? `PILE ${p.K}C` : sh ? `PILE ${p.K}C ${pct(p.away)}` : `PILE ${p.K}C ${pct(p.away)} · ${nxOf(p) > 1 ? `${p.nx} expiries` : p.expl}${SH ? '' : ` · ${n0(p.oi)}`}`;
   const ST = { king: { fill: GC.king, ink: '#131722', bold: 1 }, cw: { fill: '#16302d', ink: '#9fe0d6', stroke: '#2f6f66' },
     pw: { fill: '#3a1d1f', ink: '#f3a5a3', stroke: '#8a3b39' }, f: { fill: '#1b2130', ink: '#d6dae2', stroke: '#6f7787', dash: 1 },
     pile: { fill: '#2a2310', ink: '#ffd77a', stroke: GC.pile, dash: 1 } };
@@ -569,7 +582,7 @@ function gexSVG(r, p, st) {
     if (lv.pw !== lv.k && lv.pw !== lv.cw) off(lv.pw, pwTxt(e) + (pileAt === 'pw' ? pileW(e) : ''), withPile(ST.pw, pileAt === 'pw'));
     off(lv.f, `${narrow ? 'F' : 'FLIP'} ${kS(lv.f)} ${pct(lv.f / S0 - 1)}`, ST.f);
   }
-  if (p && !pileAt) off(p.K, narrow ? `PILE ${p.K}C ${pct(p.away)}` : `PILE ${p.K}C ${pct(p.away)} · ${n0(p.oi)} contracts`, ST.pile);
+  if (p && !pileAt) off(p.K, narrow ? `PILE ${p.K}C ${pct(p.away)}` : `PILE ${p.K}C ${pct(p.away)}${SH ? '' : ` · ${n0(p.oi)} contracts`}`, ST.pile);
   if (lv && !narrow) {
     const used = new Set([lv.k, lv.cw, lv.pw, p && p.K]), bar = Math.abs(lv.kg) / 3;
     lv.big.pos.slice(0, 3).concat(lv.big.neg.slice(0, 3)).forEach(b => { if (!used.has(b[0]) && Math.abs(b[1]) >= bar)
@@ -671,7 +684,7 @@ function cpChart(r) {
   const bw = (W - l - rt) / (n - 1);
   h.forEach((x, i) => {
     if (i === 0 || i === n - 1 || (i % every === 0 && i < n - 2)) s += `<text x="${X(i)}" y="${H - 7}" fill="#6f7787" font-size="10.5" text-anchor="middle">${fmtD(x[0])}</text>`;
-    s += `<rect class="hc" x="${X(i) - bw / 2}" y="${t}" width="${bw}" height="${H - t - b}" fill="transparent" data-tip="${esc(`After the ${fmtD(x[0])} close: all expiries ${cpTxt(x[1], x[2], 2)} · ${n0(x[1])} calls · ${n0(x[2])} puts | 180+ days ${cpTxt(x[3], x[4], 2)} · ${n0(x[3])} calls · ${n0(x[4])} puts`)}"/>`;
+    s += `<rect class="hc" x="${X(i) - bw / 2}" y="${t}" width="${bw}" height="${H - t - b}" fill="transparent" data-tip="${esc(`After the ${fmtD(x[0])} close: all expiries ${cpTxt(x[1], x[2], 2)} · ${cn(x[1])} calls · ${cn(x[2])} puts | 180+ days ${cpTxt(x[3], x[4], 2)} · ${cn(x[3])} calls · ${cn(x[4])} puts${SH ? ' (shares of today’s open interest)' : ''}`)}"/>`;
   });
   return s + '</svg>';
 }
@@ -697,7 +710,7 @@ function cpPanel(r) {
   const leg = `<div class="legend" style="margin:0 0 4px"><span><i style="background:${CP_ALL};height:3px"></i>All expiries</span>
       <span><i style="background:repeating-linear-gradient(90deg,${CP_LONG} 0 5px,transparent 5px 8px);height:3px"></i>180+ days</span></div>`;
   return `<div class="panel cpsec"><h3>Calls vs puts on ${r.sym}</h3>
-      <div class="ph num">Open now: <b class="${cpCls(c[0], c[1])}">${cpTxt(c[0], c[1], 2)}</b> (${n0(c[0])} calls · ${n0(c[1])} puts, all expiries) · 180+ days <b class="${cpCls(c[2], c[3])}">${cpTxt(c[2], c[3], 2)}</b>.
+      <div class="ph num">Open now: <b class="${cpCls(c[0], c[1])}">${cpTxt(c[0], c[1], 2)}</b> (${cn(c[0])} calls · ${cn(c[1])} puts${SH ? ' of the name’s open interest' : ''}, all expiries) · 180+ days <b class="${cpCls(c[2], c[3])}">${cpTxt(c[2], c[3], 2)}</b>.
         Each card = calls added ÷ puts added in that window, counting only series still open (expired weeklies are not closes).</div>
       <div class="cpcards">${cards}</div>
       <div class="cpchart"><div class="ph" style="margin:0">Open calls ÷ puts after each day’s close</div>${leg}${cpChart(r)}</div></div>`;
@@ -730,7 +743,12 @@ async function renderName(st) {
       }
       return;
     }
-    r = NAMES[st.s] = await res.json();
+    r = await res.json();
+    if (!sameKind(r)) {
+      app.innerHTML = back + `<p class="dim">${esc(st.s)} is being updated. Try again in a few minutes.</p>`;
+      return bindBack();
+    }
+    NAMES[st.s] = r;
   }
   let p = r.piles[0];
   if (st.k) { const [K, e] = st.k.split('|'); p = r.piles.find(x => String(x.K) === K && x.exp === e) || p; }
@@ -738,9 +756,9 @@ async function renderName(st) {
       <span class="px num">${px(r.S)}</span>
       <span class="bzbadge" data-tip="${esc(bizTip(r))}">Business ${r.biz != null ? `<b class="num">${r.biz}</b>${bizMeter(r.biz)}` : '<span class="dim">–</span>'}</span>
       <span class="kg num">Long-dated king (biggest call gamma strike, 180d+): <b style="color:#e8eaed">${r.king}</b> ${r.king_away != null ? pct(r.king_away) : ''}
-      · calls : puts ${r.cp ? `<b class="${cpCls(r.cp[0], r.cp[1])}" data-tip="${esc(`${n0(r.cp[0])} calls · ${n0(r.cp[1])} puts open, all expiries`)}">${cpTxt(r.cp[0], r.cp[1])}</b>
-        (180+ days <b class="${cpCls(r.cp[2], r.cp[3])}" data-tip="${esc(`${n0(r.cp[2])} calls · ${n0(r.cp[3])} puts open, 180+ days`)}">${cpTxt(r.cp[2], r.cp[3])}</b>)` : `${r.cp_long ?? '–'}× long-dated`}
-      · ${n0(r.tot_oi)} long-dated call contracts above the price</span>${openBtns(r.sym)}</div>`;
+      · calls : puts ${r.cp ? `<b class="${cpCls(r.cp[0], r.cp[1])}" data-tip="${esc(`${cn(r.cp[0])} calls · ${cn(r.cp[1])} puts open, all expiries`)}">${cpTxt(r.cp[0], r.cp[1])}</b>
+        (180+ days <b class="${cpCls(r.cp[2], r.cp[3])}" data-tip="${esc(`${cn(r.cp[2])} calls · ${cn(r.cp[3])} puts open, 180+ days`)}">${cpTxt(r.cp[2], r.cp[3])}</b>)` : `${r.cp_long ?? '–'}× long-dated`}
+      · ${SH ? (r.tot_oi == null ? '' : `long-dated calls above the price = ${shp(r.tot_oi)} of the name’s open interest`) : `${n0(r.tot_oi)} long-dated call contracts above the price`}</span>${openBtns(r.sym)}</div>`;
   const chips = `<div class="pchips">${r.piles.slice(0, 6).map(q => `<button class="pchip ${q === p ? 'on' : ''}" data-k="${q.K}|${q.exp}">
       <b>${q.K}C</b> ${nxOf(q) > 1 ? `${q.nx} exp` : q.expl} · ${pct(q.away)} · ${usd(q.prem)} · score ${Math.round(q.score)}</button>`).join('')}
       ${r.piles.length > 6 ? `<span class="dim" style="align-self:center;font-size:12px">+${r.piles.length - 6} more in the table below</span>` : ''}</div>`;
@@ -750,21 +768,21 @@ async function renderName(st) {
         : dt('Pile', `<span style="color:var(--pile)">${p.K}C</span> ${p.expl}`, `${expLong(p.exp)} · ${p.dte} days left`)}
       ${dt('Needs', pct(p.away), `${p.sig.toFixed(2)}σ away`)}
       ${dt('Touch odds', Math.round(p.pt * 100) + '%', 'priced into the options')}
-      ${dt('Contracts', n0(p.oi), `${sgn(p.add)} since ${sinceOf(r)} · ${sgn5(p.add5)} 1 wk · ${sgn5(p.add1)} today`)}
-      ${dt('$ in pile', usd(p.prem), `${p.padv != null ? (p.padv * 100).toFixed(1) + '% of day $vol · ' : ''}${usd(p.mid * 100)} each`)}
+      ${dt(SH ? 'Pile share' : 'Contracts', pSz(p), `${sgn(p.add)} since ${sinceOf(r)} · ${sgn5(p.add5)} 1 wk · ${sgn5(p.add1)} today`)}
+      ${dt('$ in pile', usd(p.prem), `${p.padv != null ? (p.padv * 100).toFixed(1) + '% of day $vol · ' : ''}${p.mid != null ? usd(p.mid * 100) + ' each' : 'model-priced'}`)}
       ${dt('Stands out', spk(p.spike), 'vs nearby strikes')}</div>`;
   const heat = `<div class="panel"><h3>Long-dated call open interest — strike × expiry</h3>
       <div class="ph">Open call contracts at each strike and expiry (180+ days). Brighter = more contracts.</div>
       <div class="tscroll">${heatSVG(r, p)}</div><div class="legend"><span><i style="background:#104281"></i>few</span><span><i style="background:#3987e5"></i></span><span><i style="background:#b7d3f6"></i>many</span>
       <span><i style="background:none;border:2px solid #f0b429"></i>the pile</span></div></div>`;
   const build = `<div class="panel"><h3>${p.K}C build-up</h3>
-      <div class="ph">Open contracts going into each session, all 180+ day expiries at ${p.K}. ${sgn(p.add)} since ${sinceOf(r)}.</div>${buildSVG(p)}
-      ${(p.roll || []).map(x => `<div class="rollnote"><span class="tag roll">ROLL?</span> ${fmtD(x.day)}: ${x.frm} lost ${n0(x.n)} contracts the same session this pile grew. A possible roll; it still counts as new money.</div>`).join('')}
+      <div class="ph">Open contracts going into each session, all 180+ day expiries at ${p.K}${SH ? ', as a share of the pile today' : ''}. ${sgn(p.add)} since ${sinceOf(r)}.</div>${buildSVG(p)}
+      ${(p.roll || []).map(x => `<div class="rollnote"><span class="tag roll">ROLL?</span> ${fmtD(x.day)}: ${x.frm} lost ${SH ? `about ${shp(x.n)} of this pile’s size` : `${n0(x.n)} contracts`} the same session this pile grew. A possible roll; it still counts as new money.</div>`).join('')}
       ${bxPanel(r, p)}</div>`;
   const table = `<div class="panel"><h3>Every far pile on ${r.sym}</h3><div class="ph">Click a row to switch the charts.</div>
-      <div style="overflow-x:auto"><table class="board" style="border:0"><thead><tr><th class="l">Pile</th><th>Needs</th><th>Touch odds</th><th>Contracts</th><th>Added since ${sinceOf(r)}</th><th>Last 5</th><th>$ in pile</th><th class="hide-m">Stands out</th><th class="l">Tags</th><th>Score</th></tr></thead><tbody>
+      <div style="overflow-x:auto"><table class="board" style="border:0"><thead><tr><th class="l">Pile</th><th>Needs</th><th>Touch odds</th><th>${SH ? 'Pile share' : 'Contracts'}</th><th>Added since ${sinceOf(r)}</th><th>Last 5</th><th>$ in pile</th><th class="hide-m">Stands out</th><th class="l">Tags</th><th>Score</th></tr></thead><tbody>
       ${r.piles.map(q => `<tr data-k="${q.K}|${q.exp}" ${q === p ? 'style="background:#2a2310"' : ''}><td class="l">${pileChip(r, q)}${pileSub(q)}</td>
-        <td class="num">${pct(q.away)} <span class="dim">${q.sig.toFixed(2)}σ</span></td><td class="num">${Math.round(q.pt * 100)}%</td><td class="num">${n0(q.oi)}</td><td class="num">${sgn(q.add)}</td><td class="num">${sgn5(q.add5)}</td>
+        <td class="num">${pct(q.away)} <span class="dim">${q.sig.toFixed(2)}σ</span></td><td class="num">${Math.round(q.pt * 100)}%</td><td class="num">${pSz(q)}</td><td class="num">${sgn(q.add)}</td><td class="num">${sgn5(q.add5)}</td>
         <td class="num">${usd(q.prem)}</td><td class="num hide-m">${spk(q.spike)}</td><td class="l">${tagsHtml(q)}</td>
         <td class="num"><span class="bar"><i style="width:${Math.min(100, q.score)}%"></i></span>${Math.round(q.score)}</td></tr>`).join('')}
       </tbody></table></div></div>`;
@@ -850,6 +868,10 @@ async function load() {
   VER = String(m.sha256 || '').slice(0, 12);
   const b = await getJson('leap-hunter.json?v=' + VER);
   D = b; ROWS = b.rows; BUILT = m.sha256;
+  SH = !!(b.rebuilt && b.rebuilt.shares);
+  const so = SORTS.find(s => s.id === 'oi');
+  so.th = SH ? 'Pile share' : 'Contracts'; so.key = SH ? (x => x.p.sh) : (x => x.p.oi);
+  so.tip = SH ? 'The pile’s share of the name’s long-dated calls above the price. Under it: the change in the window, as a share of the pile today.' : undefined;
   for (const r of ROWS) if (r.pin) r.piles.forEach(p => { p.pin = true; });
   for (const k of Object.keys(NAMES)) delete NAMES[k];
 }
