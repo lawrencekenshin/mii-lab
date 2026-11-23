@@ -24,6 +24,9 @@ const SH = () => !!(REB() && REB().shares);
 
 
 const shPair = (a, b) => SH() || a + b <= 1.0001;
+
+
+const shSkew = w => !!w && w.net == null && w.nC == null && w.aC != null && w.aC + w.aP <= 1.0001;
 let REB_HREF = null;
 function srcLab(r) { return r.src === "reb" ? "rebuilt map" : r.src === "bot" ? "the daily map" : "evening build"; }
 function rebTag() {
@@ -519,7 +522,13 @@ function skewCell(r, c) {
   const tags = [];
   if (w.bs === "bought" || w.bs === "sold" || w.bs === "mixed")
     tags.push(`<span class="tag bs ${w.bs}" title="Where the opened contracts last printed: at the ask = bought, at the bid = sold">${side} ${w.bs}</span>`);
-  if (w.spr) tags.push(`<span class="tag spr" title="${esc(`${fexp(w.spr[0])} ${fk(w.spr[1])} / ${fk(w.spr[2])}${c}: two lines of near-equal size (${kf(w.spr[3])} contracts) make up most of the opens`)}">spread?</span>`);
+  if (w.spr) tags.push(`<span class="tag spr" title="${esc(`${fexp(w.spr[0])} ${fk(w.spr[1])} / ${fk(w.spr[2])}${c}: two lines of near-equal size${w.spr[3] != null ? ` (${kf(w.spr[3])} contracts)` : ""} make up most of the opens`)}">spread?</span>`);
+  if (shSkew(w)) {
+    const tipS = `Calls minus puts opened, each net of closes: ${Math.round(r._pct * 100)}% of the name's open interest toward ${side}` +
+      (days > 1 && lean != null ? ` · leaning to ${side} on ${lean} of the ${days} days with a reading` : "");
+    return `<div title="${esc(tipS)}"><b class="${c === "C" ? "up" : "dn"}">${Math.round(r._pct * 100)}%</b> <span class="sm">of open interest toward ${side}</span>` +
+      (days > 1 && lean != null ? `<div class="sm">${lean} of ${days} days</div>` : "") + (tags.length ? `<div class="tgs">${tags.join("")}</div>` : "") + "</div>";
+  }
   const tip = (hv != null ? `Opened net of closes: calls ${sg(w.nC)}, puts ${sg(w.nP)}. ` : "") +
     `Calls − puts = ${sg(w.net)} contracts, ${Math.round(r._pct * 100)}% of the name's open interest` +
     (days > 1 && lean != null ? ` · leaning to ${side} on ${lean} of the ${days} days with a reading` : "");
@@ -535,6 +544,7 @@ function openedCell(r, c) {
   const a = r._tape ? [w.fC, w.fP] : [w.aC, w.aP];
   if (!(a[0] + a[1] > 0)) return '<span class="muted">–</span>';
   const tip = r._tape ? `${kf(w.fC)} calls vs ${kf(w.fP)} puts must be new (${kf(w.vC)} calls / ${kf(w.vP)} puts traded)`
+    : shSkew(w) ? `${Math.round(a[0] * 100)}% of the contracts opened were calls, ${Math.round(a[1] * 100)}% puts`
     : `${kf(w.aC)} calls vs ${kf(w.aP)} puts opened · ${kf(w.cC || 0)} calls / ${kf(w.cP || 0)} puts closed`;
   return `<div class="cp" title="${esc(tip)}"><div class="cpt"><b class="${c === "C" ? "up" : "dn"}">${Math.round(r._one * 100)}% ${SIDEW[c]}</b></div>${cpBar(a.concat([null, null]))}</div>`;
 }
