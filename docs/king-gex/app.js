@@ -21,6 +21,9 @@ const S = { idx: [], byS: {}, st: null, sym: null, doc: null, H: [], sel: -1, ma
 
 const REB = () => (S.st && S.st.rebuilt) || null;
 const SH = () => !!(REB() && REB().shares);
+
+
+const shPair = (a, b) => SH() || a + b <= 1.0001;
 let REB_HREF = null;
 function srcLab(r) { return r.src === "reb" ? "rebuilt map" : r.src === "bot" ? "the daily map" : "evening build"; }
 function rebTag() {
@@ -279,7 +282,7 @@ const kf = n => { const a = Math.abs(n); return (n < 0 ? "−" : "") + (a >= 1e6
 const cpShare = c => c[0] / (c[0] + c[1]);
 const cpWk = c => c[2] != null && c[2] + c[3] > 0 ? c[2] / (c[2] + c[3]) : null;
 function cpLab(c) {
-  const sh = cpShare(c), lo = SH() ? 1e-4 : 1, x = sh >= 0.5 ? c[0] / Math.max(c[1], lo) : c[1] / Math.max(c[0], lo), t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
+  const sh = cpShare(c), lo = shPair(c[0], c[1]) ? 1e-4 : 1, x = sh >= 0.5 ? c[0] / Math.max(c[1], lo) : c[1] / Math.max(c[0], lo), t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
   return sh >= 0.55 ? `<b class="up">${t}× calls</b>` : sh <= 0.45 ? `<b class="dn">${t}× puts</b>` : `<b class="cpe">${t}× even</b>`;
 }
 function cpBar(c, cls = "") {
@@ -295,7 +298,7 @@ function cpMove(c, pre = "1W ") {
 }
 function cpTip(c, r) {
   const wk = cpWk(c);
-  if (SH()) return `${Math.round(cpShare(c) * 100)}% of the open contracts are calls (every strike and expiry)` +
+  if (shPair(c[0], c[1])) return `${Math.round(cpShare(c) * 100)}% of the open contracts are calls (every strike and expiry)` +
     (wk == null ? "" : ` · ${r.settle5 ? fday(r.settle5, false) : "a week ago"} (same expiries) ${Math.round(wk * 100)}% calls`);
   return `${kf(c[0])} calls vs ${kf(c[1])} puts open (every strike and expiry), ${Math.round(cpShare(c) * 100)}% calls` +
     (wk == null ? "" : ` · ${r.settle5 ? fday(r.settle5, false) : "a week ago"} (same expiries) ${Math.round(wk * 100)}% calls: calls ${c[0] - c[2] >= 0 ? "+" : "−"}${kf(Math.abs(c[0] - c[2]))}, puts ${c[1] - c[3] >= 0 ? "+" : "−"}${kf(Math.abs(c[1] - c[3]))}`);
@@ -327,13 +330,13 @@ function cpHistCard(doc) {
   const line = (lab, b) => {
     if (!b) return `<span class="muted">${lab}</span><span class="muted">no data that far back</span><span></span><span></span>`;
     const c = [h.c, h.p, b[1], b[2]], wk = cpWk(c), d = wk == null ? null : (sh - wk) * 100;
-    const tip = SH() ? `${fday(b[0], false)} settle (expiries still open now): ${wk == null ? "–" : Math.round(wk * 100) + "% calls"}`
+    const tip = shPair(h.c, h.p) ? `${fday(b[0], false)} settle (expiries still open now): ${wk == null ? "–" : Math.round(wk * 100) + "% calls"}`
       : `${fday(b[0], false)} settle (expiries still open now): ${kf(b[1])} calls vs ${kf(b[2])} puts, ${wk == null ? "–" : Math.round(wk * 100) + "% calls"} · since then calls ${h.c - b[1] >= 0 ? "+" : "−"}${kf(Math.abs(h.c - b[1]))}, puts ${h.p - b[2] >= 0 ? "+" : "−"}${kf(Math.abs(h.p - b[2]))}`;
     return `<span title="${esc(tip)}">${lab} <span class="muted">${fday(b[0], false)}</span></span>${cpBar(c, "wide")}<span class="r">${wk == null ? "–" : Math.round(wk * 100) + "%"}</span>` +
       `<span class="r ${d == null || Math.abs(d) < 1 ? "muted" : d > 0 ? "up" : "dn"}">${d == null ? "" : Math.abs(d) < 1 ? "=" : (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(0) + "pt"}</span>`;
   };
   return `<div class="card2"><h4><span>Calls : puts</span><span class="muted">open contracts · every strike and expiry · ${fday(h.settle, false)} settle</span></h4>
-    <div class="cpnow">${cpBar(now.concat([null, null]), "wide big")}<div class="cpnl">${cpLab(now)}<span class="muted">${SH() ? "" : `${kf(h.c)} calls vs ${kf(h.p)} puts · `}${Math.round(sh * 100)}% calls</span></div></div>
+    <div class="cpnow">${cpBar(now.concat([null, null]), "wide big")}<div class="cpnl">${cpLab(now)}<span class="muted">${shPair(h.c, h.p) ? "" : `${kf(h.c)} calls vs ${kf(h.p)} puts · `}${Math.round(sh * 100)}% calls</span></div></div>
     <div class="cpg"><span class="muted h">vs</span><span class="muted h">calls' share now · white tick = then</span><span class="muted h r">then</span><span class="muted h r">change</span>
       ${line("1 day", h.back["1"])}${line("5 days", h.back["5"])}${line("10 days", h.back["10"])}</div>
     <div class="cnote">Green = calls' share, red = puts'. A look-back counts only the expiries still open today. One contract = 100 shares, whatever its price.</div></div>`;
@@ -449,8 +452,11 @@ async function renderTop(a) {
 }
 
 function oiCell(r) {
-  if (SH()) return r.fresh == null ? "<span class='muted'>–</span>"
-    : `${r.fresh > 0 ? "+" : r.fresh < 0 ? "−" : ""}${Math.round(Math.abs(r.fresh) * 100)}%<div class="sm">${r.fresh > 0 ? "of it new" : r.fresh < 0 ? "fewer than now" : ""}</div>`;
+  if (SH()) {
+    if (r.fresh == null) return "<span class='muted'>–</span>";
+    const n = Math.round(Math.abs(r.fresh) * 100);
+    return `${!n ? "" : r.fresh > 0 ? "+" : "−"}${n}%<div class="sm">${!n ? "no change" : r.fresh > 0 ? "of it new" : "fewer than now"}</div>`;
+  }
   return (r.add == null ? "<span class='muted'>–</span>" : (r.add >= 0 ? "+" : "−") + Math.abs(r.add).toLocaleString()) +
     `<div class="sm">${r.fresh != null && r.add > 0 ? Math.round(r.fresh * 100) + "% new" : ""}</div>`;
 }
