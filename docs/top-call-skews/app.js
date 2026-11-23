@@ -31,6 +31,20 @@
                  new: 'by the first day any board flagged the name, newest first' };
   const SIZE_DEF = "premium of the call contracts opened in the window (Skew Tracker, OI-confirmed, at each option's closing mid)";
 
+
+
+  const SH = () => !!(D && obj(D.rebuilt).shares);
+  const estDay = () => { const f = obj(D && D.rebuilt).frm; return SH() && str(f) ? f : null; };
+  const EST = () => (estDay() ? ` · a model estimate from the ${day(estDay())} session on` : '');
+  const csp = cs => { const c = Math.round(cs * 100); return [c + '%', (100 - c) + '%']; };
+  const REB_TIP = () => {
+    const src = arr(obj(D && D.rebuilt).src).map(id => srcName(id)).filter(Boolean);
+    return (src.length ? src.join(', ') + ' are read from their copies rebuilt from OCC open interest. ' : 'This board is rebuilt from OCC open interest. ') +
+      'It shows shares where it showed contract counts: the calls’ share of what opened, and the book’s calls : puts. ' +
+      (estDay() ? `Bet size and the main bet’s money are model estimates from the ${day(estDay())} session on (the open-interest rise × a model price from the last stored volatilities). ` : '') +
+      'Bought / sold tags, traded volume and the after-close tape are not rebuilt. A board that is not rebuilt stays on its last day, dimmed, and stops scoring.';
+  };
+
   const QPTS = { bought: 'bought (ask-side buying)', fresh: "flagged on its board's newest day", sold: 'sold (call selling)',
                  puts: 'put flags' };
 
@@ -304,9 +318,11 @@
 
 
   const cpShare = c => c[0] / (c[0] + c[1]);
+  const cpIsSh = c => c[0] + c[1] <= 1.02;
   const cpWk = c => (ok(c[2]) && ok(c[3]) && c[2] + c[3] > 0 ? c[2] / (c[2] + c[3]) : null);
   function cpLab(c) {
-    const sh = cpShare(c), x = sh >= 0.5 ? c[0] / Math.max(c[1], 1) : c[1] / Math.max(c[0], 1), t = x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
+    const sh = cpShare(c), fl = cpIsSh(c) ? 1e-9 : 1, x = sh >= 0.5 ? c[0] / Math.max(c[1], fl) : c[1] / Math.max(c[0], fl);
+    const t = cpIsSh(c) && x >= 99.5 ? '99+' : x >= 9.95 ? x.toFixed(0) : x.toFixed(1);
     return sh >= 0.55 ? `<b class="up">${t}× calls</b>` : sh <= 0.45 ? `<b class="dn">${t}× puts</b>` : `<b class="cpe">${t}× even</b>`;
   }
   function cpBar(c, cls = '') {
@@ -322,6 +338,7 @@
   }
   function cpTip(c) {
     const wk = cpWk(c);
+    if (cpIsSh(c)) return `${Math.round(cpShare(c) * 100)}% of the open contracts are calls (every strike and expiry)` + (wk == null ? '' : ` · a week ago (same expiries) ${Math.round(wk * 100)}% calls`);
     return `${kc(c[0])} calls vs ${kc(c[1])} puts open (every strike and expiry), ${Math.round(cpShare(c) * 100)}% calls` +
       (wk == null ? '' : ` · a week ago (same expiries) ${Math.round(wk * 100)}% calls: calls ${c[0] - c[2] >= 0 ? '+' : M}${kc(Math.abs(c[0] - c[2]))}, puts ${c[1] - c[3] >= 0 ? '+' : M}${kc(Math.abs(c[1] - c[3]))}`);
   }
@@ -384,11 +401,12 @@
     if (str(d.tier) || ok(d.tier)) out.push(['Tier', String(d.tier)]);
     if (ok(d.score)) out.push(['Board score', t1(d.score)]);
     if (ok(d.cO) || ok(d.pO)) out.push(['Opened', `${ok(d.cO) ? kcs(d.cO) + ' calls' : ''}${ok(d.cO) && ok(d.pO) ? ' · ' : ''}${ok(d.pO) ? kcs(d.pO) + ' puts' : ''}`]);
+    else if (ok(d.cs)) out.push(['Opened', `${csp(d.cs)[0]} calls · ${csp(d.cs)[1]} puts (shares of what opened)`]);
     if (ok(d.pct)) out.push(['Share of book', pcu(d.pct) + ` of the name's open contracts (net ${put ? 'put' : 'call'} lean)`]);
     if (ok(d.sk)) out.push(['One-sided', pcu(d.sk)]);
     if (ok(d.prem)) {
       const pw = arr((put ? PREM_PUT : PREM)[src]);
-      out.push(fam === 'skew' ? ['Bet size', `${usd(d.prem)}: the premium of the ${put ? 'put' : 'call'} contracts opened in the window`]
+      out.push(fam === 'skew' ? ['Bet size', `${usd(d.prem)}: the premium of the ${put ? 'put' : 'call'} contracts opened in the window${EST()}`]
         : pw.length ? [pw[0], money(d.prem) + ' ' + pw[1]] : ['Premium', money(d.prem)]);
     }
     if (ok(d.pile)) out.push(['Pile value', money(d.pile) + ' (the whole pile, not new money)']);
@@ -447,7 +465,8 @@
 
 
   function openedOf(r) {
-    const f = obj(r.f), pick = fl => { const d = obj(obj(fl).d); return ok(d.cO) || ok(d.pO) ? { cO: num(d.cO), pO: num(d.pO), pct: num(d.pct), src: obj(fl).src } : null; };
+    const f = obj(r.f), pick = fl => { const d = obj(obj(fl).d); return ok(d.cO) || ok(d.pO) ? { cO: num(d.cO), pO: num(d.pO), pct: num(d.pct), src: obj(fl).src }
+      : ok(d.cs) ? { cO: null, pO: null, cs: num(d.cs), pct: num(d.pct), src: obj(fl).src } : null; };
     let got = pick(f.skew);
     for (const [fm, fl] of famFlags(f)) { if (got) break; got = pick(fl); }
     return got || { cO: null, pO: null, pct: null, src: null };
@@ -458,10 +477,16 @@
   function sizeHTML(r, key) {
 
     if (!ok(r.size)) return key && ok(r.prem) ? `<div class="opa num" title="${esc(PREM_ALT(r))}">${usd(r.prem)}</div>` : '';
-    return `<div class="op3 num${key ? ' key' : ''}" title="${esc(`Bet size ${usd(r.size)}: ${SIZE_DEF}`)}">${usd(r.size)} <span>opened</span></div>`;
+    return `<div class="op3 num${key ? ' key' : ''}" title="${esc(`Bet size ${usd(r.size)}: ${SIZE_DEF}${EST()}`)}">${usd(r.size)} <span>opened</span></div>`;
   }
   function openedHTML(r, cls = '', noSize = false) {
     const o = openedOf(r), key = sizeKey(), sz = noSize ? '' : sizeHTML(r, key);
+    if (o.cO == null && o.pO == null && o.cs != null) {
+      const sr = srcById(o.src), tp = `${csp(o.cs)[0]} of the contracts opened in the window were calls${sr ? ' (' + (sr.name || sr.id) + ')' : ''}` +
+        (o.pct != null ? `: ${pcu(o.pct)} of the name's open contracts` : '');
+      return `<div class="opw ${cls}">${key ? sz : ''}<div class="op1 num" title="${esc(tp)}">${csp(o.cs)[0]} <span class="muted">calls</span> · ${csp(o.cs)[1]} <span class="muted">puts</span></div>` +
+        `<div class="op2" title="${esc(tp)}">${cpBar([o.cs, 1 - o.cs, null, null], 'op')}${o.pct != null ? `<span>${pcu(o.pct)} of book</span>` : ''}</div>${key ? '' : sz}</div>`;
+    }
     if (o.cO == null && o.pO == null) return sz ? `<div class="opw ${cls}">${sz}</div>` : `<span class="muted">${DASH}</span>`;
     const c = o.cO || 0, p = o.pO || 0, src = srcById(o.src);
     const tip = `${kcs(c)} calls and ${kcs(p)} puts opened in the window${src ? ' (' + (src.name || src.id) + ')' : ''}` +
@@ -498,7 +523,7 @@
       bits.push(`${money(c.usd)}: ${cts(c.oc, 'new contract') || 'new contracts'} on this line after the close at its closing mid, not settled yet`);
     } else if (c) {
       bits.push(c.usd > 0 ? `${money(c.usd)} opened in this contract in the window${c.oc > 0 ? ': ' + cts(c.oc, 'contract') : ''} at each ` +
-        "session's closing mid (the Skew Tracker's bet-size way)" : 'nothing opened in this contract in the window');
+        "session's closing mid (the Skew Tracker's bet-size way)" + EST() : 'nothing opened in this contract in the window');
       if (c.rd != null && c.ns != null && c.rd < c.ns) bits.push(`chains on ${c.rd} of ${c.ns} sessions`);
     }
 
@@ -569,7 +594,8 @@
     if (!D) return brand;
     const a = obj(D.asof);
     const sess = [str(a.settle) ? 'OI settle ' + day(a.settle) : '', str(a.close) ? 'prices ' + day(a.close) + ' close' : ''].filter(Boolean);
-    return brand + (sess.length ? `<span class="sess">${sess.join(SEP)}</span>` : '') + builtHTML() + srcBtnHTML();
+    return brand + (sess.length ? `<span class="sess">${sess.join(SEP)}</span>` : '') +
+      (SH() ? `<span class="reb" title="${esc(REB_TIP())}">REBUILT · OCC open interest</span>` : '') + builtHTML() + srcBtnHTML();
   }
   function builtHTML() {
     const t = Date.parse(D.built), age = ok(t) ? (now() - t) / 6e4 : null;
@@ -681,7 +707,7 @@
     const px = ok(n.px) ? `<span title="${esc(priceTip(n))}"><b class="num">${fpx(n.px)}</b>${od ? ` <span class="pdo">${esc(day(od))}</span>` : ''}${ok(n.d1) ? ' ' + chg(n.d1) : ''} <span class="muted">20d</span> ${chg(n.r20)}</span>` : '';
     const ctx = [kg, bz, px].filter(Boolean), key = sizeKey();
 
-    const sz = !key ? '' : ok(r.size) ? `<span class="csz num" title="${esc(`Bet size ${usd(r.size)}: ${SIZE_DEF}`)}">${usd(r.size)}</span>`
+    const sz = !key ? '' : ok(r.size) ? `<span class="csz num" title="${esc(`Bet size ${usd(r.size)}: ${SIZE_DEF}${EST()}`)}">${usd(r.size)}</span>`
       : ok(r.prem) ? `<span class="csz alt num" title="${esc(PREM_ALT(r))}">${usd(r.prem)}</span>` : '';
     return `<div class="card" data-s="${esc(r.s)}" tabindex="0" role="button" aria-label="${esc(r.s + (co ? ', ' + co : '') + ', score ' + (ok(r.sc) ? Math.round(r.sc) : DASH))}">` +
       `<div class="c1"><span class="rk">${x.rk}</span><b class="tk">${esc(r.s)}</b>${utags(n)}<span class="co">${esc(co)}</span>${sz}` +
@@ -774,10 +800,11 @@
       const r = bySym(w.id).get(sym), d = r && obj(r.f).skew ? obj(obj(r.f).skew.d) : null;
       const lab = `<button class="aw${w.id === S.w ? ' on' : ''}" data-w="${esc(w.id)}" title="${esc(spanTxt(w.frm, w.to))}">${esc(w.label || w.id)}</button>`;
       if (!r) return `${lab}<span class="an">not flagged</span>`;
+      if (d && !ok(d.cO) && !ok(d.pO) && ok(d.cs)) return `${lab}<span class="r num">${csp(d.cs)[0]}</span><span class="r num">${csp(d.cs)[1]}</span><span class="r num">${pcu(d.pct)}</span>`;
       if (!d || (!ok(d.cO) && !ok(d.pO))) return `${lab}<span class="an">not on the call list · score ${ok(r.sc) ? Math.round(r.sc) : DASH}</span>`;
       return `${lab}<span class="r num">${kcs(d.cO)}</span><span class="r num">${kcs(d.pO)}</span><span class="r num">${pcu(d.pct)}</span>`;
     });
-    return `<div class="ag"><span></span><span class="h r">Calls opened</span><span class="h r">Puts opened</span><span class="h r">% of book</span>${lines.join('')}</div>`;
+    return `<div class="ag"><span></span><span class="h r">${SH() ? 'Calls’ share' : 'Calls opened'}</span><span class="h r">${SH() ? 'Puts’ share' : 'Puts opened'}</span><span class="h r">% of book</span>${lines.join('')}</div>`;
   }
   function openInHTML(sym) {
     const op = arr(nameOf(sym).op), tabs = OPEN_IN.filter(t => op.includes(t[0]));
@@ -790,7 +817,7 @@
   function contextHTML(sym) {
     const c = cpOf(sym), k = kingOf(sym);
     const cp = '<div class="pk"><div class="pkh"><span>Book calls : puts</span>' + (c ? `<span>${Math.round(cpShare(c) * 100)}% calls</span>` : '') + '</div>' +
-      (c ? `<div class="pkv"><span>${cpLab(c)}</span>${cpMove(c)}</div>${cpBar(c, 'wide')}<div class="pks">${kc(c[0])} calls · ${kc(c[1])} puts open; white tick = a week ago</div>`
+      (c ? `<div class="pkv"><span>${cpLab(c)}</span>${cpMove(c)}</div>${cpBar(c, 'wide')}<div class="pks">${cpIsSh(c) ? 'shares of the open contracts' : `${kc(c[0])} calls · ${kc(c[1])} puts open`}; white tick = a week ago</div>`
         : '<div class="pkv muted">no open-interest data</div>') + '</div>';
     const kg = '<div class="pk"><div class="pkh"><span>King node</span>' + (k && k.pile ? '<span class="pile">pile</span>' : '') + '</div>' +
       (k ? `<div class="pkv"><span><b class="kg">${fk(k.k)}</b> ${ok(k.dist) ? pcs(k.dist) : ''}</span><span class="muted">${k.exp ? expTxt(k.exp) : ''}</span></div>` +

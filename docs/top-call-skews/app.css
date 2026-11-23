@@ -167,6 +167,8 @@ td.c-boards { white-space:normal; line-height:1.15; min-width:180px; padding-top
 .qb.spread, .qb.mixed { background:#2a2440; color:#b9a5ff; } .qb.onebig, .qb.itm, .qb.unwinding { background:#33270f; color:#ffcc80; }
 .qb.roll { background:#2a2e39; color:#c9ccd4; }
 .qb.sold { background:#2c1617; color:#f3a5a3; box-shadow:inset 0 0 0 1px #6b2f2e; }
+
+.reb { display:inline-block; margin-left:8px; padding:0 7px; border:1px solid rgba(245,214,61,.55); border-radius:4px; color:#f5d63d; font-size:10.5px; font-weight:700; letter-spacing:.04em; line-height:18px; white-space:nowrap; cursor:help; }
 .k1 { font-size:12px; white-space:nowrap; } .k1 b { font-weight:600; }
 .k2 { font-size:10.5px; color:var(--sub); margin-top:2px; white-space:nowrap; }
 .pile { display:inline-block; font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--king); border:1px solid #6b5a1c; border-radius:3px; padding:0 3px; margin-left:5px; line-height:12px; vertical-align:1px; }
