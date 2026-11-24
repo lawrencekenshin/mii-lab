@@ -373,12 +373,17 @@
   function rebText() {
     const r = S.board.rebuilt;
     if (!r || !r.frm) return '';
-    const gap = (r.gap || []).map(d2).join(' and ');
-    return `Since the ${d2(r.frm)} close the king node and the Stealth calls come from rebuilt reads (OCC open interest and closing quotes), graded by the same rules as before.` + (gap ? ` ${gap} had no option read and show the last king node before them.` : '');
+    const days = (a) => (a || []).map(d2).join(' and ');
+    let t = `Since the ${d2(r.frm)} close the king node and the Stealth calls come from rebuilt reads (OCC open interest and closing quotes), graded by the same rules as before.`;
+    if ((r.est || []).length) t += ` The king node for ${days(r.est)} is an estimate.`;
+    if ((r.gap || []).length) t += ` ${days(r.gap)} had no option read and show the last king node before them.`;
+    return t;
   }
   function rebTag(day) {
     const r = S.board.rebuilt;
-    if (!r || !r.frm || (day && day < r.frm)) return '';
+    if (!r || !r.frm) return '';
+    if (day && (r.est || []).includes(day)) return `<span class="reb" title="${esc(rebText())}">ESTIMATE</span>`;
+    if (day && day < r.frm) return '';
     return `<span class="reb" title="${esc(rebText())}">REBUILT</span>`;
   }
   function footHTML() {
